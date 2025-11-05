@@ -14,6 +14,7 @@ export class WarriorsAttackStrategy {
         this.attackLoop()
         // this.useMassAggroLoop()
         this.hardShellLoop()
+        this.useWarcryLoop()
     }
 
     public getBot(){
@@ -42,7 +43,6 @@ export class WarriorsAttackStrategy {
             }
             if(this.bot.target && this.bot.canUse("attack")) {
                 if(this.bot.getEntities({withinRange: "attack"}).filter( e=> e.id == this.bot.target).length>0) {
-                    await this.switchWeapons()
                     await this.bot.basicAttack(this.bot.target).catch(ex => console.error(ex))
                 }
             }
@@ -53,6 +53,15 @@ export class WarriorsAttackStrategy {
         finally {
             setTimeout(this.attackLoop, Math.max(1, this.bot.getCooldown("attack")))
         }
+    }
+
+    private async useWarcryLoop() {
+        if(this.bot.isOnCooldown("warcry")) return setTimeout(this.useWarcryLoop, this.bot.getCooldown("warcry"))
+        if(!this.bot.canUse("warcry") || this.bot.smartMoving) return setTimeout(this.useWarcryLoop, 2000)
+        if(this.bot.s.warcry) return setTimeout(this.useWarcryLoop, this.bot.s.warcry.ms)
+
+        await this.useWarcryLoop().catch(ex => console.warn(ex))
+        return setTimeout(this.useWarcryLoop, this.bot.getCooldown("warcry"))
     }
 
     private async switchWeapons(cleave? : boolean, stomp?: boolean) {
@@ -67,7 +76,7 @@ export class WarriorsAttackStrategy {
                     console.error(ex)
                 }
             }
-            let cleave_weapon = Items.PERSONAL_ITEMS[this.bot.name as keyof typeof Items.PERSONAL_ITEMS].cleave
+            let cleave_weapon = Items.WariousItems.cleave
             let cleave_item_idx = this.bot.locateItem(cleave_weapon.name as ItemName, [], {level: cleave_weapon.level})
             this.bot.equip(cleave_item_idx).catch(ex => console.error(ex))
         }
@@ -82,7 +91,7 @@ export class WarriorsAttackStrategy {
                     console.error(ex)
                 }
             }
-            let stomp_item = Items.PERSONAL_ITEMS[this.bot.name as keyof typeof Items.PERSONAL_ITEMS].stomp
+            let stomp_item = Items.WariousItems.stomp
             let stop_item_idx = this.bot.locateItem(stomp_item.name as ItemName, [], {level: stomp_item.level})
             this.bot.equip(stop_item_idx).catch(ex => console.error(ex))
         }
@@ -92,12 +101,12 @@ export class WarriorsAttackStrategy {
             let offhand_item
             let offhand_idx = -1
             if(CF.shouldUseMassWeapon(this.bot)) {
-                mainhand_item = Items.PERSONAL_ITEMS[this.bot.name as keyof typeof Items.PERSONAL_ITEMS].solo_mainhand
-                offhand_item = Items.PERSONAL_ITEMS[this.bot.name as keyof typeof Items.PERSONAL_ITEMS].solo_offhand
+                mainhand_item = Items.WariousItems.solo_mainhand
+                offhand_item = Items.WariousItems.solo_offhand
             }
             else {
-                mainhand_item = Items.PERSONAL_ITEMS[this.bot.name as keyof typeof Items.PERSONAL_ITEMS].mass_mainhand
-                offhand_item = Items.PERSONAL_ITEMS[this.bot.name as keyof typeof Items.PERSONAL_ITEMS].mass_offhand
+                mainhand_item = Items.WariousItems.mass_mainhand
+                offhand_item = Items.WariousItems.mass_offhand
             }
             if(this.bot.slots.mainhand?.name == mainhand_item.name as ItemName && this.bot.slots.offhand?.name == offhand_item.name) return
             mainhand_idx = this.bot.locateItem(mainhand_item.name as ItemName, [], {level: mainhand_item.level})
@@ -112,7 +121,7 @@ export class WarriorsAttackStrategy {
         if(!CF.shouldUseMassWeapon(this.bot)) return
         await this.switchWeapons(true)
         await this.bot.cleave().catch(ex => console.error(ex))
-
+        await this.switchWeapons()
     }
 
     private async useStomp() {
@@ -135,6 +144,7 @@ export class WarriorsAttackStrategy {
         if(CF.calculate_hps(this.bot)/dps < 2) {
             await this.switchWeapons(false, true)
             await this.bot.stomp().catch(ex => console.error(ex))
+            await this.switchWeapons()
         }
     }
 
@@ -151,6 +161,16 @@ export class WarriorsAttackStrategy {
         await this.bot.agitate().catch(ex => console.error(ex))
 
         setTimeout(this.useMassAggroLoop, this.bot.getCooldown("agitate"))
+    }
+
+    public async useMassAggro() {
+        if(this.bot.isOnCooldown("scare")) return setTimeout(this.useMassAggroLoop, this.bot.getCooldown("scare"))
+        if(this.bot.smartMoving) return setTimeout(this.useMassAggroLoop, 2000)
+        if(!CF.shouldUseMassWeapon(this.bot)) return setTimeout(this.useMassAggroLoop, 2000)
+        if(this.bot.getEntities({hasTarget: false}).length<2) return setTimeout(this.useMassAggroLoop, 2000)
+
+        await this.bot.agitate().catch(ex => console.error(ex))
+
     }
 
     private async hardShellLoop() {

@@ -1,6 +1,8 @@
 import * as ALClient from "alclient"
 import { WarriorsAttackStrategy } from "./classes_logic/warriors_attack_strategy"
 import { PriestsAttackStrategy } from "./classes_logic/priests_attack_strategy"
+import { RangerAttackStrategy } from "./classes_logic/ranger_attack_strategy"
+import { MageAttackStrategy } from "./classes_logic/mage_attack_strategy"
 
 
 var active_players = []
@@ -18,8 +20,8 @@ const my_characters = {
 
 var class_functions = {
     warrior: { start: ALClient.Game.startWarrior, attackStrategy: WarriorsAttackStrategy},
-    ranger: { start: ALClient.Game.startRanger,},
-    mage: { start: ALClient.Game.startMage, },
+    ranger: { start: ALClient.Game.startRanger, attackStrategy: RangerAttackStrategy},
+    mage: { start: ALClient.Game.startMage, attackStrategy: MageAttackStrategy},
     merchant: { start: ALClient.Game.startMerchant, },
     priest: { start: ALClient.Game.startPriest, attackStrategy: PriestsAttackStrategy},
     rogue: { start: ALClient.Game.startRogue, }

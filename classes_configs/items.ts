@@ -10,8 +10,7 @@ export const DONT_SEND_ITEMS = [
 ]
 
 
-export const PERSONAL_ITEMS = {
-    Warious: {
+export var WariousItems: {
         cleave: {name: "scythe", level: 5},
         stomp: {name: "basher", level: 7},
         mass_mainhand: {name: "ololipop", level: 9},
@@ -20,14 +19,16 @@ export const PERSONAL_ITEMS = {
         solo_offhand: {name: "fireblade", level: 9},
         elixir: "pumpkinspice",
         main_orb: {name: "test_orb", level: 0},
-    },
-    arMAGEdon: {
+    }
+
+export var arMAGEdonItems: {
         solo_mainhand: {name: "firestaff", level: 9},
         solo_offhand: {name: "exoarm", level: 1},
         mass_mainhand: {name: "gstaff", level: 6},
         elixir: "pumpkinspice"
-    },
-    Archealer: {
+    }
+
+export var ArchealerItems: {
         elixir: "elixirluck",
         luck_offhand: {name: "mshield", level: 7},
         armor_offhand: {name: "exoarm", level: 1},
@@ -56,4 +57,10 @@ export const PERSONAL_ITEMS = {
             gloves: {name: "handofmidas", level: 4}
         }
     }
+
+export var aRanDonDon: {
+    mass_mainhand: {name: "pouchbow", level: 11},
+    mass_offhand: {name: "alloyquiver", level: 8},
+    solo_mainhand: {name: "crossbow", level: 7},
+    solo_offhand: {name: "t2quiver", level: 8}
 }

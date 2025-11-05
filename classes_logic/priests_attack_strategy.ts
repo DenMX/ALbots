@@ -9,6 +9,8 @@ export class PriestsAttackStrategy {
         this.bot = bot
         this.attackOrHealLoop()
         this.useZap()
+        this.useDarkBlessingLoop()
+        this.useCurseLoop()
     }
 
     public getBot(){
@@ -35,7 +37,16 @@ export class PriestsAttackStrategy {
         let target = this.bot.getTargetEntity()
         if(target && Tools.distance(target, this.bot)<= this.bot.range) {
             await this.bot.basicAttack(target.id).catch( ex => console.error(ex))
+            return setTimeout(this.attackOrHealLoop, this.bot.getCooldown("attack"))
         }
+        return setTimeout(this.attackOrHealLoop, Math.min(this.bot.frequency, this.bot.getCooldown("attack")))
+    }
+
+    private async useCurseLoop() {
+        if(!this.bot.target || this.bot.smartMoving) return setTimeout(this.useCurseLoop, 2000)
+        if(this.bot.getCooldown("curse")) return setTimeout(this.useCurseLoop, this.bot.getCooldown("curse"))
+        await this.bot.curse(this.bot.target).catch(ex => console.warn(ex))
+        return setTimeout(this.useCurseLoop, this.bot.getCooldown("curse"))
     }
 
     private whoNeedsHeal()  {
@@ -79,50 +90,29 @@ export class PriestsAttackStrategy {
         return this.bot.partyHeal()
     }
 
+    private async useDarkBlessingLoop() {
+        if(this.bot.isOnCooldown("darkblessing")) return setTimeout(this.useDarkBlessingLoop, this.bot.getCooldown("darkblessing"))
+        if(!this.bot.canUse("darkblessing") || this.bot.smartMoving) return setTimeout(this.useDarkBlessingLoop, 2000)
+        if(this.bot.s.darkblessing) return setTimeout(this.useDarkBlessingLoop, this.bot.s.darkblessing.ms)
+
+        await this.useDarkBlessingLoop().catch(ex => console.warn(ex))
+        return setTimeout(this.useDarkBlessingLoop, this.bot.getCooldown("darkblessing"))
+    }
+
     private async useZap() {
         if(!this.bot.canUse("zap")) return setTimeout(this.useZap, Math.max(50, this.bot.getCooldown("zap")))
 
         let dps = 0
         let hps = this.bot.heal * this.bot.frequency
         for(let mob of this.bot.getEntities({targetingMe: true, targetingPartyMember: true})) {
-            switch (mob.damage_type) {
-                case "physical": 
-                    dps += (mob.attack * Tools.damage_multiplier(this.bot.armor)) * mob.frequency
-                    break;
-                case "magical":
-                    dps += (mob.attack * Tools.damage_multiplier(this.bot.resistance)) * mob.frequency
-                    break;
-                case "pure":
-                    dps += mob.attack * mob.frequency
-                    break;
-                default:
-                    break;
-            }
+            dps+= CF.calculate_monster_dps(this.bot, mob)
             
         }
         let MobsWithoutTargetingParty = this.bot.getEntities({targetingMe: false, targetingPartyMember:false})
         
         if(MobsWithoutTargetingParty.length>0 && dps<hps) {
             for( let mob of MobsWithoutTargetingParty) {
-                if(mob.damage_type == "physical") {
-                    if (dps + (mob.attack * Tools.damage_multiplier(this.bot.armor)) * this.bot.frequency < hps) {
-                        await this.bot.zapperZap(mob.id).catch(er => console.warn(er))
-                        return setTimeout(this.useZap, Math.max(1, this.bot.getCooldown("zapperzap")))
-                    }
-                }
-                else if (mob.damage_type == "magical") {
-                    if (dps + (mob.attack * Tools.damage_multiplier(this.bot.resistance)) * this.bot.frequency < hps) {
-                        await this.bot.zapperZap(mob.id).catch(er => console.warn(er))
-                        return setTimeout(this.useZap, Math.max(1, this.bot.getCooldown("zapperzap")))
-                    }
-                }
-                else if (mob.damage_type == "pure") {
-                    if (dps + mob.attack * this.bot.frequency < hps) {
-                        await this.bot.zapperZap(mob.id).catch(er => console.warn(er))
-                        return setTimeout(this.useZap, Math.max(1, this.bot.getCooldown("zapperzap")))
-                    }
-                }
-                else {
+                if(hps > dps + CF.calculate_monster_dps(this.bot, mob)) {
                     await this.bot.zapperZap(mob.id).catch(er => console.warn(er))
                     return setTimeout(this.useZap, Math.max(1, this.bot.getCooldown("zapperzap")))
                 }

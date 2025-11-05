@@ -1,4 +1,4 @@
-import {Entity, PingCompensatedCharacter, Tools, Game} from "alclient"
+import {Entity, PingCompensatedCharacter, Tools, Game, SkillName} from "alclient"
 
 export function calculate_monsters_dps (bot: PingCompensatedCharacter) {
     let dps = 0
@@ -18,17 +18,20 @@ export function calculate_monsters_dps (bot: PingCompensatedCharacter) {
 }
 
 export function calculate_monster_dps(bot: PingCompensatedCharacter, mob: Entity) {
-    if(!mob) return
+    if(!mob || !bot) return 0
     if(mob.damage_type == "physical") {
         return (mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing)) * (mob.frequency/100)
     }
     else if(mob.damage_type == "magical"){
         return (mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing)) * (mob.frequency/100)
     }
-    else {
+    else if(mob.damage_type == "pure"){
         return mob.attack * (mob.frequency/100)
     }
+    return 0
 }
+
+
 
 export function calculate_hps(bot: PingCompensatedCharacter, mobsCount?: number) {
     let default_hps = 250
@@ -64,7 +67,15 @@ export function calculate_my_dps(bot: PingCompensatedCharacter) {
 }
 
 export function shouldUseMassWeapon(bot: PingCompensatedCharacter) {
-        if(bot.getEntities({targetingPartyMember: true, targetingMe: true}).length>1) return true
-        if(calculate_hps(bot) - calculate_monsters_dps(bot) > 0)
-        return false
-    }
+    if(bot.getEntities({targetingPartyMember: true, targetingMe: true}).length>1) return true
+    if(calculate_hps(bot) - calculate_monsters_dps(bot) > 0)
+    return false
+}
+
+export function isInRange(entity: Entity, bot: PingCompensatedCharacter, skill?: SkillName) {
+    if(!entity || !bot) return false
+    if(entity.map != bot.map) return false
+    if(!skill) skill = "attack"
+    if(Tools.distance(entity, bot) < bot.G.skills[skill].range!) return true
+    return false
+}
