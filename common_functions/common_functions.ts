@@ -31,12 +31,24 @@ export function calculate_monster_dps(bot: PingCompensatedCharacter, mob: Entity
     return 0
 }
 
+export function calculate_ttk(mob: Entity, bot: PingCompensatedCharacter) {
+    if(!mob || !bot) return 0
+    switch(bot.damage_type) {
+        case "physical":
+            return mob.hp / ((bot.attack * 0.9 * Tools.damage_multiplier(mob.armor-bot.apiercing)) * (bot.frequency/100))
+        case "magical":
+            return mob.hp / ((bot.attack * 0.9 * Tools.damage_multiplier(mob.resistance-bot.rpiercing)) * (bot.frequency/100))
+        default:
+            return 0
+    }
+}
+
 
 
 export function calculate_hps(bot: PingCompensatedCharacter, mobsCount?: number) {
     let default_hps = 250
     let total_hps = default_hps
-    if(bot.lifesteal>0) {
+    if(bot.lifesteal>0 && mobsCount && mobsCount > 0) {
         // take 90% of dmg apply lifesteal and frequency
         total_hps += (calculate_my_dps(bot) * bot.lifesteal/100) * bot.getEntities().length
     }

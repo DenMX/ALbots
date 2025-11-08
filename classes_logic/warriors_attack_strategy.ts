@@ -33,7 +33,7 @@ export class WarriorsAttackStrategy {
     async attackLoop() {
         if( !this.bot.getTargetEntity()) return setTimeout(this.attackLoop, 100)
         if( this.bot.isOnCooldown("scare") && this.bot.getEntities({targetingMe: true, targetingPartyMember:true}).length<1) return setTimeout(this.attackLoop, this.bot.getCooldown("scare"))
-
+        if(!this.bot.getTargetEntity().target && CF.calculate_monster_dps(this.bot, this.bot.getTargetEntity())/CF.calculate_hps(this.bot) >=2) return setTimeout(this.attackLoop, 500)
         try {
             if(!this.bot.smartMoving && this.bot.canUse("stomp", {ignoreEquipped: true})) {
                 await this.useStomp()
@@ -77,7 +77,7 @@ export class WarriorsAttackStrategy {
                 }
             }
             let cleave_weapon = Items.WariousItems.cleave
-            let cleave_item_idx = this.bot.locateItem(cleave_weapon.name as ItemName, [], {level: cleave_weapon.level})
+            let cleave_item_idx = this.bot.locateItem(cleave_weapon!.name as ItemName, [], {level: cleave_weapon!.level})
             this.bot.equip(cleave_item_idx).catch(ex => console.error(ex))
         }
         else if(stomp) {
@@ -92,7 +92,7 @@ export class WarriorsAttackStrategy {
                 }
             }
             let stomp_item = Items.WariousItems.stomp
-            let stop_item_idx = this.bot.locateItem(stomp_item.name as ItemName, [], {level: stomp_item.level})
+            let stop_item_idx = this.bot.locateItem(stomp_item!.name as ItemName, [], {level: stomp_item!.level})
             this.bot.equip(stop_item_idx).catch(ex => console.error(ex))
         }
         else {
@@ -108,9 +108,9 @@ export class WarriorsAttackStrategy {
                 mainhand_item = Items.WariousItems.mass_mainhand
                 offhand_item = Items.WariousItems.mass_offhand
             }
-            if(this.bot.slots.mainhand?.name == mainhand_item.name as ItemName && this.bot.slots.offhand?.name == offhand_item.name) return
-            mainhand_idx = this.bot.locateItem(mainhand_item.name as ItemName, [], {level: mainhand_item.level})
-            mainhand_idx = this.bot.locateItem(mainhand_item.name as ItemName, [], {level: mainhand_item.level})
+            if(this.bot.slots.mainhand?.name == mainhand_item!.name as ItemName && this.bot.slots.offhand?.name == offhand_item!.name) return
+            mainhand_idx = this.bot.locateItem(mainhand_item!.name as ItemName, [], {level: mainhand_item!.level})
+            mainhand_idx = this.bot.locateItem(mainhand_item!.name as ItemName, [], {level: mainhand_item!.level})
             this.bot.equipBatch([{num: mainhand_idx, slot: "mainhand"}, {num: offhand_idx, slot: "offhand"}]).catch(ex => console.error(ex))
         }
     }

@@ -3,6 +3,7 @@ import { WarriorsAttackStrategy } from "./classes_logic/warriors_attack_strategy
 import { PriestsAttackStrategy } from "./classes_logic/priests_attack_strategy"
 import { RangerAttackStrategy } from "./classes_logic/ranger_attack_strategy"
 import { MageAttackStrategy } from "./classes_logic/mage_attack_strategy"
+import { RogueAttackStrategy } from "./classes_logic/rogue_attack_strategy"
 
 
 var active_players = []
@@ -24,7 +25,7 @@ var class_functions = {
     mage: { start: ALClient.Game.startMage, attackStrategy: MageAttackStrategy},
     merchant: { start: ALClient.Game.startMerchant, },
     priest: { start: ALClient.Game.startPriest, attackStrategy: PriestsAttackStrategy},
-    rogue: { start: ALClient.Game.startRogue, }
+    rogue: { start: ALClient.Game.startRogue, attackStrategy: RogueAttackStrategy}
 }
 
 run()

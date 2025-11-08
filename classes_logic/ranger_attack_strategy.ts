@@ -11,11 +11,14 @@ export class RangerAttackStrategy {
         this.basicAttackLoop()
         this.useSupershotLoop()
         this.useMarkLoop()
+        this.changeWeapon()
     }
 
     private async basicAttackLoop() {
 
         if(this.bot.canUse("attack")) return setTimeout(this.basicAttackLoop, this.bot.frequency)
+        if(!this.bot.target) return setTimeout(this.basicAttackLoop, 500)
+        if(!this.bot.getTargetEntity().target && CF.calculate_monster_dps(this.bot, this.bot.getTargetEntity())/CF.calculate_hps(this.bot) >=2) return setTimeout(this.basicAttackLoop, 500)
         
         if(this.bot.getEntities({targetingMe: true, targetingPartyMember: true}).length < 1 && this.bot.isOnCooldown("scare")) return setTimeout(this.basicAttackLoop, this.bot.getCooldown("scare"))
         
@@ -60,26 +63,26 @@ export class RangerAttackStrategy {
         let needChangeMainhand = false
         let needChangeOffhand = false
         if(this.bot.getEntities({targetingMe: true, targetingPartyMember: true}).length>1) {
-            if(this.bot.slots.mainhand?.name != Items.aRanDonDon.mass_mainhand.name) needChangeMainhand = true
-            if(this.bot.slots.offhand?.name != <ItemName>(Items.aRanDonDon.mass_offhand).name) needChangeOffhand = true
+            if(this.bot.slots.mainhand?.name != Items.aRanDonDon.mass_mainhand!.name) needChangeMainhand = true
+            if(this.bot.slots.offhand?.name != Items.aRanDonDon.mass_offhand!.name) needChangeOffhand = true
             let equipBatch : {num: number, slot: SlotType}[] = []
             for( let i = 0; i< this.bot.items.length; i++) {
                 let item = this.bot.items[i]
                 if(!item) continue
-                if(item.name == Items.aRanDonDon.mass_mainhand.name && item.level == Items.aRanDonDon.mass_mainhand.level) equipBatch.push({num: i, slot: "mainhand"})
-                if(item.name == <ItemName>(Items.aRanDonDon.mass_offhand).name && item.level == Items.aRanDonDon.mass_offhand.level) equipBatch.push({num: i, slot: "offhand"})
+                if(item.name == Items.aRanDonDon.mass_mainhand!.name && item.level == Items.aRanDonDon.mass_mainhand!.level) equipBatch.push({num: i, slot: "mainhand"})
+                if(item.name == Items.aRanDonDon.mass_offhand!.name && item.level == Items.aRanDonDon.mass_offhand!.level) equipBatch.push({num: i, slot: "offhand"})
             }
             await this.bot.equipBatch(equipBatch)
         }
         else {
-            if(this.bot.slots.mainhand?.name != Items.aRanDonDon.solo_mainhand.name) needChangeMainhand = true
-            if(this.bot.slots.offhand?.name != Items.aRanDonDon.solo_offhand.name) needChangeOffhand = true
+            if(this.bot.slots.mainhand?.name != Items.aRanDonDon.solo_mainhand!.name) needChangeMainhand = true
+            if(this.bot.slots.offhand?.name != Items.aRanDonDon.solo_offhand!.name) needChangeOffhand = true
             let equipBatch : {num: number, slot: SlotType}[] = []
             for( let i = 0; i< this.bot.items.length; i++) {
                 let item = this.bot.items[i]
                 if(!item) continue
-                if(item.name == Items.aRanDonDon.solo_mainhand.name && item.level == Items.aRanDonDon.solo_mainhand.level) equipBatch.push({num: i, slot: "mainhand"})
-                if(item.name == Items.aRanDonDon.solo_offhand.name && item.level == Items.aRanDonDon.solo_offhand.level) equipBatch.push({num: i, slot: "offhand"})
+                if(item.name == Items.aRanDonDon.solo_mainhand!.name && item.level == Items.aRanDonDon.solo_mainhand!.level) equipBatch.push({num: i, slot: "mainhand"})
+                if(item.name == Items.aRanDonDon.solo_offhand!.name && item.level == Items.aRanDonDon.solo_offhand!.level) equipBatch.push({num: i, slot: "offhand"})
             }
             await this.bot.equipBatch(equipBatch)
         }

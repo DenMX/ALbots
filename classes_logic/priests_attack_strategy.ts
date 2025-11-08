@@ -35,6 +35,7 @@ export class PriestsAttackStrategy {
         }
         if(this.bot.isOnCooldown("attack")) return setTimeout(this.attackOrHealLoop, this.bot.getCooldown("attack"))
         let target = this.bot.getTargetEntity()
+        if(!target.target && CF.calculate_monster_dps(this.bot, target)/CF.calculate_hps(this.bot) >=2) return setTimeout(this.attackOrHealLoop, 500)
         if(target && Tools.distance(target, this.bot)<= this.bot.range) {
             await this.bot.basicAttack(target.id).catch( ex => console.error(ex))
             return setTimeout(this.attackOrHealLoop, this.bot.getCooldown("attack"))
