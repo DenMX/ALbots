@@ -1,6 +1,6 @@
 import { Priest, ItemName, Tools, Player, Game} from "alclient"
-import * as Items from "../classes_configs/items.ts"
-import * as CF from "../common_functions/common_functions.ts"
+import * as Items from "../classes_configs/items"
+import * as CF from "../../src/common_functions/common_functions"
 
 export class PriestsAttackStrategy {
 
@@ -63,6 +63,7 @@ export class PriestsAttackStrategy {
     public async pullMobsFromParty() {
         let mobs_targeting_party = this.bot.getEntities({targetingPartyMember: true, targetingMe: false})
         if(mobs_targeting_party.length<1) return setTimeout(this.pullMobsFromParty, 1000)
+        if(mobs_targeting_party.filter( e=> e.abilities.stone)) return
         let players : Map<string, number> = new Map()
         let player_with_more_mobs = 'null'
         for (let pm of this.bot.partyData.list) {

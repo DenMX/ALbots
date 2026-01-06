@@ -1,5 +1,5 @@
 import {Tools, Game, Ranger, SkillName, ItemName, ItemSentGRDataObject, SlotType} from "alclient"
-import * as CF from "../common_functions/common_functions"
+import * as CF from "../../src/common_functions/common_functions"
 import * as Items from "../classes_configs/items"
 
 export class RangerAttackStrategy {
@@ -16,38 +16,38 @@ export class RangerAttackStrategy {
 
     private async basicAttackLoop() {
 
-        if(this.bot.canUse("attack")) return setTimeout(this.basicAttackLoop, this.bot.frequency)
+        if(!this.bot.canUse("attack")) return setTimeout(this.basicAttackLoop, this.bot.frequency)
         if(!this.bot.target) return setTimeout(this.basicAttackLoop, 500)
         if(!this.bot.getTargetEntity().target && CF.calculate_monster_dps(this.bot, this.bot.getTargetEntity())/CF.calculate_hps(this.bot) >=2) return setTimeout(this.basicAttackLoop, 500)
         
         if(this.bot.getEntities({targetingMe: true, targetingPartyMember: true}).length < 1 && this.bot.isOnCooldown("scare")) return setTimeout(this.basicAttackLoop, this.bot.getCooldown("scare"))
         
-        let targets = this.bot.getEntities({targetingPartyMember: true}).filter( e => CF.isInRange(e, this.bot))
+        let targets = this.bot.getEntities({targetingPartyMember: true, withinRange: "attack"})
         
-        if(targets.length>3) {
+        if(targets.length>3 && this.bot.canUse("5shot")) {
             await this.bot.fiveShot(targets[0].id, targets[1].id, targets[2].id, targets[3].id, targets[4].id).catch( ex => console.warn(ex))
             return setTimeout(this.basicAttackLoop, this.bot.getCooldown("attack"))
         }
-        else if(targets.length>1) {
+        else if(targets.length>1 && this.bot.canUse("3shot")) {
             await this.bot.threeShot(targets[0].id, targets[1].id, targets[2].id).catch( ex => console.warn(ex))
             return setTimeout(this.basicAttackLoop, this.bot.getCooldown("attack"))
         }
-        else if(this.bot.getEntities({targetingMe: true}).length>3) {
+        else if(this.bot.getEntities({targetingMe: true}).length>3 && this.bot.canUse("5shot")) {
             targets = this.bot.getEntities({targetingMe: true})
             await this.bot.fiveShot(targets[0].id, targets[1].id, targets[2].id, targets[3].id, targets[4].id).catch( ex => console.warn(ex))
             return setTimeout(this.basicAttackLoop, this.bot.getCooldown("attack"))
         }
-        else if(this.bot.getEntities({targetingMe: true}).length>1) {
+        else if(this.bot.getEntities({targetingMe: true}).length>1 && this.bot.canUse("3shot"))  {
             targets = this.bot.getEntities({targetingMe: true})
             await this.bot.threeShot(targets[0].id, targets[1].id, targets[2].id).catch( ex => console.warn(ex))
             return setTimeout(this.basicAttackLoop, this.bot.getCooldown("attack"))
         }
-        else if(this.bot.getEntities({canKillInOneShot: "5shot"}).length>3) {
+        else if(this.bot.getEntities({canKillInOneShot: "5shot"}).length>3 && this.bot.canUse("5shot")) {
             targets = this.bot.getEntities({canKillInOneShot: "5shot"})
             await this.bot.fiveShot(targets[0].id, targets[1].id, targets[2].id, targets[3].id, targets[4].id).catch( ex => console.warn(ex))
             return setTimeout(this.basicAttackLoop, this.bot.getCooldown("attack"))
         }
-        else if(this.bot.getEntities({canKillInOneShot: "3shot"}).length>1) {
+        else if(this.bot.getEntities({canKillInOneShot: "3shot"}).length>1 && this.bot.canUse("3shot")) {
             targets = this.bot.getEntities({canKillInOneShot: "3shot"})
             await this.bot.threeShot(targets[0].id, targets[1].id, targets[2].id).catch( ex => console.warn(ex))
             return setTimeout(this.basicAttackLoop, this.bot.getCooldown("attack"))

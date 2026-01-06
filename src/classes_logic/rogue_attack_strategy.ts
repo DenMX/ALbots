@@ -1,5 +1,5 @@
 import { Rogue, Game } from "alclient"
-import * as CF from "../common_functions/common_functions"
+import * as CF from "../../src/common_functions/common_functions"
 
 export class RogueAttackStrategy {
 

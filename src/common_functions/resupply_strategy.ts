@@ -5,23 +5,29 @@ export class ResuplyStrategy {
 
     private bot: PingCompensatedCharacter
 
+    private active_bots: PingCompensatedCharacter[]
+
     //POTS
     private MPOTS_CAP = 9000
     private HPOTS_CAP = 5000
-    //SCROLLS
-    private SCROLL0_CAP = 100
-    private SCROLL1_CAP = 20
-    private SCROLL2_CAP = 2
-    private CSCROLL0_CAP = 20
-    private CSCROLL1_CAP = 5
-    private CSCROLL2_CAP = 0
+
+    private scrolls_cap: Map<ItemName,number> = new Map([
+        ["scroll0", 500],
+        ["scroll1", 50],
+        ["scroll2", 10],
+        ["cscroll0", 200],
+        ["cscroll1", 50],
+        ["cscroll2", 5]
+    ])
+   
 
     private ressuplyFunction: Function[] = [
         this.resupplyPots,
         this.usePotionsLoop,
         this.scareLoop, 
-        this.useElixirsLoop,
-        this.checkTomeOfProtection
+        // this.useElixirsLoop,
+        this.checkTomeOfProtection,
+        this.resuplyScrolls
     ]
 
     constructor (bot: PingCompensatedCharacter) {
@@ -31,6 +37,18 @@ export class ResuplyStrategy {
         }
         bot.socket.on("death", this.respawnStrat)
         
+    }
+
+    protected getBot() : PingCompensatedCharacter {
+        return this.bot
+    }
+
+    protected getActiveBots() : PingCompensatedCharacter[] {
+        return this.active_bots
+    }
+
+    public async setActiveBots(bots: PingCompensatedCharacter[]) {
+        this.active_bots = bots;
     }
 
     private async respawnStrat() {
@@ -90,39 +108,57 @@ export class ResuplyStrategy {
         return setTimeout(this.usePotionsLoop, Math.max(500,this.bot.getCooldown("regen_hp")))
     }
 
-    private async resupplyPots(bot: PingCompensatedCharacter) {
-        let hpot = bot.items[bot.locateItem("hpot1")]?.q || 0
-        let mpot = bot.items[bot.locateItem("mpot1")]?.q || 0
-        if(bot.locateItem("computer") >= 0) {
-            if(this.HPOTS_CAP > hpot) await bot.buy("hpot1", this.HPOTS_CAP - hpot).catch(ex => console.warn(ex))
-            if(this.MPOTS_CAP > mpot) await bot.buy("mpot1", this.MPOTS_CAP - mpot).catch(ex => console.warn(ex))
+    private async resupplyPots() {
+        let hpot = this.bot.items[this.bot.locateItem("hpot1")]?.q || 0
+        let mpot = this.bot.items[this.bot.locateItem("mpot1")]?.q || 0
+        if(this.bot.locateItem("computer") >= 0) {
+            if(this.HPOTS_CAP > hpot) await this.bot.buy("hpot1", this.HPOTS_CAP - hpot).catch(ex => console.warn(ex))
+            if(this.MPOTS_CAP > mpot) await this.bot.buy("mpot1", this.MPOTS_CAP - mpot).catch(ex => console.warn(ex))
         }
         else {
             if(mpot < 100) {
-                await bot.smartMove("main")
-                await bot.buy("hpot1", this.HPOTS_CAP - hpot).catch(ex => console.warn(ex))
-                await bot.buy("mpot1", this.MPOTS_CAP - mpot).catch(ex => console.warn(ex))
+                await this.bot.smartMove("main")
+                await this.bot.buy("hpot1", this.HPOTS_CAP - hpot).catch(ex => console.warn(ex))
+                await this.bot.buy("mpot1", this.MPOTS_CAP - mpot).catch(ex => console.warn(ex))
             }
         }
-        return setTimeout(() => {this.resupplyPots(bot)}, 1000)
+        return setTimeout(() => {this.resupplyPots()}, 5000)
     }
 
-    private async scareLoop(bot: PingCompensatedCharacter) {
-        if(bot.isOnCooldown("scare")) return setTimeout(this.scareLoop, bot.getCooldown("scare"))
-        if(bot.hp < bot.max_hp * 0.4) {
-            if(bot.slots.orb?.name != "jacko") {
-                let cur_orb = bot.slots.orb
-                let jacko_idx = bot.locateItem("jacko")
+    private async resuplyScrolls() {
+        if(this.bot.ctype != "merchant") return
+        let scrollsCount: ItemName[] =[
+            "scroll0",
+            "scroll1",
+            "scroll2",
+            "cscroll0",
+            "cscroll1",
+            "cscroll2"
+        ]
+
+        scrollsCount.forEach( async (e) => {
+            let scroll_count =this.bot.countItem(e as ItemName)
+            if(scroll_count< this.scrolls_cap[e] && this.bot.canBuy(e)) await this.bot.buy(e,this.scrolls_cap[e]-scroll_count)
+        
+        })
+    }
+
+    private async scareLoop() {
+        if(this.bot.isOnCooldown("scare")) return setTimeout(this.scareLoop, this.bot.getCooldown("scare"))
+        if(this.bot.hp < this.bot.max_hp * 0.4) {
+            if(this.bot.slots.orb?.name != "jacko") {
+                let cur_orb = this.bot.slots.orb
+                let jacko_idx = this.bot.locateItem("jacko")
                 if(jacko_idx>=0) {
-                    await bot.equip(jacko_idx).catch(ex => console.warn(ex))
-                    await bot.scare().catch(ex => console.warn(ex))
-                    await bot.equip(bot.locateItem(cur_orb!.name, undefined, {returnHighestLevel: true})).catch(ex => console.warn(ex))
-                    return setTimeout(this.scareLoop, bot.getCooldown("scare"))
+                    await this.bot.equip(jacko_idx).catch(ex => console.warn(ex))
+                    await this.bot.scare().catch(ex => console.warn(ex))
+                    await this.bot.equip(this.bot.locateItem(cur_orb!.name, undefined, {returnHighestLevel: true})).catch(ex => console.warn(ex))
+                    return setTimeout(this.scareLoop, this.bot.getCooldown("scare"))
                 }
             }
             else {
-                await bot.scare()
-                return setTimeout(this.scareLoop, bot.getCooldown("scare"))
+                await this.bot.scare()
+                return setTimeout(this.scareLoop, this.bot.getCooldown("scare"))
             }
         }
         return setTimeout(this.scareLoop, 1000)

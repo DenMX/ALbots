@@ -4,6 +4,7 @@ export const DONT_SEND_ITEMS = [
     "tracker", 
     "computer", 
     "supercomputer", 
+    "xptome",
     "hpot1", 
     "mpot1", 
     "luckbooster", 
@@ -29,14 +30,14 @@ export type ItemsConfig = {
 
 
 export var WariousItems: ItemsConfig = {
-        cleave: {name: "scythe", level: 5},
-        stomp: {name: "basher", level: 7},
+        cleave: {name: "bataxe", level: 8},
+        stomp: {name: "basher", level: 8},
         mass_mainhand: {name: "ololipop", level: 9},
         mass_offhand: {name: "ololipop", level: 9},
         solo_mainhand: {name: "candycanesword", level: 9},
         solo_offhand: {name: "fireblade", level: 9},
         elixir: "pumpkinspice",
-        main_orb: {name: "test_orb", level: 0},
+        main_orb: {name: "orbofstr", level: 3},
     }
 
 export var arMAGEdonItems: ItemsConfig = {
@@ -91,3 +92,98 @@ export var aRanDonDon: ItemsConfig = {
 export var aRogDonDon: ItemsConfig = {
     elixir: "pumpkinspice"
 }
+
+export const DO_NOT_EXCHANGE: ItemName[] = [
+    "lostearring",
+    "goldenegg",
+    "cosmo0",
+    "cosmo1",
+    "cosmo2",
+    "cosmo3",
+    "cosmo4"
+]
+
+export type UpgradeConfig = {
+    level: number,
+    primlingAt?: number,
+    scrollUpAt?: number,
+    offeringAt?: number,
+    shouldBeShiny?: boolean
+}
+
+export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, UpgradeConfig>([
+    // --- UPGRADE SECTION --- \\
+    ["staff", { level: 8 }],
+    ["angelwings", { level: 6 }],
+    ["cape", { level: 7 }],
+    ["sshield", { level: 8 }],
+    ["mshield", { level: 6 }],
+    ["wbreeches", { level: 8 }],
+
+    // Darkforge set
+    ["xhelmet", { level: 3, primlingAt: 0 }],
+    ["xarmor", { level: 3, primlingAt: 0 }],
+    ["xpants", { level: 3, primlingAt: 0 }],
+
+    ["firestaff", { level: 8, primlingAt: 7 }],
+    ["fireblade", { level: 8, primlingAt: 7 }],
+
+    ["harbringer", { level: 7 }],
+    ["oozingterror", { level: 6 }],
+
+
+    // Halloween
+    ["ololipop", { level: 8, primlingAt: 6, scrollUpAt: 3 }],
+    ["glolipop", { level: 8, primlingAt: 6, scrollUpAt: 3 }],
+
+    // Bunny stuff
+    ["ecape", { level: 7, scrollUpAt: 5 }],
+    ["pinkie", { level: 7 }],
+    ["eslippers", { level: 7, scrollUpAt: 5 }],
+
+    ["wingedboots", { level: 7, scrollUpAt: 5 }],
+    ["lmace", { level: 3, primlingAt: 0 }],
+    ["handofmidas", { level: 5 }],
+    ["bataxe", { level: 8, scrollUpAt: 4, primlingAt: 4, offeringAt: 6 }],
+
+    // Winter holidays
+    ["gcape", { level: 7 }],
+    ["mittens", { level: 8, scrollUpAt: 6 }],
+    ["ornamentstaff", { level: 8, scrollUpAt: 6 }],
+    ["supermittens", { level: 3, primlingAt: 0 }],
+
+    // --- COMPOUND SECTION --- \\
+    // Offhands
+    ["wbookhs", { level: 3, primlingAt: 1 }],
+
+    // Earrings
+    ["strearring", { level: 4, primlingAt: 2, scrollUpAt: 1 }],
+    ["intearring", { level: 4, primlingAt: 2, scrollUpAt: 1 }],
+    ["dexearring", { level: 4, primlingAt: 2, scrollUpAt: 1 }],
+    ["lostearring", { level: 2 }],
+
+    // Rings
+    ["strring", { level: 4, primlingAt: 3 }],
+    ["intring", { level: 4, primlingAt: 3 }],
+    ["dexring", { level: 4, primlingAt: 3 }],
+
+    // Amulets
+    ["intamulet", { level: 4, primlingAt: 3 }],
+    ["stramulet", { level: 4, primlingAt: 3 }],
+
+
+    ["t2stramulet", { level: 3, primlingAt: 2 }],
+    ["t2intamulet", { level: 3, primlingAt: 2 }],
+    ["t2dexamulet", { level: 3, primlingAt: 2 }],
+
+    // Belts
+    ["intbelt", { level: 4, offeringAt: 3 }],
+    ["strbelt", { level: 4, offeringAt: 3 }],
+
+    ["crossbow", { level: 5, primlingAt: 3, scrollUpAt: 4 }],
+
+    // Orbs
+    ["orbg", { level: 3 }],
+    ["jacko", { level: 3 }]
+]);
+

@@ -1,6 +1,6 @@
 import { Warrior, ItemName, Tools} from "alclient"
-import * as Items from "../classes_configs/items.ts"
-import * as CF from "../common_functions/common_functions.ts"
+import * as Items from "../classes_configs/items"
+import * as CF from "../../src/common_functions/common_functions"
 
 
 export class WarriorsAttackStrategy {
