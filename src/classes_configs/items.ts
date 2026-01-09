@@ -1,17 +1,7 @@
-import {ItemName } from "alclient"
+import {ItemName, ItemData} from "alclient"
 
-export const DONT_SEND_ITEMS = [
-    "tracker", 
-    "computer", 
-    "supercomputer", 
-    "xptome",
-    "hpot1", 
-    "mpot1", 
-    "luckbooster", 
-    "goldbooster", 
-    "xpbooster"
-]
 
+// REWORK ?! // CHARS ITEMS CONFIGS
 export type ItemsConfig = {
     cleave? : {name: ItemName, level: number},
     stomp? : {name: ItemName, level: number},
@@ -28,6 +18,14 @@ export type ItemsConfig = {
     dps_orb?: {name: ItemName, level: number}
 }
 
+// export type Set = "loot" | "luck" | "tank"
+// export type SetItems = Map<Set,ItemData[]> 
+// export var charactersItems: Map<string,SetItems[]> = new Map([
+//     ["Archealer", ["loot", [
+//         {name: "mshield" as ItemName, level: 9},
+//         {name: "handofmidas" as ItemName, level: 5}
+//     ]]]
+// ])
 
 export var WariousItems: ItemsConfig = {
         cleave: {name: "bataxe", level: 8},
@@ -93,6 +91,21 @@ export var aRogDonDon: ItemsConfig = {
     elixir: "pumpkinspice"
 }
 
+
+/// MANAGE ITEMS SECTION ///
+
+export const DONT_SEND_ITEMS = [
+    "tracker", 
+    "computer", 
+    "supercomputer", 
+    "xptome",
+    "hpot1", 
+    "mpot1", 
+    "luckbooster", 
+    "goldbooster", 
+    "xpbooster"
+]
+
 export const DO_NOT_EXCHANGE: ItemName[] = [
     "lostearring",
     "goldenegg",
@@ -101,6 +114,124 @@ export const DO_NOT_EXCHANGE: ItemName[] = [
     "cosmo2",
     "cosmo3",
     "cosmo4"
+]
+
+export const ITEMS_TO_SELL: ItemName[] = [
+    //materials
+	'frogt', 
+	'xmashat',
+	'pstem', 
+	'poison', 
+	'smush',
+	'smoke', 
+	'ink',
+	'snowball',
+	'dstones',
+	'spores',
+    'sstinger',
+    'firecrackers',
+    'rfangs',
+    'bcandle',
+    'bandages',
+
+	//Elexirs
+	'elixirvit0', 
+	'elixirvit1', 
+	'elixirvit2', 
+	'elixirstr0',
+	'elixirstr1',
+	'elixirstr2',
+	'elixirdex0',
+	'elixirdex1',
+	'elixirdex2',
+	'elixirint0',
+	'elixirint1',
+	'elixirint2',
+	'eggnog',
+	'emptyjar',
+	'rattail',
+	'wbook0',
+
+	//xmass set
+	'rednose',
+	'iceskates',
+	'xmasshoes',
+	'xmassweater',
+	'warmscarf',
+	'merry',
+
+	//Jewelery
+	'hpamulet',
+	'hpbelt',
+	'vitearring',
+	'vitring',
+	'ringsj',
+
+	//scrolls
+	'vitscroll',
+	'forscroll',
+
+	//begginers shit
+	'stinger',
+	'slimestaff',
+	'gloves',
+	'shoes',
+	'pclaw',
+
+	//beginners set
+	'helmet',
+	'gloves',
+	'shoes',
+	'quiver',
+
+	//Rugged set
+	'helmet1',
+	'pants1',
+	'gloves1',
+	'shoes1',
+	'coat1',
+
+	//useless weapons
+	'dagger',
+	'hotchocolate',
+	'throwingstars',
+	'carrotsword',
+	'spear',
+	'swifty',
+	'phelmet',
+	'cupid',
+
+	//halloween
+	'gphelmet',
+	'skullamulet',
+
+	//weapon of dead
+	'pmaceofthedead',
+	'swordofthedead',
+	'staffofthedead',
+	'daggerofthedead',
+	'maceofthedead',
+	'bowofthedead',
+
+	//heavy set
+	'harmor',
+	'hhelmet',
+	'hpants',
+	"sword",
+	'sstinger',
+
+	//heavy useless
+	'hboots',
+	'hgloves',
+	// 'cape'
+	//shields
+	// 'mshield'
+]
+
+export const DISMANTLE_ITEMS: ItemName[] = [
+	'firebow', 
+	// 'lostearring',
+    'goldenegg'
 ]
 
 export type UpgradeConfig = {

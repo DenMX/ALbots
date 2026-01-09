@@ -1,8 +1,7 @@
 import { Database, Entity, MonsterName, PingCompensatedCharacter, Game, Tools, IPosition, Constants } from "alclient"
-import * as CF from "./common_functions"
 import { StateModel } from "../database/state/state.model"
 import fs from "fs"
-import { ResuplyStrategy } from "./resupply_strategy"
+import { MemoryStorage } from "./memory_storage"
 import { ManageItems } from "./manage_items_strategy"
 
 export type MobsSortFilter = {
@@ -29,8 +28,8 @@ export class StateStrategy extends ManageItems { // class for 1 function? mv to 
         state_type: "farm"
     }
 
-    constructor (bot: PingCompensatedCharacter) {
-        super(bot)
+    constructor (bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
+        super(bot, memoryStorage)
         this.loadState()
         this.getTargetLoop()
         this.checkState()
@@ -46,7 +45,7 @@ export class StateStrategy extends ManageItems { // class for 1 function? mv to 
         if(Database.connection) {
             try{
                 const savedState = await StateModel.findOne({
-                    botId: super.getBot().id
+                    botId: super.getBot.id
                 }).exec()
                 if(savedState) {
                     this.current_state = {
@@ -55,7 +54,7 @@ export class StateStrategy extends ManageItems { // class for 1 function? mv to 
                         location: savedState.location
                     }
                 }
-                return console.warn(`${super.getBot().name} loaded state from MONGO`)
+                return console.warn(`${super.getBot.name} loaded state from MONGO`)
             }
             catch(ex){
                 console.error("Error while loading state from DB")
@@ -64,7 +63,7 @@ export class StateStrategy extends ManageItems { // class for 1 function? mv to 
         }
         if( !this.current_state ) {
             try {
-                let fileData = fs.readFileSync(`../${super.getBot().name}_state.json`, 'utf-8')
+                let fileData = fs.readFileSync(`../${super.getBot.name}_state.json`, 'utf-8')
                 this.current_state = JSON.parse(fileData)
             }
             catch(ex) {
@@ -79,13 +78,13 @@ export class StateStrategy extends ManageItems { // class for 1 function? mv to 
         if(Database.connection) {
             try {
                 const stateData = {
-                botId: super.getBot().id,
+                botId: super.getBot.id,
                 wantedMob: this.current_state.wantedMob,
                 state_type: this.current_state.state_type,
                 location: this.current_state.location
                 }
                 const result = await StateModel.findOneAndUpdate(
-                    { botId: super.getBot().id},
+                    { botId: super.getBot.id},
                     stateData,
                     {
                         upsert: true,
@@ -94,82 +93,82 @@ export class StateStrategy extends ManageItems { // class for 1 function? mv to 
                         setDefaultsOnInsert: true
                     }
                 ).exec()
-                console.log(`State saved in DB. ${super.getBot().name}`)
+                console.log(`State saved in DB. ${super.getBot.name}`)
             }
             catch(ex) {
                 console.error("Error while saving state in DB")
                 console.error(ex)
             }
         }
-        fs.writeFileSync(`../${super.getBot().name}_state.json`, JSON.stringify(this.current_state), "utf-8")
-        console.warn(`State saved in json. ${super.getBot().name}`)   
+        fs.writeFileSync(`../${super.getBot.name}_state.json`, JSON.stringify(this.current_state), "utf-8")
+        console.warn(`State saved in json. ${super.getBot.name}`)   
         setTimeout(this.saveState, 2000)     
     }
 
     public async startQuest() {
-        if(super.getBot().smartMoving) return setTimeout(this.startQuest, 1000)
-        if(super.getBot().target && Constants.ONE_SPAWN_MONSTERS.includes(super.getBot().getTargetEntity().type)) return setTimeout(this.startQuest, 1000)
+        if(super.getBot.smartMoving) return setTimeout(this.startQuest, 1000)
+        if(super.getBot.target && Constants.ONE_SPAWN_MONSTERS.includes(super.getBot.getTargetEntity().type)) return setTimeout(this.startQuest, 1000)
         if(["boss", "event"].includes(this.current_state.state_type)) return setTimeout(this.startQuest, 1000)
-        await super.getBot().smartMove("monsterhunter")
-        await super.getBot().getMonsterHuntQuest()
+        await super.getBot.smartMove("monsterhunter")
+        await super.getBot.getMonsterHuntQuest()
         if(this.current_state.state_type == "farm" && this.last_state != this.current_state) {
             this.last_state = this.current_state
         }
-        this.current_state = {wantedMob: super.getBot().s.monsterhunt!.id, state_type: "quest"}
-        await super.getBot().smartMove(super.getBot().s.monsterhunt!.id)
+        this.current_state = {wantedMob: super.getBot.s.monsterhunt!.id, state_type: "quest"}
+        await super.getBot.smartMove(super.getBot.s.monsterhunt!.id)
     }
 
     private async checkState() {
-        if( super.getBot().smartMoving) return setTimeout(this.checkState, 1000)
+        if( super.getBot.smartMoving) return setTimeout(this.checkState, 1000)
         let wanted_monster: MonsterName[]
         if(typeof this.current_state.wantedMob === "string" ) wanted_monster = [this.current_state.wantedMob]
         else wanted_monster = this.current_state.wantedMob
-        if(this.state_scheduler.length<1 && this.current_state.state_type == "farm" && super.getBot().getEntities().filter( e => wanted_monster.includes(e.type)).length>0) return setTimeout(this.checkState, 1000)
+        if(this.state_scheduler.length<1 && this.current_state.state_type == "farm" && super.getBot.getEntities().filter( e => wanted_monster.includes(e.type)).length>0) return setTimeout(this.checkState, 1000)
         this.sortScheduler()
         if(this.current_state.state_type == "farm") {
             if(this.state_scheduler.length>0){
                 if(this.state_scheduler[0].state_type != "farm" && this.last_state != this.current_state) this.last_state = this.current_state
                 this.current_state = this.state_scheduler.shift()!
                 if(this.current_state.location) {
-                    super.getBot().smartMove(this.current_state.location)
+                    super.getBot.smartMove(this.current_state.location)
                 }
                 else {
                     if(typeof this.current_state.wantedMob === "string") wanted_monster = [this.current_state.wantedMob]
                     else wanted_monster = this.current_state.wantedMob
-                    await super.getBot().smartMove(wanted_monster[0])
+                    await super.getBot.smartMove(wanted_monster[0])
                     return setTimeout(this.checkState, 1000)
                 }
             }
-            else if(super.getBot().getEntities().filter( e => wanted_monster.includes(e.type)).length < 1) {
-                if(this.current_state.location) await super.getBot().smartMove(this.current_state.location)
-                else await super.getBot().smartMove(wanted_monster[0])
+            else if(super.getBot.getEntities().filter( e => wanted_monster.includes(e.type)).length < 1) {
+                if(this.current_state.location) await super.getBot.smartMove(this.current_state.location)
+                else await super.getBot.smartMove(wanted_monster[0])
                 return setTimeout(this.checkState, 1000)
             }
         }
         else if(this.current_state.state_type == "boss" || this.current_state.state_type == "event"){
             // we still fighting
-            if(super.getBot().getEntities().filter( e=> wanted_monster.includes(e.type)).length>0) {
+            if(super.getBot.getEntities().filter( e=> wanted_monster.includes(e.type)).length>0) {
                 return setTimeout(this.checkState, 1000)
             }                
             // wanted mobs not found
-            else if(super.getBot().getEntities().filter( e=> wanted_monster.includes(e.type)).length<1) {
+            else if(super.getBot.getEntities().filter( e=> wanted_monster.includes(e.type)).length<1) {
                 // if we are too far moving to mob
-                if(!this.current_state.location || Tools.distance(this.current_state.location, super.getBot()) > 400) {
-                    if (this.current_state.location) await super.getBot().smartMove(this.current_state.location)
-                    else await super.getBot().smartMove(wanted_monster[0])
+                if(!this.current_state.location || Tools.distance(this.current_state.location, super.getBot) > 400) {
+                    if (this.current_state.location) await super.getBot.smartMove(this.current_state.location)
+                    else await super.getBot.smartMove(wanted_monster[0])
                 }
                 // if we still not found monster return to other tasks or farm
-                if(super.getBot().getEntities().filter( e=> wanted_monster.includes(e.type)).length<1) {
+                if(super.getBot.getEntities().filter( e=> wanted_monster.includes(e.type)).length<1) {
                     if(this.state_scheduler.length>0) {
                         this.current_state = this.state_scheduler.shift()!
                         if(this.current_state.location) {
-                            await super.getBot().smartMove(this.current_state.location)
+                            await super.getBot.smartMove(this.current_state.location)
                             return setTimeout
                         }
                         else {
                             if(typeof this.current_state.wantedMob === "string") wanted_monster = [this.current_state.wantedMob]
                             else wanted_monster = this.current_state.wantedMob
-                            await super.getBot().smartMove(wanted_monster[0])
+                            await super.getBot.smartMove(wanted_monster[0])
                             return setTimeout(this.checkState, 1000)
                         }
                     }
@@ -177,12 +176,12 @@ export class StateStrategy extends ManageItems { // class for 1 function? mv to 
                         let state = (this.last_state != null) ? this.last_state : this.default_state
                         this.current_state = state
                         if(this.current_state.location) {
-                            await super.getBot().smartMove(this.current_state.location)
+                            await super.getBot.smartMove(this.current_state.location)
                         }
                         else {
                             if(typeof this.current_state.wantedMob === "string") wanted_monster = [this.current_state.wantedMob]
                             else wanted_monster = this.current_state.wantedMob
-                            await super.getBot().smartMove(wanted_monster[0])
+                            await super.getBot.smartMove(wanted_monster[0])
                             return setTimeout(this.checkState, 1000)
                         }
                     }
@@ -190,46 +189,46 @@ export class StateStrategy extends ManageItems { // class for 1 function? mv to 
             }
         }
         else if(this.current_state.state_type == "quest") {
-            if(super.getBot().s.monsterhunt && super.getBot().s.monsterhunt.c == 0) {
-                await super.getBot().smartMove("monsterhunter")
-                await super.getBot().finishMonsterHuntQuest()
+            if(super.getBot.s.monsterhunt && super.getBot.s.monsterhunt.c == 0) {
+                await super.getBot.smartMove("monsterhunter")
+                await super.getBot.finishMonsterHuntQuest()
             }
-            else if(super.getBot().s.monsterhunt && super.getBot().s.monsterhunt.c > 0) {
+            else if(super.getBot.s.monsterhunt && super.getBot.s.monsterhunt.c > 0) {
                 if(this.state_scheduler.length>0) {
                     this.last_state = this.current_state
                     this.current_state = this.state_scheduler.shift()!
                     if(this.current_state.location) {
-                        await super.getBot().smartMove(this.current_state.location)
+                        await super.getBot.smartMove(this.current_state.location)
                     }
                     else {
                         if(typeof this.current_state.wantedMob === "string") wanted_monster = [this.current_state.wantedMob]
                         else wanted_monster = this.current_state.wantedMob
-                        await super.getBot().smartMove(wanted_monster[0])
+                        await super.getBot.smartMove(wanted_monster[0])
                     }
                     return setTimeout(this.checkState, 1000)
                 }
-                else if(super.getBot().getEntities().filter( e => wanted_monster.includes(e.type)).length <1) {
-                    await super.getBot().smartMove(wanted_monster[0])
+                else if(super.getBot.getEntities().filter( e => wanted_monster.includes(e.type)).length <1) {
+                    await super.getBot.smartMove(wanted_monster[0])
                 }
                 return setTimeout(this.checkState, 1000)
             }
-            if(!super.getBot().s.monsterhunt) {
+            if(!super.getBot.s.monsterhunt) {
                 if(this.state_scheduler.length<1){
-                    await super.getBot().smartMove("monsterhunter")
-                    await super.getBot().getMonsterHuntQuest()
-                    this.current_state = {state_type: "quest", wantedMob: super.getBot().s.monsterhunt!.id}
-                    await super.getBot().smartMove(super.getBot().s.monsterhunt!.id)
+                    await super.getBot.smartMove("monsterhunter")
+                    await super.getBot.getMonsterHuntQuest()
+                    this.current_state = {state_type: "quest", wantedMob: super.getBot.s.monsterhunt!.id}
+                    await super.getBot.smartMove(super.getBot.s.monsterhunt!.id)
                     return setTimeout(this.checkState, 1000)
                 }
                 else {
                     this.current_state = this.state_scheduler.shift()!
                     if(this.current_state.location) {
-                        await super.getBot().smartMove(this.current_state.location)
+                        await super.getBot.smartMove(this.current_state.location)
                     }
                     else {
                         if(typeof this.current_state.wantedMob === "string") wanted_monster = [this.current_state.wantedMob]
                         else wanted_monster = this.current_state.wantedMob
-                        await super.getBot().smartMove(wanted_monster[0])
+                        await super.getBot.smartMove(wanted_monster[0])
                     }
                     return setTimeout(this.checkState, 1000)
                 }
@@ -261,34 +260,34 @@ export class StateStrategy extends ManageItems { // class for 1 function? mv to 
         //we want to switch target if another map
         //prioritize boss => mobs targeting party => wantedMob => lowest hp => distance
         //we don't want to targeting mob with dps more than 2x hps
-        let target = super.getBot().getTargetEntity()
-        let entities = super.getBot().getEntities()
+        let target = super.getBot.getTargetEntity()
+        let entities = super.getBot.getEntities()
         if(entities.length<1) return setTimeout(this.getTargetLoop, 500)
         if(!target || (target && target.willBurnToDeath())) {
             entities = this.sortEntities(entities)
-            super.getBot().target = entities[0].id
+            super.getBot.target = entities[0].id
         }
         else if(target && target.spawns) {
             entities = this.sortEntities(entities, {sortSpawns: true})
-            if(entities[0].id != target.id) super.getBot().target = entities[0].id
+            if(entities[0].id != target.id) super.getBot.target = entities[0].id
         }
         else if (target && !Constants.ONE_SPAWN_MONSTERS.includes(target.type)) {
             entities = this.sortEntities(entities)
-            if(!Constants.ONE_SPAWN_MONSTERS.includes(target.type) && Constants.ONE_SPAWN_MONSTERS.includes(entities[0].type)) super.getBot().target = entities[0].id
+            if(!Constants.ONE_SPAWN_MONSTERS.includes(target.type) && Constants.ONE_SPAWN_MONSTERS.includes(entities[0].type)) super.getBot.target = entities[0].id
         }
-        else if (target && target.map != super.getBot().map) {
+        else if (target && target.map != super.getBot.map) {
             entities = this.sortEntities(entities)
-            super.getBot().target = entities[0].id
+            super.getBot.target = entities[0].id
         }
     }
 
     private sortEntities(entities: Entity[], filter?: MobsSortFilter): Entity[] {
-        let target = super.getBot().getTargetEntity()
+        let target = super.getBot.getTargetEntity()
         
         entities.sort(
             (curr, next) => {
-                let dist_current = Tools.distance(super.getBot(), curr)
-                let dist_next = Tools.distance(super.getBot(), next)
+                let dist_current = Tools.distance(super.getBot, curr)
+                let dist_next = Tools.distance(super.getBot, next)
                 let wantedMob
                 if(typeof this.current_state.wantedMob === "string") wantedMob = [this.current_state.wantedMob]
                 else wantedMob = this.current_state.wantedMob
@@ -300,11 +299,11 @@ export class StateStrategy extends ManageItems { // class for 1 function? mv to 
                 if(Constants.ONE_SPAWN_MONSTERS.includes(curr.type)!=Constants.ONE_SPAWN_MONSTERS.includes(next.type)) {
                     return (Constants.ONE_SPAWN_MONSTERS.includes(curr.type) && !Constants.ONE_SPAWN_MONSTERS.includes(next.type)) ? -1 : 1;
                 }
-                if(curr.isAttackingUs(super.getBot())!=next.isAttackingUs(super.getBot())) {
-                    return (curr.isAttackingUs(super.getBot()) && !next.isAttackingUs(super.getBot())) ? -1 : 1;
+                if(curr.isAttackingUs(super.getBot)!=next.isAttackingUs(super.getBot)) {
+                    return (curr.isAttackingUs(super.getBot) && !next.isAttackingUs(super.getBot)) ? -1 : 1;
                 }
-                if(curr.isAttackingPartyMember(super.getBot())!=next.isAttackingPartyMember(super.getBot())) {
-                    return (curr.isAttackingPartyMember(super.getBot()) && !next.isAttackingPartyMember(super.getBot())) ? -1 : 1;
+                if(curr.isAttackingPartyMember(super.getBot)!=next.isAttackingPartyMember(super.getBot)) {
+                    return (curr.isAttackingPartyMember(super.getBot) && !next.isAttackingPartyMember(super.getBot)) ? -1 : 1;
                 }
                 if(curr.type!=next.type && (wantedMob.includes(curr.type) || wantedMob.includes(next.type))) {
                     return (wantedMob.includes(curr.type)) ? -1 : 1;
