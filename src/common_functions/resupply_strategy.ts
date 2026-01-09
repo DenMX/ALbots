@@ -6,9 +6,6 @@ import { MemoryStorage } from "./memory_storage"
 
 export class ResuplyStrategy extends PartyStrategy {
 
-
-    private active_bots: PingCompensatedCharacter[]
-
     //POTS
     private MPOTS_CAP = 9000
     private HPOTS_CAP = 5000
@@ -34,43 +31,37 @@ export class ResuplyStrategy extends PartyStrategy {
 
     constructor (bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
         super(bot, memoryStorage)
-        for(let fn of this.ressuplyFunction){
-            fn()
-        }
-        bot.socket.on("death", this.respawnStrat)
+        setTimeout(() => this.initialize(), 5000)
+        bot.socket.on("death", this.respawnStrat.bind(this))
         
     }
 
-    
-
-    protected getActiveBots() : PingCompensatedCharacter[] {
-        return this.active_bots
-    }
-
-    public async setActiveBots(bots: PingCompensatedCharacter[]) {
-        this.active_bots = bots;
+    private async initialize() {
+        for(let fn of this.ressuplyFunction){
+            await fn().catch(console.error)
+        }
     }
 
     private async respawnStrat() {
         
-        setTimeout(super.getBot.respawn, 15000)
+        setTimeout(this.bot.respawn, 15000)
         setTimeout(() => {
-            super.getBot.smartMove("monsterhunter")
+            this.bot.smartMove("monsterhunter")
             this.checkTomeOfProtection()
         }, 15500)
     }
 
     private async checkTomeOfProtection(){
-        if(super.getBot.locateItem("xptome") === undefined && super.getBot.gold > 3200000) {
-            if(super.getBot.locateItem("computer") === undefined) {
-                await super.getBot.smartMove("premium")
+        if(this.bot.locateItem("xptome") === undefined && this.bot.gold > 3200000) {
+            if(this.bot.locateItem("computer") === undefined) {
+                await this.bot.smartMove("premium")
             }
-            await super.getBot.buy("xptome")
+            await this.bot.buy("xptome")
         }
     }
 
     private getBotitems() : CI.ItemsConfig {
-        switch(super.getBot.name){
+        switch(this.bot.name){
             case "Archealer":
                 return CI.ArchealerItems
             case "Warious":
@@ -82,51 +73,52 @@ export class ResuplyStrategy extends PartyStrategy {
             case "aRogDonDon":
                 return CI.aRogDonDon
             default:
-                throw(`There is no config for ${super.getBot.name}. Check Resupply strategy.`)
+                throw(`There is no config for ${this.bot.name}. Check Resupply strategy.`)
         }
     }
 
     private async useElixirsLoop() {
-        if(super.getBot.slots.elixir?.expires) return setTimeout(this.useElixirsLoop, Date.parse(super.getBot.slots.elixir.expires) - Date.now())
-        if(!super.getBot.slots || (super.getBot.slots.elixir?.expires &&  Date.parse(super.getBot.slots.elixir.expires) - Date.now() < 60000 )) {
-            await super.getBot.equip(super.getBot.locateItem(this.getBotitems().elixir))
+        if(this.bot.slots.elixir?.expires) return setTimeout( () => this.useElixirsLoop(), Date.parse(this.bot.slots.elixir.expires) - Date.now())
+        if(!this.bot.slots || (this.bot.slots.elixir?.expires &&  Date.parse(this.bot.slots.elixir.expires) - Date.now() < 60000 )) {
+            await this.bot.equip(this.bot.locateItem(this.getBotitems().elixir))
         }
-        return setTimeout(this.useElixirsLoop, 2000)
+        return setTimeout( () => this.useElixirsLoop(), 2000)
     }
 
     private async usePotionsLoop() {
-        if(super.getBot.hp < super.getBot.max_hp * 0.5) {
-            let hpot = super.getBot.locateItem("hpot1")
-            hpot>=0 ? await super.getBot.usePotion(hpot).catch(ex => console.warn(ex)) : await super.getBot.regenHP().catch(ex => console.warn(ex))
-            return setTimeout(this.usePotionsLoop, Math.max(500,super.getBot.getCooldown("regen_hp")))
+        if(this.bot.hp < this.bot.max_hp * 0.5) {
+            let hpot = this.bot.locateItem("hpot1")
+            hpot>=0 ? await this.bot.usePotion(hpot).catch(ex => console.warn(ex)) : await this.bot.regenHP().catch(ex => console.warn(ex))
+            return setTimeout( () => this.usePotionsLoop(), Math.max(500,this.bot.getCooldown("regen_hp")))
         }
-        if(super.getBot.mp < super.getBot.max_mp-500) {
-            let mpot = super.getBot.locateItem("mpot1")
-            mpot>=0 ? await super.getBot.usePotion(mpot).catch(ex => console.warn(ex)) : await super.getBot.regenMP().catch(ex => console.warn(ex))
-            return setTimeout(this.usePotionsLoop, Math.max(500,super.getBot.getCooldown("regen_hp")))
+        if(this.bot.mp < this.bot.max_mp-500) {
+            let mpot = this.bot.locateItem("mpot1")
+            mpot>=0 ? await this.bot.usePotion(mpot).catch(ex => console.warn(ex)) : await this.bot.regenMP().catch(ex => console.warn(ex))
+            return setTimeout( () => this.usePotionsLoop(), Math.max(500,this.bot.getCooldown("regen_hp")))
         }
-        return setTimeout(this.usePotionsLoop, Math.max(500,super.getBot.getCooldown("regen_hp")))
+        return setTimeout( () => this.usePotionsLoop(), Math.max(500,this.bot.getCooldown("regen_hp")))
     }
 
     private async resupplyPots() {
-        let hpot = super.getBot.items[super.getBot.locateItem("hpot1")]?.q || 0
-        let mpot = super.getBot.items[super.getBot.locateItem("mpot1")]?.q || 0
-        if(super.getBot.locateItem("computer") >= 0) {
-            if(this.HPOTS_CAP > hpot) await super.getBot.buy("hpot1", this.HPOTS_CAP - hpot).catch(ex => console.warn(ex))
-            if(this.MPOTS_CAP > mpot) await super.getBot.buy("mpot1", this.MPOTS_CAP - mpot).catch(ex => console.warn(ex))
+        if(!this.bot.items) return setTimeout( () => this.resupplyPots(), 5000)
+        let hpot = this.bot.items[this.bot.locateItem("hpot1")]?.q || 0// let hpot = this.getBot.items[this.bot.locateItem("hpot1")]?.q || 0
+        let mpot = this.bot.items[this.bot.locateItem("mpot1")]?.q || 0
+        if(this.bot.locateItem("computer") >= 0) {
+            if(this.HPOTS_CAP > hpot) await this.bot.buy("hpot1", this.HPOTS_CAP - hpot).catch(ex => console.warn(ex))
+            if(this.MPOTS_CAP > mpot) await this.bot.buy("mpot1", this.MPOTS_CAP - mpot).catch(ex => console.warn(ex))
         }
         else {
             if(mpot < 100) {
-                await super.getBot.smartMove("main")
-                await super.getBot.buy("hpot1", this.HPOTS_CAP - hpot).catch(ex => console.warn(ex))
-                await super.getBot.buy("mpot1", this.MPOTS_CAP - mpot).catch(ex => console.warn(ex))
+                await this.bot.smartMove("main")
+                await this.bot.buy("hpot1", this.HPOTS_CAP - hpot).catch(ex => console.warn(ex))
+                await this.bot.buy("mpot1", this.MPOTS_CAP - mpot).catch(ex => console.warn(ex))
             }
         }
         return setTimeout(() => {this.resupplyPots()}, 5000)
     }
 
     private async resuplyScrolls() {
-        if(super.getBot.ctype != "merchant") return
+        if(this.bot.ctype != "merchant") return
         let scrollsCount: ItemName[] =[
             "scroll0",
             "scroll1",
@@ -137,31 +129,31 @@ export class ResuplyStrategy extends PartyStrategy {
         ]
 
         scrollsCount.forEach( async (e) => {
-            let scroll_count =super.getBot.countItem(e as ItemName)
-            if(scroll_count< this.scrolls_cap[e] && super.getBot.canBuy(e)) super.getBot.buy(e,this.scrolls_cap[e]-scroll_count).catch(console.warn)
+            let scroll_count =this.bot.countItem(e as ItemName)
+            if(scroll_count< this.scrolls_cap[e] && this.bot.canBuy(e)) this.bot.buy(e,this.scrolls_cap[e]-scroll_count).catch(console.warn)
         
         })
     }
 
     private async scareLoop() {
-        if(super.getBot.isOnCooldown("scare")) return setTimeout(this.scareLoop, super.getBot.getCooldown("scare"))
-        if(super.getBot.hp < super.getBot.max_hp * 0.4) {
-            if(super.getBot.slots.orb?.name != "jacko") {
-                let cur_orb = super.getBot.slots.orb
-                let jacko_idx = super.getBot.locateItem("jacko")
+        if(this.bot.isOnCooldown("scare")) return setTimeout( () => this.scareLoop(), this.bot.getCooldown("scare"))
+        if(this.bot.hp < this.bot.max_hp * 0.4) {
+            if(this.bot.slots.orb?.name != "jacko") {
+                let cur_orb = this.bot.slots.orb
+                let jacko_idx = this.bot.locateItem("jacko")
                 if(jacko_idx>=0) {
-                    await super.getBot.equip(jacko_idx).catch(ex => console.warn(ex))
-                    await super.getBot.scare().catch(ex => console.warn(ex))
-                    await super.getBot.equip(super.getBot.locateItem(cur_orb!.name, undefined, {returnHighestLevel: true})).catch(ex => console.warn(ex))
-                    return setTimeout(this.scareLoop, super.getBot.getCooldown("scare"))
+                    await this.bot.equip(jacko_idx).catch(ex => console.warn(ex))
+                    await this.bot.scare().catch(ex => console.warn(ex))
+                    await this.bot.equip(this.bot.locateItem(cur_orb!.name, undefined, {returnHighestLevel: true})).catch(ex => console.warn(ex))
+                    return setTimeout( () => this.scareLoop(), this.bot.getCooldown("scare"))
                 }
             }
             else {
-                await super.getBot.scare()
-                return setTimeout(this.scareLoop, super.getBot.getCooldown("scare"))
+                await this.bot.scare()
+                return setTimeout( () => this.scareLoop(), this.bot.getCooldown("scare"))
             }
         }
-        return setTimeout(this.scareLoop, 1000)
+        return setTimeout( () => this.scareLoop(), 1000)
     } 
 
 }

@@ -4,16 +4,16 @@ import { my_characters } from "../main";
 
 export class PartyStrategy {
 
-    private bot: PingCompensatedCharacter
+    protected bot: PingCompensatedCharacter
 
-    private memoryStorage: MemoryStorage
+    protected memoryStorage: MemoryStorage
 
     
     constructor(bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
         this.bot = bot
         this.memoryStorage = memoryStorage
-        this.bot.socket.on("invite", this.onPartyInvite)
-        this.bot.socket.on("request", this.onPartyRequest)
+        this.bot.socket.on("invite", (data) => this.onPartyInvite(data))
+        this.bot.socket.on("request", (data) => this.onPartyRequest(data))
         this.checkParty()
     }
 
@@ -40,7 +40,7 @@ export class PartyStrategy {
     private async checkParty() {
         let pl = this.memoryStorage.getCurrentPartyLeader
         let default_pl = this.memoryStorage.getDefaultPartyLeader
-        if(pl != this.bot.name && !this.bot.partyData.list.includes(pl)) {
+        if(pl != this.bot.name && !this.bot.partyData?.list.includes(pl)) {
             let players = await this.bot.getServerPlayers()
             let shouldWait = (players.filter( e=> e.name == pl).length>0 || my_characters.has(pl))
             if(shouldWait) {
@@ -62,10 +62,6 @@ export class PartyStrategy {
 
     protected get getMemoryStorage() {
         return this.memoryStorage
-    }
-
-    protected get getBot() : PingCompensatedCharacter {
-        return this.bot
     }
 
 }

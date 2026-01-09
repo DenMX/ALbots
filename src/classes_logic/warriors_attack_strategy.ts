@@ -3,9 +3,10 @@ import * as Items from "../classes_configs/items"
 import * as CF from "../../src/common_functions/common_functions"
 import { MemoryStorage } from "../common_functions/memory_storage";
 import { ManageItems } from "../common_functions/manage_items_strategy";
+import { StateStrategy } from "../common_functions/state_strategy";
 
 
-export class WarriorsAttackStrategy extends ManageItems {
+export class WarriorsAttackStrategy extends StateStrategy {
 
     private warrior: Warrior
 
@@ -14,10 +15,16 @@ export class WarriorsAttackStrategy extends ManageItems {
     constructor (bot: Warrior, memoryStorage: MemoryStorage){
         super(bot, memoryStorage)
         this.warrior = bot
-        this.attackLoop()
+        this.bot = bot
+        this.memoryStorage = memoryStorage
+        setTimeout(() => this.initializ(), 1000)
+    }
+
+    private async initializ() {
+        await this.attackLoop()
         // this.useMassAggroLoop()
-        this.hardShellLoop()
-        this.useWarcryLoop()
+        await this.hardShellLoop()
+        await this.useWarcryLoop()
     }
 
 
@@ -30,7 +37,7 @@ export class WarriorsAttackStrategy extends ManageItems {
         return this._firehazard
     }
 
-    async attackLoop() {
+    private async attackLoop() {
         if( !this.warrior.getTargetEntity()) return setTimeout(this.attackLoop, 100)
         if( this.warrior.isOnCooldown("scare") && this.warrior.getEntities({targetingMe: true, targetingPartyMember:true}).length<1) return setTimeout(this.attackLoop, this.warrior.getCooldown("scare"))
         if(!this.warrior.getTargetEntity().target && CF.calculate_monster_dps(this.warrior, this.warrior.getTargetEntity())/CF.calculate_hps(this.warrior) >=2) return setTimeout(this.attackLoop, 500)

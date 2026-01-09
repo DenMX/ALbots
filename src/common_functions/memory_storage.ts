@@ -21,7 +21,7 @@ export class MemoryStorage {
 
     constructor(bots: PingCompensatedCharacter[]) {
         this.active_bots = bots
-        this.secretKey = fs.readFileSync(`../../api_token.txt`, 'utf-8') || ""
+        this.secretKey = fs.readFileSync(`../api_token.txt`, 'utf-8') || ""
 
         this.current_party_leader = this.default_party_leader
         this.current_tank = this.default_tank

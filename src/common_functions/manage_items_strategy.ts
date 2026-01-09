@@ -43,95 +43,93 @@ export class ManageItems extends ResuplyStrategy {
         super(bot, memoryStorage)
     }
 
-    
-
     protected async upgradeItems() {
-        if(!super.getBot.locateItem(["computer", "supercomputer"]) && Tools.distance(super.getBot, {x: -203, y: -115, map: "main"})>Constants.NPC_INTERACTION_DISTANCE) return
+        if(!this.bot.locateItem(["computer", "supercomputer"]) && Tools.distance(this.bot, {x: -203, y: -115, map: "main"})>Constants.NPC_INTERACTION_DISTANCE) return
 
         level: for(let lvl = 0; lvl < 9; lvl++){
-            for(const [slot,item] of super.getBot.getItems()) {
+            for(const [slot,item] of this.bot.getItems()) {
                 if(!item) continue
                 if(!Game.G.items[item.name].upgrade || !ItemsConfig.MERCHANT_UPGRADE.has(item.name)) continue
                 let itemConfig = ItemsConfig.MERCHANT_UPGRADE.get(item.name)
                 if(item.level != lvl || item.level>= itemConfig.level) continue
                 if(item.level == 0 && itemConfig.shouldBeShiny && item.p != "shiny") continue
                 if(itemConfig.offeringAt >= item.level) {
-                    if(!super.getBot.locateItem("offering", super.getBot.items) && super.getBot.gold > 500000000 && super.getBot.esize>0) await super.getBot.buy("offering")
-                    if(!super.getBot.locateItem("offering", super.getBot.items)) continue
+                    if(!this.bot.locateItem("offering", this.bot.items) && this.bot.gold > 500000000 && this.bot.esize>0) await this.bot.buy("offering")
+                    if(!this.bot.locateItem("offering", this.bot.items)) continue
                 }
-                if(itemConfig.primlingAt >= item.level && (!itemConfig.offeringAt || itemConfig.offeringAt < item.level) && !super.getBot.locateItem("offeringp", super.getBot.items)) continue
+                if(itemConfig.primlingAt >= item.level && (!itemConfig.offeringAt || itemConfig.offeringAt < item.level) && !this.bot.locateItem("offeringp", this.bot.items)) continue
 
                 let primling
                 if(itemConfig.offeringAt >= item.level) {
-                    primling = super.getBot.locateItem("offering", super.getBot.items)
+                    primling = this.bot.locateItem("offering", this.bot.items)
                 }
                 else if(itemConfig.primlingAt >= item.level) {
-                    primling = super.getBot.locateItem("offeringp", super.getBot.items)
+                    primling = this.bot.locateItem("offeringp", this.bot.items)
                 }
                 let scroll_grade = item.calculateGrade()
                 scroll_grade = (itemConfig.scrollUpAt>= item.level && scroll_grade<2) ? scroll_grade+1 : scroll_grade
                 let scroll_name = `scroll${scroll_grade}` as ItemName
-                let scroll_idx = super.getBot.locateItem(scroll_name, super.getBot.items)
-                if(!scroll_idx && scroll_idx<3 && super.getBot.esize>0 && super.getBot.gold > Game.G.items[scroll_name].g) {
-                    await super.getBot.buy(scroll_name)
+                let scroll_idx = this.bot.locateItem(scroll_name, this.bot.items)
+                if(!scroll_idx && scroll_idx<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
+                    await this.bot.buy(scroll_name)
                 }
 
-                scroll_idx = super.getBot.locateItem(scroll_name, super.getBot.items)
+                scroll_idx = this.bot.locateItem(scroll_name, this.bot.items)
                 if(!scroll_idx) continue
-                await super.getBot.upgrade(slot, scroll_idx, primling)
+                await this.bot.upgrade(slot, scroll_idx, primling)
             }
         }
     }
 
     protected async compoundItems() {
-        if(!super.getBot.locateItem(["computer", "supercomputer"]) && Tools.distance(super.getBot, {x: -203, y: -115, map: "main"})>Constants.NPC_INTERACTION_DISTANCE) return
+        if(!this.bot.locateItem(["computer", "supercomputer"]) && Tools.distance(this.bot, {x: -203, y: -115, map: "main"})>Constants.NPC_INTERACTION_DISTANCE) return
 
         level: for(let lvl=0; lvl<5; lvl++){
-            for(const [, item] of super.getBot.getItems()) {
+            for(const [, item] of this.bot.getItems()) {
                 if(!item) continue
                 if(!Game.G.items[item.name].compound || ! ItemsConfig.MERCHANT_UPGRADE.has(item.name)) continue
                 let itemConfig = ItemsConfig.MERCHANT_UPGRADE.get(item.name)
                 if(item.level != lvl || item.level>= itemConfig.level) continue
-                const items = super.getBot.locateItems(item.name, super.getBot.items, {level: item.level, locked: false})
+                const items = this.bot.locateItems(item.name, this.bot.items, {level: item.level, locked: false})
                 if (items.length < 3) continue
                 if(itemConfig.offeringAt >= item.level) {
-                    if(!super.getBot.locateItem("offering", super.getBot.items) && super.getBot.gold > 500000000 && super.getBot.esize>0) await super.getBot.buy("offering")
-                    if(!super.getBot.locateItem("offering", super.getBot.items)) continue
+                    if(!this.bot.locateItem("offering", this.bot.items) && this.bot.gold > 500000000 && this.bot.esize>0) await this.bot.buy("offering")
+                    if(!this.bot.locateItem("offering", this.bot.items)) continue
                 }
-                if(itemConfig.primlingAt >= item.level && (!itemConfig.offeringAt || itemConfig.offeringAt < item.level) && !super.getBot.locateItem("offeringp", super.getBot.items)) continue
+                if(itemConfig.primlingAt >= item.level && (!itemConfig.offeringAt || itemConfig.offeringAt < item.level) && !this.bot.locateItem("offeringp", this.bot.items)) continue
 
                 let primling
                 if(itemConfig.offeringAt >= item.level) {
-                    primling = super.getBot.locateItem("offering", super.getBot.items)
+                    primling = this.bot.locateItem("offering", this.bot.items)
                 }
                 else if(itemConfig.primlingAt >= item.level) {
-                    primling = super.getBot.locateItem("offeringp", super.getBot.items)
+                    primling = this.bot.locateItem("offeringp", this.bot.items)
                 }
                 let scroll_grade = item.calculateGrade()
                 scroll_grade = (itemConfig.scrollUpAt>= item.level && scroll_grade<2) ? scroll_grade+1 : scroll_grade
                 let scroll_name = `scroll${scroll_grade}` as ItemName
-                let scroll_idx = super.getBot.locateItem(scroll_name, super.getBot.items)
-                if(!scroll_idx && scroll_idx<3 && super.getBot.esize>0 && super.getBot.gold > Game.G.items[scroll_name].g) {
-                    await super.getBot.buy(scroll_name)
+                let scroll_idx = this.bot.locateItem(scroll_name, this.bot.items)
+                if(!scroll_idx && scroll_idx<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
+                    await this.bot.buy(scroll_name)
                 }
 
-                scroll_idx = super.getBot.locateItem(scroll_name, super.getBot.items)
+                scroll_idx = this.bot.locateItem(scroll_name, this.bot.items)
                 if(!scroll_idx) continue
 
-                await super.getBot.compound(items[0],items[1],items[2], scroll_idx, primling)
+                await this.bot.compound(items[0],items[1],items[2], scroll_idx, primling)
                 
             }
         }
     }
 
     protected async exchangeItems() {
-        if(super.getBot.esize<1) return
-        items: for(const [idx, item] of super.getBot.getItems()) {
+        if(this.bot.esize<1) return
+        items: for(const [idx, item] of this.bot.getItems()) {
             if(!item || ItemsConfig.DO_NOT_EXCHANGE.includes(item.name)) continue
             if(!item.e || item.q < item.e) continue
             for(let q = 0; q< Math.floor(item.e/item.q); q++) {
-                if(super.getBot.esize < 1 ) break items;
-                await super.getBot.exchange(idx)
+                if(this.bot.esize < 1 ) break items;
+                await this.bot.exchange(idx)
             }
         }
     }
@@ -141,11 +139,11 @@ export class ManageItems extends ResuplyStrategy {
         //search for resources needs to make shiny ? can we craft needed items?
         //withdraw all from bank while esize > 0
         //shiny
-        //super.getBot.upgrade(itm_idx, undefined, ingot_idx)
+        //this.bot.upgrade(itm_idx, undefined, ingot_idx)
     }
 
     protected async storeItems() {
-        let bot = super.getBot
+        let bot = this.bot
         if(!bot.map.startsWith("bank")) return
         if(!bot.bank) console.error("We don't have bank information")
 
@@ -243,7 +241,7 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected async upgradeItemsFromBank() {
-        let bot = super.getBot
+        let bot = this.bot
         const items = this.getUpgradeListFromBank()
         let itemsToUpgrade = 0
         items.upgrade.forEach( (e) => { itemsToUpgrade+=e.slots.length})
@@ -307,7 +305,7 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected getUpgradeListFromBank() : UpgradeItems {
-        const bot = super.getBot
+        const bot = this.bot
         if (!bot.map.startsWith("bank") && !super.getMemoryStorage.getBank) throw new Error("We aren't in the bank")
         if (!bot.bank && !super.getMemoryStorage.getBank) throw new Error("We don't have bank information")
 
@@ -436,7 +434,7 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected calculateItemsCountTotal(item: ItemName): number {
-        let bot = super.getBot
+        let bot = this.bot
         if(!Game.G.items[item].s) return 0
 
         let bank = (bot.bank) ? bot.bank : super.getMemoryStorage.getBank
@@ -465,7 +463,7 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected async sendItems(name: string) {
-        let me = super.getBot
+        let me = this.bot
         if(me.getPlayers({withinRange: Constants.NPC_INTERACTION_DISTANCE}).filter( e=> e.name == name).length>0) {
             for(const [idx, item] of me.getItems()) {
                 if(ItemsConfig.DONT_SEND_ITEMS.includes(item.name)) continue
@@ -476,7 +474,7 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected async sellTrash() {
-        let bot = super.getBot
+        let bot = this.bot
         for(const [idx,item] of bot.getItems()) {
             if(item.isLocked()) continue
             if(ItemsConfig.ITEMS_TO_SELL.includes(item.name) && (!item.level || item.level == 0)) bot.sell(idx,item.q)

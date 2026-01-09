@@ -1,40 +1,40 @@
 import { Rogue, Game } from "alclient"
 import * as CF from "../../src/common_functions/common_functions"
+import { ManageItems } from "../common_functions/manage_items_strategy"
+import { MemoryStorage } from "../common_functions/memory_storage"
+import { StateStrategy } from "../common_functions/state_strategy"
 
-export class RogueAttackStrategy {
+export class RogueAttackStrategy extends StateStrategy {
 
-    private bot: Rogue
-    constructor(bot: Rogue) {
-        this.bot = bot
+    private rogue: Rogue
+    constructor(bot: Rogue, memoryStorage: MemoryStorage) {
+        super(bot, memoryStorage)
+        this.rogue = bot
         this.basicAttackLoop()
         this.stubLoop()
     }
 
-    public getBot(){
-        return this.bot
-    }
-
     private async basicAttackLoop() {
-        if(!this.bot.target) return setTimeout(this.basicAttackLoop, 500)
-        if(!this.bot.getTargetEntity().target && CF.calculate_monster_dps(this.bot, this.bot.getTargetEntity())/CF.calculate_hps(this.bot) >=2) return setTimeout(this.basicAttackLoop, 500)
-        if(this.bot.isOnCooldown("scare") && !this.bot.getTargetEntity().target) return setTimeout(this.basicAttackLoop, this.bot.getCooldown("scare"))
-        if(!this.bot.canUse("attack")) return setTimeout(this.basicAttackLoop, Math.max(50, this.bot.getCooldown("attack")))        
-        await this.bot.basicAttack(this.bot.target).catch( ex => console.warn(ex) )
-        return setTimeout(this.basicAttackLoop, Math.max(50, this.bot.getCooldown("attack")))
+        if(!this.rogue.target) return setTimeout(this.basicAttackLoop, 500)
+        if(!this.rogue.getTargetEntity().target && CF.calculate_monster_dps(this.rogue, this.rogue.getTargetEntity())/CF.calculate_hps(this.rogue) >=2) return setTimeout(this.basicAttackLoop, 500)
+        if(this.rogue.isOnCooldown("scare") && !this.rogue.getTargetEntity().target) return setTimeout(this.basicAttackLoop, this.rogue.getCooldown("scare"))
+        if(!this.rogue.canUse("attack")) return setTimeout(this.basicAttackLoop, Math.max(50, this.rogue.getCooldown("attack")))        
+        await this.rogue.basicAttack(this.rogue.target).catch( ex => console.warn(ex) )
+        return setTimeout(this.basicAttackLoop, Math.max(50, this.rogue.getCooldown("attack")))
     }
 
     private async stubLoop() {
-        if(!this.bot.target) return setTimeout(this.stubLoop, 500)
-        if(!this.bot.getTargetEntity().target && CF.calculate_monster_dps(this.bot, this.bot.getTargetEntity())/CF.calculate_hps(this.bot) >=2) return setTimeout(this.stubLoop, 500)
-        if(this.bot.isOnCooldown("scare") && !this.bot.getTargetEntity().target) return setTimeout(this.stubLoop, this.bot.getCooldown("scare"))
-        if(this.bot.slots.mainhand){
-            if(Game.G.items[this.bot.slots.mainhand.name].wtype == "fist" && this.bot.canUse("quickpunch") && this.bot.mp - Game.G.skills.quickpunch.mp! > this.bot.mp_cost * 2) {
-                await this.bot.quickPunch(this.bot.target).catch( ex => console.warn(ex))
-                return setTimeout(this.stubLoop, this.bot.getCooldown("quickpunch"))
+        if(!this.rogue.target) return setTimeout(this.stubLoop, 500)
+        if(!this.rogue.getTargetEntity().target && CF.calculate_monster_dps(this.rogue, this.rogue.getTargetEntity())/CF.calculate_hps(this.rogue) >=2) return setTimeout(this.stubLoop, 500)
+        if(this.rogue.isOnCooldown("scare") && !this.rogue.getTargetEntity().target) return setTimeout(this.stubLoop, this.rogue.getCooldown("scare"))
+        if(this.rogue.slots.mainhand){
+            if(Game.G.items[this.rogue.slots.mainhand.name].wtype == "fist" && this.rogue.canUse("quickpunch") && this.rogue.mp - Game.G.skills.quickpunch.mp! > this.rogue.mp_cost * 2) {
+                await this.rogue.quickPunch(this.rogue.target).catch( ex => console.warn(ex))
+                return setTimeout(this.stubLoop, this.rogue.getCooldown("quickpunch"))
             }
-            if(Game.G.items[this.bot.slots.mainhand.name].wtype == "dagger" && this.bot.canUse("quickstab") && this.bot.mp - Game.G.skills.quickstab.mp! > this.bot.mp_cost * 2) {
-                await this.bot.quickStab(this.bot.target).catch( ex => console.warn(ex))
-                return setTimeout(this.stubLoop, this.bot.getCooldown("quickstab"))
+            if(Game.G.items[this.rogue.slots.mainhand.name].wtype == "dagger" && this.rogue.canUse("quickstab") && this.rogue.mp - Game.G.skills.quickstab.mp! > this.rogue.mp_cost * 2) {
+                await this.rogue.quickStab(this.rogue.target).catch( ex => console.warn(ex))
+                return setTimeout(this.stubLoop, this.rogue.getCooldown("quickstab"))
             }
         }
         return setTimeout(this.stubLoop, 500)

@@ -1,74 +1,75 @@
 import { Priest, ItemName, Tools, Player, Game} from "alclient"
 import * as Items from "../classes_configs/items"
 import * as CF from "../../src/common_functions/common_functions"
+import { MemoryStorage } from "../common_functions/memory_storage"
+import { StateStrategy } from "../common_functions/state_strategy"
 
-export class PriestsAttackStrategy {
+export class PriestsAttackStrategy extends StateStrategy {
 
-    private bot: Priest
-    constructor (bot: Priest) {
-        this.bot = bot
+    private priest: Priest
+    constructor (bot: Priest, memoryStorage: MemoryStorage) {
+        super(bot, memoryStorage)
+        this.priest = bot
         this.attackOrHealLoop()
         this.useZap()
         this.useDarkBlessingLoop()
         this.useCurseLoop()
     }
 
-    public getBot(){
-        return this.bot
-    }
-
     private async attackOrHealLoop() {
-        if(this.bot.isOnCooldown("attack")) return setTimeout(this.attackOrHealLoop, this.bot.getCooldown("attack"))
-        if(!this.bot.canUse("attack")) return setTimeout(this.attackOrHealLoop, Math.max(1, this.bot.getCooldown("attack")))
+        if(this.priest.isOnCooldown("attack")) return setTimeout(this.attackOrHealLoop, this.priest.getCooldown("attack"))
+        if(!this.priest.canUse("attack")) return setTimeout(this.attackOrHealLoop, Math.max(1, this.priest.getCooldown("attack")))
         let healTarget = this.whoNeedsHeal()
-        let playerHealTartget = this.bot.players.get(healTarget)
+        let playerHealTartget = this.priest.players.get(healTarget)
         if(healTarget !== "null") {
-            if(!this.bot.smartMoving && playerHealTartget && Tools.distance(playerHealTartget,this.bot)> this.bot.range) {
-                await this.bot.move( 
-                    this.bot.x + (playerHealTartget.x - this.bot.x)/2,
-                    this.bot.y + (playerHealTartget.y - this.bot.y)/2
+            if(!this.priest.smartMoving && playerHealTartget && Tools.distance(playerHealTartget,this.priest)> this.priest.range) {
+                await this.priest.move( 
+                    this.priest.x + (playerHealTartget.x - this.priest.x)/2,
+                    this.priest.y + (playerHealTartget.y - this.priest.y)/2
                 )
             }
-            if(playerHealTartget && Tools.distance(playerHealTartget, this.bot)<= this.bot.range) {
-                this.bot.healSkill(playerHealTartget.id).catch( ex => console.error(ex))
+            if(playerHealTartget && Tools.distance(playerHealTartget, this.priest)<= this.priest.range) {
+                this.priest.healSkill(playerHealTartget.id).catch( ex => console.error(ex))
             }
         }
-        if(this.bot.isOnCooldown("attack")) return setTimeout(this.attackOrHealLoop, this.bot.getCooldown("attack"))
-        let target = this.bot.getTargetEntity()
-        if(!target.target && CF.calculate_monster_dps(this.bot, target)/CF.calculate_hps(this.bot) >=2) return setTimeout(this.attackOrHealLoop, 500)
-        if(target && Tools.distance(target, this.bot)<= this.bot.range) {
-            await this.bot.basicAttack(target.id).catch( ex => console.error(ex))
-            return setTimeout(this.attackOrHealLoop, this.bot.getCooldown("attack"))
+        if(this.priest.isOnCooldown("attack")) return setTimeout(this.attackOrHealLoop, this.priest.getCooldown("attack"))
+        let target = this.priest.getTargetEntity()
+        if(!target?.target && CF.calculate_monster_dps(this.priest, target)/CF.calculate_hps(this.priest) >=2) return setTimeout(this.attackOrHealLoop, 500)
+        if(target && Tools.distance(target, this.priest)<= this.priest.range) {
+            await this.priest.basicAttack(target.id).catch( ex => console.error(ex))
+            return setTimeout(this.attackOrHealLoop, this.priest.getCooldown("attack"))
         }
-        return setTimeout(this.attackOrHealLoop, Math.min(this.bot.frequency, this.bot.getCooldown("attack")))
+        return setTimeout(this.attackOrHealLoop, Math.min(this.priest.frequency, this.priest.getCooldown("attack")))
     }
 
     private async useCurseLoop() {
-        if(!this.bot.target || this.bot.smartMoving) return setTimeout(this.useCurseLoop, 2000)
-        if(this.bot.getCooldown("curse")) return setTimeout(this.useCurseLoop, this.bot.getCooldown("curse"))
-        await this.bot.curse(this.bot.target).catch(ex => console.warn(ex))
-        return setTimeout(this.useCurseLoop, this.bot.getCooldown("curse"))
+        if(!this.priest.target || this.priest.smartMoving) return setTimeout(this.useCurseLoop, 2000)
+        if(this.priest.getCooldown("curse")) return setTimeout(this.useCurseLoop, this.priest.getCooldown("curse"))
+        await this.priest.curse(this.priest.target).catch(ex => console.warn(ex))
+        return setTimeout(this.useCurseLoop, this.priest.getCooldown("curse"))
     }
 
     private whoNeedsHeal()  {
-        if(this.bot.hp < this.bot.max_hp*0.7 && this.bot.getEntities({targetingMe: true}).length>0) return this.bot.name
-        let players_near = Object.values(this.bot.players).filter( e=> Tools.distance(this.bot, e) < this.bot.range * 2 && e.name)
+        if(this.priest.hp < this.priest.max_hp*0.7 && this.priest.getEntities({targetingMe: true}).length>0) return this.priest.name
+        let players_near = Object.values(this.priest.players).filter( e=> Tools.distance(this.priest, e) < this.priest.range * 2 && e.name)
         for(let player of players_near) {
-            if(this.bot.partyData.list.includes(player.name) && player.hp < player.max_hp*0.8) return player.name
-            if(!this.bot.partyData.list.includes(player.name) && player.hp<player.max_hp*0.6 && Tools.distance(player, this.bot)<=this.bot.range) return player.name
+            if(this.priest.partyData.list.includes(player.name) && player.hp < player.max_hp*0.8) return player.name
+            if(!this.priest.partyData.list.includes(player.name) && player.hp<player.max_hp*0.6 && Tools.distance(player, this.priest)<=this.priest.range) return player.name
         }
         return "null"
     }
 
     public async pullMobsFromParty() {
-        let mobs_targeting_party = this.bot.getEntities({targetingPartyMember: true, targetingMe: false})
+        let mobs_targeting_party = this.priest.getEntities({targetingPartyMember: true, targetingMe: false})
         if(mobs_targeting_party.length<1) return setTimeout(this.pullMobsFromParty, 1000)
         if(mobs_targeting_party.filter( e=> e.abilities.stone)) return
         let players : Map<string, number> = new Map()
         let player_with_more_mobs = 'null'
-        for (let pm of this.bot.partyData.list) {
+
+        for (let pm of this.priest.partyData.list) {
             players.set(pm,0)
         }
+
         for(let mob of mobs_targeting_party) {
             if(!player_with_more_mobs) player_with_more_mobs = mob.target
             let playerCount = players.get(mob.target) || 0
@@ -83,47 +84,48 @@ export class PriestsAttackStrategy {
                 player_with_more_mobs = mob.target
             }
         }
-        await this.bot.absorbSins(player_with_more_mobs)        
+
+        await this.priest.absorbSins(player_with_more_mobs)        
     }
 
     public async useMassHeal() {
-        if(!this.bot.canUse("partyheal")) return
+        if(!this.priest.canUse("partyheal")) return
         
-        return this.bot.partyHeal()
+        return this.priest.partyHeal()
     }
 
     private async useDarkBlessingLoop() {
-        if(this.bot.isOnCooldown("darkblessing")) return setTimeout(this.useDarkBlessingLoop, this.bot.getCooldown("darkblessing"))
-        if(!this.bot.canUse("darkblessing") || this.bot.smartMoving) return setTimeout(this.useDarkBlessingLoop, 2000)
-        if(this.bot.s.darkblessing) return setTimeout(this.useDarkBlessingLoop, this.bot.s.darkblessing.ms)
+        if(this.priest.isOnCooldown("darkblessing")) return setTimeout(this.useDarkBlessingLoop, this.priest.getCooldown("darkblessing"))
+        if(!this.priest.canUse("darkblessing") || this.priest.smartMoving) return setTimeout(this.useDarkBlessingLoop, 2000)
+        if(this.priest.s.darkblessing) return setTimeout(this.useDarkBlessingLoop, this.priest.s.darkblessing.ms)
 
         await this.useDarkBlessingLoop().catch(ex => console.warn(ex))
-        return setTimeout(this.useDarkBlessingLoop, this.bot.getCooldown("darkblessing"))
+        return setTimeout(this.useDarkBlessingLoop, this.priest.getCooldown("darkblessing"))
     }
 
     private async useZap() {
-        if(!this.bot.canUse("zap")) return setTimeout(this.useZap, Math.max(50, this.bot.getCooldown("zap")))
+        if(!this.priest.canUse("zap")) return setTimeout(this.useZap, Math.max(50, this.priest.getCooldown("zap")))
 
         let dps = 0
-        let hps = this.bot.heal * this.bot.frequency
-        for(let mob of this.bot.getEntities({targetingMe: true, targetingPartyMember: true})) {
-            dps+= CF.calculate_monster_dps(this.bot, mob)
+        let hps = this.priest.heal * this.priest.frequency
+        for(let mob of this.priest.getEntities({targetingMe: true, targetingPartyMember: true})) {
+            dps+= CF.calculate_monster_dps(this.priest, mob)
             
         }
-        let MobsWithoutTargetingParty = this.bot.getEntities({targetingMe: false, targetingPartyMember:false})
+        let MobsWithoutTargetingParty = this.priest.getEntities({targetingMe: false, targetingPartyMember:false})
         
         if(MobsWithoutTargetingParty.length>0 && dps<hps) {
             for( let mob of MobsWithoutTargetingParty) {
-                if(hps > dps + CF.calculate_monster_dps(this.bot, mob)) {
-                    await this.bot.zapperZap(mob.id).catch(er => console.warn(er))
-                    return setTimeout(this.useZap, Math.max(1, this.bot.getCooldown("zapperzap")))
+                if(hps > dps + CF.calculate_monster_dps(this.priest, mob)) {
+                    await this.priest.zapperZap(mob.id).catch(er => console.warn(er))
+                    return setTimeout(this.useZap, Math.max(1, this.priest.getCooldown("zapperzap")))
                 }
             }
         }
 
-        if(this.bot.mp > this.bot.max_mp * 0.8 && this.bot.getTargetEntity()) {
-            await this.bot.zapperZap(this.bot.getTargetEntity().id)
-            return setTimeout(this.useZap, Math.max(1, this.bot.getCooldown("zapperzap")))
+        if(this.priest.mp > this.priest.max_mp * 0.8 && this.priest.getTargetEntity()) {
+            await this.priest.zapperZap(this.priest.getTargetEntity().id)
+            return setTimeout(this.useZap, Math.max(1, this.priest.getCooldown("zapperzap")))
         }
 
         return setTimeout(this.useZap, 1000)

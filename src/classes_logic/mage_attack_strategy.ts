@@ -1,59 +1,60 @@
 import {Tools, Game, Mage } from "alclient"
+import { ManageItems } from "../common_functions/manage_items_strategy"
+import { MemoryStorage } from "../common_functions/memory_storage"
+import { StateStrategy } from "../common_functions/state_strategy"
 
-export class MageAttackStrategy {
+export class MageAttackStrategy extends StateStrategy {
 
-    private bot : Mage
+    private mage : Mage
 
-    constructor(bot: Mage) {
-        this.bot = bot
+    constructor(bot: Mage, memoryStorage: MemoryStorage) {
+        super(bot, memoryStorage) 
         this.attackLoop()
         this.useReflectionShieldLoop()
         this.useEnergizeLoop()
     }
 
-    public getBot() {
-        return this.bot
-    }
+    
 
     private async attackLoop() {
-        if (!this.bot.canUse("attack")) return setTimeout(this.attackLoop, Math.max(1, this.bot.getCooldown("attack")))
-        let target = this.bot.getTargetEntity()
+        if (!this.mage.canUse("attack")) return setTimeout(this.attackLoop, Math.max(1, this.mage.getCooldown("attack")))
+        let target = this.mage.getTargetEntity()
         if(!target) return setTimeout(this.attackLoop, 1000)
 
-        if(!target.target && this.bot.isOnCooldown("scare")) return setTimeout(this.attackLoop, this.bot.getCooldown("scare"))
+        if(!target.target && this.mage.isOnCooldown("scare")) return setTimeout(this.attackLoop, this.mage.getCooldown("scare"))
 
-        await this.bot.basicAttack(target.id).catch(er => console.warn(er))
-        return setTimeout(this.attackLoop, this.bot.getCooldown("attack"))
+        await this.mage.basicAttack(target.id).catch(er => console.warn(er))
+        return setTimeout(this.attackLoop, this.mage.getCooldown("attack"))
         
     }
 
     private async useReflectionShieldLoop() {
-        if(this.bot.isOnCooldown("reflection")) return setTimeout(this.useReflectionShieldLoop, this.bot.getCooldown("reflection"))
-        if(!this.bot.canUse("reflection") || this.bot.smartMoving) return setTimeout(this.useReflectionShieldLoop, 2000)
-        if(this.bot.getEntities({targetingPartyMember: true}).length>0) {
-            let mob = this.bot.getEntities({targetingPartyMember: true})[0]
+        if(this.mage.isOnCooldown("reflection")) return setTimeout(this.useReflectionShieldLoop, this.mage.getCooldown("reflection"))
+        if(!this.mage.canUse("reflection") || this.mage.smartMoving) return setTimeout(this.useReflectionShieldLoop, 2000)
+        if(this.mage.getEntities({targetingPartyMember: true}).length>0) {
+            let mob = this.mage.getEntities({targetingPartyMember: true})[0]
             let target = mob.target
             if (mob.damage_type == "magical" ) {
-                await this.bot.applyReflection(target).catch(ex => console.warn(ex))
-                return setTimeout(this.useReflectionShieldLoop, this.bot.getCooldown("reflection"))
+                await this.mage.applyReflection(target).catch(ex => console.warn(ex))
+                return setTimeout(this.useReflectionShieldLoop, this.mage.getCooldown("reflection"))
             }
         }
-        else if(this.bot.getEntities({targetingMe: true}).length>0) {
-            await this.bot.applyReflection(this.bot.name).catch(ex => console.warn(ex))
-            return setTimeout(this.useReflectionShieldLoop, this.bot.getCooldown("reflection"))
+        else if(this.mage.getEntities({targetingMe: true}).length>0) {
+            await this.mage.applyReflection(this.mage.name).catch(ex => console.warn(ex))
+            return setTimeout(this.useReflectionShieldLoop, this.mage.getCooldown("reflection"))
         }
         return setTimeout(this.useReflectionShieldLoop, 2000)
     }
 
     private async useEnergizeLoop() {
-        if(this.bot.getCooldown("energize")) return setTimeout(this.useEnergizeLoop, this.bot.getCooldown("energize"))
-        if(!this.bot.canUse("energize") || this.bot.smartMoving) return setTimeout(this.useEnergizeLoop, 2000)
+        if(this.mage.getCooldown("energize")) return setTimeout(this.useEnergizeLoop, this.mage.getCooldown("energize"))
+        if(!this.mage.canUse("energize") || this.mage.smartMoving) return setTimeout(this.useEnergizeLoop, 2000)
         
-        for( let k of Object.keys(this.bot.partyData.party)) {
-            let member = this.bot.partyData.party[k]
-            if(Tools.distance(member, this.bot)>320 && (member.type == "warrior" || member.type == "ranger")) {
-                await this.bot.energize(k, 1).catch(ex => console.warn(ex))
-                return setTimeout(this.useEnergizeLoop, this.bot.getCooldown("energize"))
+        for( let k of Object.keys(this.mage.partyData.party)) {
+            let member = this.mage.partyData.party[k]
+            if(Tools.distance(member, this.mage)<Game.G.skills["energize"].range && (member.type == "warrior" || member.type == "ranger")) {
+                await this.mage.energize(k, 1).catch(ex => console.warn(ex))
+                return setTimeout(this.useEnergizeLoop, this.mage.getCooldown("energize"))
             }
         }
         

@@ -256,7 +256,7 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["xarmor", { level: 3, primlingAt: 0 }],
     ["xpants", { level: 3, primlingAt: 0 }],
 
-    ["firestaff", { level: 8, primlingAt: 7 }],
+    ["firestaff", { level: 8, primlingAt: 7, shouldBeShiny: true, scrollUpAt: 5 }],
     ["fireblade", { level: 8, primlingAt: 7 }],
 
     ["harbringer", { level: 7 }],
@@ -264,7 +264,7 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
 
 
     // Halloween
-    ["ololipop", { level: 8, primlingAt: 6, scrollUpAt: 3 }],
+    ["ololipop", { level: 8, primlingAt: 6, scrollUpAt: 3, shouldBeShiny: true }],
     ["glolipop", { level: 8, primlingAt: 6, scrollUpAt: 3 }],
 
     // Bunny stuff
@@ -275,7 +275,7 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["wingedboots", { level: 7, scrollUpAt: 5 }],
     ["lmace", { level: 3, primlingAt: 0 }],
     ["handofmidas", { level: 5 }],
-    ["bataxe", { level: 8, scrollUpAt: 4, primlingAt: 4, offeringAt: 6 }],
+    ["bataxe", { level: 8, scrollUpAt: 4, primlingAt: 4, offeringAt: 6, shouldBeShiny: true }],
 
     // Winter holidays
     ["gcape", { level: 7 }],
@@ -301,6 +301,7 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     // Amulets
     ["intamulet", { level: 4, primlingAt: 3 }],
     ["stramulet", { level: 4, primlingAt: 3 }],
+    ["dexamulet", { level: 4, primlingAt: 3 }],
 
 
     ["t2stramulet", { level: 3, primlingAt: 2 }],
@@ -310,11 +311,14 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     // Belts
     ["intbelt", { level: 4, offeringAt: 3 }],
     ["strbelt", { level: 4, offeringAt: 3 }],
+    ["dexbelt", { level: 4, offeringAt: 3 }],
 
     ["crossbow", { level: 5, primlingAt: 3, scrollUpAt: 4 }],
 
     // Orbs
     ["orbg", { level: 3 }],
-    ["jacko", { level: 3 }]
+    ["jacko", { level: 3 }],
+    ["orbofdex", { level: 4, scrollUpAt: 2, offeringAt: 3 }],
+    ["orbofstr", { level: 4, scrollUpAt: 2, offeringAt: 3 }]
 ]);
 
