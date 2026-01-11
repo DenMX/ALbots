@@ -40,7 +40,17 @@ export class ManageItems extends ResuplyStrategy {
     
 
     constructor (bot: PingCompensatedCharacter, memoryStorage: MemoryStorage){
-        super(bot, memoryStorage)
+        super(bot as  PingCompensatedCharacter, memoryStorage)
+
+        //bind context functions
+        this.upgradeItems = this.upgradeItems.bind(this)
+        this.compoundItems = this.upgradeItems.bind(this)
+        this.exchangeItems = this.exchangeItems.bind(this)
+        this.storeItems = this.storeItems.bind(this)
+        this.upgradeItemsFromBank = this.upgradeItemsFromBank.bind(this)
+        this.sellTrash = this.sellTrash.bind(this)
+        this.sendItems = this.sendItems.bind(this)
+
     }
 
     protected async upgradeItems() {
@@ -175,7 +185,7 @@ export class ManageItems extends ResuplyStrategy {
             }
             if(!item.q){
                 let emptyBankSlot = getEmptySlot()
-                await bot.smartMove(emptyBankSlot[0], {getWithin: 9999})
+                await bot.smartMove(emptyBankSlot[0], {getWithin: 9999}).catch(console.warn)
                 await bot.depositItem(i, emptyBankSlot[0])
             }
             if(item.q && Game.G.items[item.name].s > item.q) {
@@ -183,10 +193,10 @@ export class ManageItems extends ResuplyStrategy {
                     quantityLessThan: Game.G.items[item.name].s - item.q +1,
                 })
                 if(bankItems.length) {
-                    await bot.smartMove(bankItems[0][0], {getWithin: 9999})
+                    await bot.smartMove(bankItems[0][0], {getWithin: 9999}).catch(console.warn)
                 }
                 else if(emptyBankSlots.length>0){
-                    await bot.smartMove(getEmptySlot()[0], {getWithin: 9999})
+                    await bot.smartMove(getEmptySlot()[0], {getWithin: 9999}).catch(console.warn)
                 }
                 await bot.depositItem(i)
             }
@@ -254,7 +264,7 @@ export class ManageItems extends ResuplyStrategy {
             let offerings = this.locateItemsInBank(bot, "offeringp")
             if(offerings.length) {
                 for(const bankPack of offerings) {
-                    await bot.smartMove(bankPack[0], {getWithin: 9999})
+                    await bot.smartMove(bankPack[0], {getWithin: 9999}).catch(console.warn)
                     for(const pack of bankPack[1]) {
                         await bot.withdrawItem(bankPack[0], pack)
                     }
@@ -265,7 +275,7 @@ export class ManageItems extends ResuplyStrategy {
             let offerings = this.locateItemsInBank(bot, "offering")
             if(offerings.length) {
                 for(const bankPack of offerings) {
-                    await bot.smartMove(bankPack[0], {getWithin: 9999})
+                    await bot.smartMove(bankPack[0], {getWithin: 9999}).catch(console.warn)
                     for(const pack of bankPack[1]) {
                         await bot.withdrawItem(bankPack[0], pack)
                     }
@@ -277,7 +287,7 @@ export class ManageItems extends ResuplyStrategy {
         outer: for(let i = 0; i < items.upgrade.length; i++) {
             for(const it of items.upgrade[i].slots) {
                 if(bot.esize<2) break outer;
-                await bot.smartMove(it[0], {getWithin: 9999})
+                await bot.smartMove(it[0], {getWithin: 9999}).catch(console.warn)
                 await bot.withdrawItem(it[0], it[1])
             }
         }
@@ -292,14 +302,14 @@ export class ManageItems extends ResuplyStrategy {
                 if(items.compound[i].slots.length-1<it+2) break
 
                 for(let x = 0; i < 3; i++) {
-                    await bot.smartMove(items.compound[i].slots[it+x][0], {getWithin: 9999})
+                    await bot.smartMove(items.compound[i].slots[it+x][0], {getWithin: 9999}).catch(console.warn)
                     await bot.withdrawItem(items.compound[i].slots[it+x][0], items.compound[i].slots[it+x][1])
                 }
                 
             }
         }
 
-        await bot.smartMove("main")
+        await bot.smartMove("main").catch(console.warn)
         await this.upgradeItems()
         await this.compoundItems()
     }

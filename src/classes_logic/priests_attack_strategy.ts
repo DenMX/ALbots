@@ -1,5 +1,4 @@
-import { Priest, ItemName, Tools, Player, Game} from "alclient"
-import * as Items from "../classes_configs/items"
+import { Priest, Tools, } from "alclient"
 import * as CF from "../../src/common_functions/common_functions"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
@@ -10,6 +9,13 @@ export class PriestsAttackStrategy extends StateStrategy {
     constructor (bot: Priest, memoryStorage: MemoryStorage) {
         super(bot, memoryStorage)
         this.priest = bot
+
+        this.attackOrHealLoop = this.attackOrHealLoop.bind(this)
+        this.useZap = this.useZap.bind(this)
+        this.useDarkBlessingLoop = this.useDarkBlessingLoop.bind(this)
+        this.useCurseLoop = this.useCurseLoop.bind(this)
+
+
         this.attackOrHealLoop()
         this.useZap()
         this.useDarkBlessingLoop()
@@ -17,26 +23,35 @@ export class PriestsAttackStrategy extends StateStrategy {
     }
 
     private async attackOrHealLoop() {
-        if(this.priest.isOnCooldown("attack")) return setTimeout(this.attackOrHealLoop, this.priest.getCooldown("attack"))
+        if(this.priest.isOnCooldown("attack")) return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
         if(!this.priest.canUse("attack")) return setTimeout(this.attackOrHealLoop, Math.max(1, this.priest.getCooldown("attack")))
         let healTarget = this.whoNeedsHeal()
-        let playerHealTartget = this.priest.players.get(healTarget)
-        if(healTarget !== "null") {
-            if(!this.priest.smartMoving && playerHealTartget && Tools.distance(playerHealTartget,this.priest)> this.priest.range) {
-                await this.priest.move( 
-                    this.priest.x + (playerHealTartget.x - this.priest.x)/2,
-                    this.priest.y + (playerHealTartget.y - this.priest.y)/2
-                )
-            }
-            if(playerHealTartget && Tools.distance(playerHealTartget, this.priest)<= this.priest.range) {
-                this.priest.healSkill(playerHealTartget.id).catch( ex => console.error(ex))
+        if(healTarget !== undefined) {
+            let healEntity = this.priest.getPlayers().filter( e => e.name == healTarget)[0]
+            if(healEntity && Tools.distance(healEntity, this.priest)<= this.priest.range*2) {
+                if(!this.priest.smartMoving && Tools.distance(healEntity,this.priest)> this.priest.range) {
+                    await this.priest.move( 
+                        this.priest.x + (healEntity.x - this.priest.x)/2,
+                        this.priest.y + (healEntity.y - this.priest.y)/2
+                    ).catch(console.warn)
+                }
+                if(Tools.distance(healEntity, this.priest)<= this.priest.range) {
+                    await this.priest.healSkill(healTarget).catch(console.error)
+                    return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
+                }
             }
         }
-        if(this.priest.isOnCooldown("attack")) return setTimeout(this.attackOrHealLoop, this.priest.getCooldown("attack"))
         let target = this.priest.getTargetEntity()
-        if(!target?.target && CF.calculate_monster_dps(this.priest, target)/CF.calculate_hps(this.priest) >=2) return setTimeout(this.attackOrHealLoop, 500)
-        if(target && Tools.distance(target, this.priest)<= this.priest.range) {
-            await this.priest.basicAttack(target.id).catch( ex => console.error(ex))
+        if(!target) return setTimeout(this.attackOrHealLoop, 300)
+        if(!target.target && CF.calculate_monster_dps(this.priest, target)/CF.calculate_hps(this.priest) >=2) return setTimeout(this.attackOrHealLoop, 500)
+        if(!this.priest.smartMoving && !this.priest.moving && Tools.distance(target, this.priest)> this.priest.range) {
+            await this.bot.move(
+                this.priest.x + (target.x - this.priest.x)/2,
+                this.priest.y + (target.y - this.priest.y)/2
+            ).catch(console.warn)
+        }
+        if(Tools.distance(target, this.priest)<= this.priest.range) {
+            await this.priest.basicAttack(target.id).catch(console.error)
             return setTimeout(this.attackOrHealLoop, this.priest.getCooldown("attack"))
         }
         return setTimeout(this.attackOrHealLoop, Math.min(this.priest.frequency, this.priest.getCooldown("attack")))
@@ -45,18 +60,35 @@ export class PriestsAttackStrategy extends StateStrategy {
     private async useCurseLoop() {
         if(!this.priest.target || this.priest.smartMoving) return setTimeout(this.useCurseLoop, 2000)
         if(this.priest.getCooldown("curse")) return setTimeout(this.useCurseLoop, this.priest.getCooldown("curse"))
-        await this.priest.curse(this.priest.target).catch(ex => console.warn(ex))
+        await this.priest.curse(this.priest.target).catch(console.warn)
         return setTimeout(this.useCurseLoop, this.priest.getCooldown("curse"))
     }
 
-    private whoNeedsHeal()  {
+    private whoNeedsHeal() : string  {
         if(this.priest.hp < this.priest.max_hp*0.7 && this.priest.getEntities({targetingMe: true}).length>0) return this.priest.name
-        let players_near = Object.values(this.priest.players).filter( e=> Tools.distance(this.priest, e) < this.priest.range * 2 && e.name)
-        for(let player of players_near) {
-            if(this.priest.partyData.list.includes(player.name) && player.hp < player.max_hp*0.8) return player.name
-            if(!this.priest.partyData.list.includes(player.name) && player.hp<player.max_hp*0.6 && Tools.distance(player, this.priest)<=this.priest.range) return player.name
+        let party = this.priest.getPlayers({isPartyMember: true, withinRange: this.priest.range*2}).filter( e => e.hp<e.max_hp*0.85)
+        let randomPlayers = this.priest.getPlayers({withinRange: "heal", isPartyMember: false}).filter( e => e.hp < e.max_hp*0.7)
+        if(party.length == 1) return party[0].name
+        if(party.length>1) {
+            party = party.sort( (cur, next) => {
+                if(cur.hp != next.hp) {
+                    return cur.hp<next.hp ? -1 : 1
+                }
+                return 0
+            })
+            return party[0].name
         }
-        return "null"
+        if(randomPlayers.length == 1) return randomPlayers[0].name
+        if(randomPlayers.length > 1) {
+            randomPlayers = randomPlayers.sort( (cur, next) => {
+                if(cur.hp != next.hp) {
+                    return cur.hp<next.hp ? -1 : 1
+                }
+                return 0
+            })
+            return randomPlayers[0].name
+        }
+        return undefined
     }
 
     public async pullMobsFromParty() {
@@ -97,15 +129,15 @@ export class PriestsAttackStrategy extends StateStrategy {
     private async useDarkBlessingLoop() {
         if(this.priest.isOnCooldown("darkblessing")) return setTimeout(this.useDarkBlessingLoop, this.priest.getCooldown("darkblessing"))
         if(!this.priest.canUse("darkblessing") || this.priest.smartMoving) return setTimeout(this.useDarkBlessingLoop, 2000)
-        if(this.priest.s.darkblessing) return setTimeout(this.useDarkBlessingLoop, this.priest.s.darkblessing.ms)
+        if(this.priest.s.darkblessing) return setTimeout(this.useDarkBlessingLoop, Math.max(100,this.priest.s.darkblessing.ms))
 
-        await this.useDarkBlessingLoop().catch(ex => console.warn(ex))
-        return setTimeout(this.useDarkBlessingLoop, this.priest.getCooldown("darkblessing"))
+        await this.priest.darkBlessing().catch(console.warn)
+        return setTimeout(this.useDarkBlessingLoop, Math.max(1,this.priest.getCooldown("darkblessing")))
     }
 
     private async useZap() {
-        if(!this.priest.canUse("zap")) return setTimeout(this.useZap, Math.max(50, this.priest.getCooldown("zap")))
-
+        if(!this.priest.canUse("zapperzap")) return setTimeout(this.useZap, Math.max(50, this.priest.getCooldown("zapperzap")))
+        console.log("Priest can use zap?")
         let dps = 0
         let hps = this.priest.heal * this.priest.frequency
         for(let mob of this.priest.getEntities({targetingMe: true, targetingPartyMember: true})) {

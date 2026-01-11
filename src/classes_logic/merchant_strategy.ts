@@ -18,8 +18,8 @@ export class MerchantStrategy extends ManageItems {
         this.checkPartyInventory()
         if(!super.getMemoryStorage.getBank) {
             this.job_scheduler.push(async() => {
-                await bot.smartMove("bank")
-                if(!bot.bank) await bot.smartMove("bank_b")
+                await bot.smartMove("bank").catch(console.warn)
+                if(!bot.bank) await bot.smartMove("bank_b").catch(console.warn)
                 this.job_scheduler.push(this.checkBankUpgrades)
             })
         }
@@ -76,7 +76,7 @@ export class MerchantStrategy extends ManageItems {
     private async shovelInventory() {
         this.changeMerchState("Going to bank")
         let bot = this.bot
-        await bot.smartMove("bank")
+        await bot.smartMove("bank").catch(console.warn)
         this.changeMerchState("Try to store items")
         await super.storeItems()
         this.changeMerchState(this.DEFAULT_STATE)
@@ -89,7 +89,7 @@ export class MerchantStrategy extends ManageItems {
             if(Object.values(bot.getItems()).filter( e => !items.DONT_SEND_ITEMS.includes(e.name) && !e.isLocked()).length>5) {
                 this.job_scheduler.push(async() => {
                     this.changeMerchState(`Smartmoving to ${bot.name}`)
-                    await this.bot.smartMove(bot)
+                    await this.bot.smartMove(bot).catch(console.warn)
                     this.changeMerchState('Getting items')
                     for(const [idx, item] of bot.getItems()) {
                         if(items.DONT_SEND_ITEMS.includes(item.name)) continue

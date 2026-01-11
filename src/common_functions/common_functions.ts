@@ -17,15 +17,18 @@ export function calculate_monsters_dps (bot: PingCompensatedCharacter) {
     return dps
 }
 
-export function calculate_monster_dps(bot: PingCompensatedCharacter, mob: Entity) {
+export function calculate_monster_dps(bot: PingCompensatedCharacter, mob: Entity): number {
     if(!mob || !bot) return 0
     if(mob.damage_type == "physical") {
+        console.log(`${mob.type} DPS counter ${bot.name}: ${(mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing)) * (mob.frequency/100)}`)
         return (mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing)) * (mob.frequency/100)
     }
     else if(mob.damage_type == "magical"){
+        console.log(`${mob.type} DPS counter ${bot.name}: ${(mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing)) * (mob.frequency/100)}`)
         return (mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing)) * (mob.frequency/100)
     }
     else if(mob.damage_type == "pure"){
+        console.log(`${mob.type} DPS counter ${bot.name}: ${mob.attack * (mob.frequency/100)}`)
         return mob.attack * (mob.frequency/100)
     }
     return 0
@@ -71,6 +74,7 @@ export function calculate_hps(bot: PingCompensatedCharacter, mobsCount?: number)
                                     )
                                     .forEach( e => { total_hps += 400 }) //add HPS for party heal skill
     }
+    console.log(`HPS for ${bot.name} is ${total_hps}`)
     return total_hps
 }
 

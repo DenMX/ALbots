@@ -4,3 +4,4 @@ credentials.json
 .env
 *.log
 api_token.txt
+*_state.json

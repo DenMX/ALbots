@@ -10,35 +10,27 @@ export class StateController {
     constructor(bots: StateStrategy[]) {
         this.bots = bots
         // this.serverObserver = serverObserver
-        this.checkEventBuff()
+        this.checkEvents = this.checkEvents.bind(this)
         this.checkEvents()
     }
 
     private async checkEvents() {
         for(let bot of this.bots) {
             let b = bot.stateBot
-            let events = Object.keys(b.S).filter( e => WANTED_EVENTS.has(e as MonsterName | MapName))
+            let events = Object.keys(b.S).filter( e => b.S[e].live != false  && WANTED_EVENTS.has(e as MonsterName | MapName))
             if(events.length) {
                 events.forEach( (e) => {
                     bot.addStateToScheduler({
-                    state_type: "event",
-                    wantedMob: WANTED_EVENTS.get(e as MonsterName | MapName),
-                    eventName: e as MonsterName | MapName
-                })
+                        state_type: "event",
+                        wantedMob: WANTED_EVENTS.get(e as MonsterName),
+                        eventName: e as MonsterName | MapName
+                    })
+                    console.log(`Found event for ${b.name}:`)
+                    console.log(JSON.stringify(e))
                 })
                 
             }
         }
-    }
-
-    private async checkEventBuff() {
-        for(const bot of this.bots) {
-            if(bot.stateBot.S.holidayseason && !bot.stateBot.s.holidayspirit)
-            {
-                await bot.stateBot.smartMove("main").catch(console.warn)
-                await bot.stateBot.getHolidaySpirit()
-            }
-        }
-        setTimeout(this.checkEventBuff, 5000)
+        setTimeout(this.checkEvents, 60 * 1000)
     }
 }

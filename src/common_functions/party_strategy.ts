@@ -10,11 +10,14 @@ export class PartyStrategy {
 
     
     constructor(bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
-        this.bot = bot
+        this.bot = bot as PingCompensatedCharacter
         this.memoryStorage = memoryStorage
         this.bot.socket.on("invite", (data) => this.onPartyInvite(data))
         this.bot.socket.on("request", (data) => this.onPartyRequest(data))
+        this.checkParty = this.checkParty.bind(this)
+        this.loot = this.loot.bind(this)
         this.checkParty()
+        this.loot()
     }
 
     private async onPartyInvite(data: InviteData) {
@@ -37,22 +40,39 @@ export class PartyStrategy {
         }
     }
 
+    private async loot() {
+        if(!this.bot.chests) return setTimeout( this.loot, 500)
+        if(this.canLoot()) {
+            if(this.bot.chests.size>3 || (this.bot.chests.size>0 && this.bot.smartMoving)) {
+                this.bot.chests.forEach( (e) => this.bot.openChest(e.id).catch(console.warn))
+            }
+        }
+        setTimeout(this.loot, 1000)
+    }
+
+    private canLoot() : boolean {
+        let looter = this.memoryStorage.getCurrentTank
+        if(this.bot.name == looter) return true
+        let looterEntity = this.bot.getPlayers({withinRange: 600}).filter( e => e.name == looter)
+        if(!this.bot.partyData || !this.bot.partyData?.list.includes(looter) || looterEntity.length<1) return true
+        return false
+    }
+
     private async checkParty() {
+        console.log("party loop")
         let pl = this.memoryStorage.getCurrentPartyLeader
         let default_pl = this.memoryStorage.getDefaultPartyLeader
         if(pl != this.bot.name && !this.bot.partyData?.list.includes(pl)) {
-            let players = await this.bot.getServerPlayers()
+            let players = await this.bot.getServerPlayers().catch(console.warn)
+            if(!players) return setTimeout(this.checkParty, 5000)
             let shouldWait = (players.filter( e=> e.name == pl).length>0 || my_characters.has(pl))
             if(shouldWait) {
-                setTimeout((pl) => {
-                    //sending another request in 2sec
-                    this.bot.sendPartyRequest(pl)
-                    //checking our party after 1 sec when sent request. 3 sec total
-                    setTimeout(this.checkParty, 1000)
-                }, 2000)
+                //checking our party after 1 sec when sent request. 3 sec total
+                return setTimeout(this.checkParty, 1000)
+                
             }
             if(!shouldWait) {
-                this.bot.sendPartyRequest(default_pl)
+                this.bot.sendPartyRequest(default_pl).catch(console.warn)
             }
         }
 

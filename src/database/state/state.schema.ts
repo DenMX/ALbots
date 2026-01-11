@@ -7,7 +7,7 @@ const StateSchema = new Schema({
         type: Number,
     },
     botId: {required: true, type: String },
-    wantedMob: {required: true, type: String },
+    wantedMob: {required: true, type: String || Array },
     state_type: {required: true, type: String },
     location: {required: false, type: Object }
 })
