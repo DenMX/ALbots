@@ -1,5 +1,5 @@
 import { ItemName, PingCompensatedCharacter, Ranger, Tools } from "alclient"
-import * as CI from "../classes_configs/items"
+import * as CI from "../configs/character_items_configs"
 import { PartyStrategy } from "./party_strategy"
 import { MemberExpression } from "typescript"
 import { MemoryStorage } from "./memory_storage"
@@ -111,26 +111,26 @@ export class ResuplyStrategy extends PartyStrategy {
         if(this.bot.hp < this.bot.max_hp * 0.5) {
             let hpot = this.bot.locateItem("hpot1")
             hpot>=0 ? await this.bot.usePotion(hpot).catch(console.warn) : await this.bot.regenHP().catch(console.warn)
-            console.log("Regening HP")
+            // console.log("Regening HP")
             return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
         }
         if(this.bot.mp < this.bot.max_mp-500) {
             let mpot = this.bot.locateItem("mpot1")
             mpot>=0 ? await this.bot.usePotion(mpot).catch(console.warn) : await this.bot.regenMP().catch(console.warn)
-            console.log("Regening MP")
+            // console.log("Regening MP")
             return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
         }
         if(this.bot.hp<this.bot.max_hp*0.9) {
             let hpot = this.bot.locateItem("hpot1")
             hpot>=0 ? await this.bot.usePotion(hpot).catch(console.warn) : await this.bot.regenHP().catch(console.warn)
-            console.log("Regening HP")
+            // console.log("Regening HP")
             return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
         }
         return setTimeout( () => this.usePotionsLoop(), 1000)
     }
 
     private async resupplyPots() {
-        console.log("Ressuply pots loop")
+        // console.log("Ressuply pots loop")
         if(!this.bot.items) return setTimeout( () => this.resupplyPots(), 5000)
         let hpot = this.bot.items[this.bot.locateItem("hpot1")]?.q || 0// let hpot = this.getBot.items[this.bot.locateItem("hpot1")]?.q || 0
         let mpot = this.bot.items[this.bot.locateItem("mpot1")]?.q || 0
@@ -168,7 +168,7 @@ export class ResuplyStrategy extends PartyStrategy {
     }
 
     private async scareLoop() {
-        console.log("Scare loop")
+        // console.log("Scare loop")
         if(!this.bot.canUse("scare")) return setTimeout(this.scareLoop, 1000)
         if(this.bot.isOnCooldown("scare")) return setTimeout( () => this.scareLoop(), Math.max(1, this.bot.getCooldown("scare")))
         if(this.bot.hp < this.bot.max_hp * 0.4) {

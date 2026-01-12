@@ -1,5 +1,5 @@
 import { Warrior, ItemName, Tools, PingCompensatedCharacter} from "alclient"
-import * as Items from "../classes_configs/items"
+import * as Items from "../configs/character_items_configs"
 import * as CF from "../../src/common_functions/common_functions"
 import { MemoryStorage } from "../common_functions/memory_storage";
 import { StateStrategy } from "../common_functions/state_strategy";
@@ -76,11 +76,11 @@ export class WarriorsAttackStrategy extends StateStrategy {
                     await this.warrior.basicAttack(this.warrior.target).catch(console.error)
                 }
                 else if( !this.warrior.moving && !this.warrior.smartMoving ) {
-                    
-                    await this.warrior.move(
-                        this.warrior.x + (target.x - this.warrior.x)/2,
-                        this.warrior.y + (target.y - this.warrior.y)/2
-                    ).catch(console.warn)
+                    await this.bot.smartMove(target, {getWithin: this.bot.range}).catch(console.warn)
+                    // await this.warrior.move(
+                    //     this.warrior.x + (target.x - this.warrior.x)/2,
+                    //     this.warrior.y + (target.y - this.warrior.y)/2
+                    // ).catch(console.warn)
                 }
             }
         }
@@ -93,7 +93,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
     }
 
     private async useWarcryLoop() {
-        console.log("Warcry loop")
+        // console.log("Warcry loop")
         if(this.warrior.isOnCooldown("warcry")) return setTimeout(this.useWarcryLoop, this.warrior.getCooldown("warcry"))
         if(!this.warrior.canUse("warcry") || this.warrior.smartMoving) return setTimeout(this.useWarcryLoop, 2000)
         if(this.warrior.s.warcry) return setTimeout(this.useWarcryLoop, this.warrior.s.warcry.ms)
@@ -161,7 +161,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
     }
 
     private async useStomp() {
-        console.log("Calculating needs to use stomp")
+        // console.log("Calculating needs to use stomp")
         let dps = 0
         for(let mob of this.warrior.getEntities({targetingMe: true, targetingPartyMember: true, })) {
             if(mob.damage_type == "physical"){
@@ -211,7 +211,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
     }
 
     private async hardShellLoop() {
-        console.log("Hardshell loop")
+        // console.log("Hardshell loop")
         if(this.warrior.smartMoving || !this.warrior.canUse("hardshell") || this.warrior.moving) return setTimeout(this.hardShellLoop, 2000)
         if(this.warrior.hp < this.warrior.max_hp * 0.6 && Object.values(this.warrior.getEntities({targetingMe: true})).filter(e=> e.damage_type == "physical").length>0) {
             await this.warrior.hardshell().catch(console.error)

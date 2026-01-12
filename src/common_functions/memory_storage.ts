@@ -11,11 +11,11 @@ export class MemoryStorage {
 
     private secretKey: string
 
-    private default_party_leader: string = "MerchanDiser"
+    private default_party_leader: string = "frostyHeal"
 
     private current_party_leader: string
 
-    private default_tank: string = "Archealer"
+    private default_tank: string = "frostyHeal"
 
     private current_tank: string
 

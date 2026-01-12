@@ -26,14 +26,14 @@ export class PartyStrategy {
 
     private async onPartyRequest(data: InviteData) {
         if(this.bot.name != this.memoryStorage.getCurrentPartyLeader) return
-        if(my_characters.has(data.name)) this.bot.acceptPartyRequest(data.name)
+        if(my_characters.has(data.name) || !this.bot.partyData) this.bot.acceptPartyRequest(data.name)
         let myCharsInParty = 0
-        this.bot.partyData.list.forEach((e) => { if(my_characters.has(e)) myCharsInParty++})
+        this.bot.partyData?.list.forEach((e) => { if(my_characters.has(e)) myCharsInParty++})
         if(
             //All my characters in party. we can have additional chars
             myCharsInParty==4 || 
             //9 is maximum(ish) party size, so 9 minus party.lenght +1(current request) is party capacity, 4 - myCharsInParty needed capacity
-            9-this.bot.partyData.list.length+1>4-myCharsInParty
+            9-this.bot.partyData?.list.length+1>4-myCharsInParty
         ) 
         {
             this.bot.acceptPartyRequest(data.name)
@@ -65,13 +65,11 @@ export class PartyStrategy {
         if(pl != this.bot.name && !this.bot.partyData?.list.includes(pl)) {
             let players = await this.bot.getServerPlayers().catch(console.warn)
             if(!players) return setTimeout(this.checkParty, 5000)
-            let shouldWait = (players.filter( e=> e.name == pl).length>0 || my_characters.has(pl))
-            if(shouldWait) {
-                //checking our party after 1 sec when sent request. 3 sec total
+            if(players.filter( e=> e.name == pl).length>0) {
+                this.bot.sendPartyRequest(pl)
                 return setTimeout(this.checkParty, 1000)
-                
             }
-            if(!shouldWait) {
+            if(this.bot.name != default_pl) {
                 this.bot.sendPartyRequest(default_pl).catch(console.warn)
             }
         }

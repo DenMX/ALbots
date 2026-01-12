@@ -1,5 +1,5 @@
 import { PingCompensatedCharacter} from "alclient"
-import * as items from "../classes_configs/items"
+import * as items from "../configs/manage_items_configs"
 import { ManageItems } from "../common_functions/manage_items_strategy"
 import { MemoryStorage } from "../common_functions/memory_storage"
 

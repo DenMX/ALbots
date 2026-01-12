@@ -1,6 +1,6 @@
 import { MapName, MonsterName, Observer, PingCompensatedCharacter } from "alclient";
 import { StateStrategy } from "../common_functions/state_strategy";
-import { WANTED_EVENTS } from "../classes_configs/events_and_spots";
+import { WANTED_EVENTS } from "../configs/events_and_spots";
 
 export class StateController {
     private bots: StateStrategy[]

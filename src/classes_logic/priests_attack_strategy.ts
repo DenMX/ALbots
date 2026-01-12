@@ -45,23 +45,17 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(!target) return setTimeout(this.attackOrHealLoop, 300)
         if(!target.target && CF.calculate_monster_dps(this.priest, target)/CF.calculate_hps(this.priest) >=2) return setTimeout(this.attackOrHealLoop, 500)
         if(!this.priest.smartMoving && !this.priest.moving && Tools.distance(target, this.priest)> this.priest.range) {
-            await this.bot.move(
-                this.priest.x + (target.x - this.priest.x)/2,
-                this.priest.y + (target.y - this.priest.y)/2
-            ).catch(console.warn)
+            await this.bot.smartMove(target, {getWithin: this.bot.range}).catch(console.warn)
+            // await this.bot.move(
+            //     this.priest.x + (target.x - this.priest.x)/2,
+            //     this.priest.y + (target.y - this.priest.y)/2
+            // ).catch(console.warn)
         }
         if(Tools.distance(target, this.priest)<= this.priest.range) {
             await this.priest.basicAttack(target.id).catch(console.error)
             return setTimeout(this.attackOrHealLoop, this.priest.getCooldown("attack"))
         }
         return setTimeout(this.attackOrHealLoop, Math.min(this.priest.frequency, this.priest.getCooldown("attack")))
-    }
-
-    private async useCurseLoop() {
-        if(!this.priest.target || this.priest.smartMoving) return setTimeout(this.useCurseLoop, 2000)
-        if(this.priest.getCooldown("curse")) return setTimeout(this.useCurseLoop, this.priest.getCooldown("curse"))
-        await this.priest.curse(this.priest.target).catch(console.warn)
-        return setTimeout(this.useCurseLoop, this.priest.getCooldown("curse"))
     }
 
     private whoNeedsHeal() : string  {
@@ -91,12 +85,21 @@ export class PriestsAttackStrategy extends StateStrategy {
         return undefined
     }
 
+    private async useCurseLoop() {
+        if(!this.priest.getTargetEntity() || this.priest.smartMoving) return setTimeout(this.useCurseLoop, 2000)
+        if(this.priest.getCooldown("curse") || !this.priest.canUse("curse")) return setTimeout(this.useCurseLoop, Math.max(100, this.priest.getCooldown("curse")))
+        if(this.priest.getTargetEntity().hp<5000) return setTimeout(this.useCurseLoop, 1000)
+            await this.priest.curse(this.priest.target).catch(console.warn)
+        return setTimeout(this.useCurseLoop, this.priest.getCooldown("curse"))
+    }
+
+    // REWRITE!!!
     public async pullMobsFromParty() {
         let mobs_targeting_party = this.priest.getEntities({targetingPartyMember: true, targetingMe: false})
         if(mobs_targeting_party.length<1) return setTimeout(this.pullMobsFromParty, 1000)
-        if(mobs_targeting_party.filter( e=> e.abilities.stone)) return
+        if(mobs_targeting_party.filter( e=> e.abilities.stone)) return setTimeout(this.pullMobsFromParty, 1000)
         let players : Map<string, number> = new Map()
-        let player_with_more_mobs = 'null'
+        let player_with_more_mobs : string
 
         for (let pm of this.priest.partyData.list) {
             players.set(pm,0)

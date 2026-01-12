@@ -1,5 +1,5 @@
 import {Item, ItemName, BankInfo, PingCompensatedCharacter, Tools, Constants, Game, BankPackName, LocateItemFilters} from "alclient"
-import * as ItemsConfig from "../classes_configs/items"
+import * as ItemsConfig from "../configs/manage_items_configs"
 import { ResuplyStrategy } from "./resupply_strategy"
 import { MemoryStorage } from "./memory_storage"
 

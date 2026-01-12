@@ -107,6 +107,7 @@ export class StateStrategy extends ManageItems {
     }
 
     private async saveState() {
+        if(this.current_state.state_type == "event" || this.current_state.state_type == "boss") return setTimeout(this.saveState, Constants.MONGO_UPDATE_MS)
         if(Database.connection) {
             try {
                 const stateData = {
@@ -135,7 +136,7 @@ export class StateStrategy extends ManageItems {
             fs.writeFileSync(`../${this.bot.name}_state.json`, JSON.stringify(this.current_state), "utf-8")
             console.warn(`State saved in json. ${this.bot.name}`)   
         }
-        setTimeout(this.saveState, Constants.MONGO_UPDATE_MS)     
+        setTimeout(this.saveState, Constants.MONGO_UPDATE_MS)
     }
 
     public async startQuest() {
@@ -152,11 +153,11 @@ export class StateStrategy extends ManageItems {
     }
 
     private async checkState() {
-        console.log(`Check state, smartmoving: ${this.bot.smartMoving}`)
+        // console.log(`Check state, smartmoving: ${this.bot.smartMoving}`)
         // WE ARE SMARTMOVING => EXIT
         if( this.bot.smartMoving) return setTimeout(this.checkState, 1000)
 
-        console.log(`Check state continue. Current state: ${this.current_state.state_type} : ${this.current_state.wantedMob}`)
+        // console.log(`Check state continue. Current state: ${this.current_state.state_type} : ${this.current_state.wantedMob}`)
         
         // CHECK EVENT BUFF IF IT EXPIRED
         await this.checkEventBuff()
@@ -312,7 +313,7 @@ export class StateStrategy extends ManageItems {
         //we want to switch target if another map
         //prioritize boss => mobs targeting party => wantedMob => lowest hp => distance
         //we don't want to targeting mob with dps more than 2x hps
-        console.log(`Target loop, ${this.bot.target}`)
+        // console.log(`Target loop, ${this.bot.target}`)
         let target = this.bot.getTargetEntity()
         let entities = this.bot.getEntities()
         if(entities.length<1) return setTimeout(this.getTargetLoop, 500)
@@ -321,7 +322,7 @@ export class StateStrategy extends ManageItems {
                 console.log("Searching target")
                 entities = this.sortEntities(entities)
                 this.bot.target = entities[0].id
-                console.log(`Target found?: ${this.bot.target}`)
+                // console.log(`Target found?: ${this.bot.target}`)
             }
             else if(target && target.spawns) {
                 entities = this.sortEntities(entities, {sortSpawns: true})
@@ -348,7 +349,8 @@ export class StateStrategy extends ManageItems {
     private sortEntities(entities: Entity[], filter?: MobsSortFilter): Entity[] {
         let target = this.bot.getTargetEntity()
         
-        entities.sort(
+        entities = entities.filter(e=> !e.s.fullguard)
+        return entities.sort(
             (curr, next) => {
                 let dist_current = Tools.distance(this.bot, curr)
                 let dist_next = Tools.distance(this.bot, next)
@@ -378,6 +380,5 @@ export class StateStrategy extends ManageItems {
                 if(dist_current != dist_next) return (dist_current < dist_next) ? -1 : 1;
                 return 0;
         })
-        return entities
     }
 }

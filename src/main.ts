@@ -44,14 +44,14 @@ async function run(){
     // active_players.push(merchant)
 
     // let merchant = await Game.startMerchant("frostyMerch","EU", "II")
-    let priest = await Game.startPriest("frostyHeal", "EU", "II")
+    // let priest = await Game.startPriest("frostyHeal", "EU", "II")
     
-    // let ranger = await Game.startRanger("frostyRan", "EU", "II")
+    let ranger = await Game.startRanger("frostyRan", "EU", "II")
     
     // active_players.push(merchant)
-    active_players.push(priest)
+    // active_players.push(priest)
     
-    // active_players.push(ranger)
+    active_players.push(ranger)
     
     // console.log(`Warrior created: ${warrior.name}`)
     // console.log("Smart moving to snowman")
@@ -65,13 +65,14 @@ async function run(){
     // PROD READY STEADY
     let stateList = []
 
-    let warrior = await Game.startWarrior("frostyWar", "EU", "II")
-    active_players.push(warrior)
+    // let warrior = await Game.startWarrior("frostyWar", "EU", "II")
+    // active_players.push(warrior)
+    // active_players.push(priest)
     
     let memoryStorage = new MemoryStorage(active_players)
-    stateList.push(new PriestsAttackStrategy(priest, memoryStorage))
-    stateList.push(new WarriorsAttackStrategy(warrior, memoryStorage))
-    // stateList.push(new RangerAttackStrategy(ranger, memoryStorage))
+    // stateList.push(new PriestsAttackStrategy(priest, memoryStorage))
+    // stateList.push(new WarriorsAttackStrategy(warrior, memoryStorage))
+    stateList.push(new RangerAttackStrategy(ranger, memoryStorage))
     // new MerchantStrategy(merchant, memoryStorage)
     let stateController = new StateController(stateList)
     let bwi = new BWIReporter(active_players)

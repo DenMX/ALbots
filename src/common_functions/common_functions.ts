@@ -20,16 +20,16 @@ export function calculate_monsters_dps (bot: PingCompensatedCharacter) {
 export function calculate_monster_dps(bot: PingCompensatedCharacter, mob: Entity): number {
     if(!mob || !bot) return 0
     if(mob.damage_type == "physical") {
-        console.log(`${mob.type} DPS counter ${bot.name}: ${(mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing)) * (mob.frequency/100)}`)
-        return (mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing)) * (mob.frequency/100)
+        console.log(`${mob.type} DPS counter ${bot.name}: ${(mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing)) * mob.frequency}`)
+        return (mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing)) * mob.frequency
     }
     else if(mob.damage_type == "magical"){
-        console.log(`${mob.type} DPS counter ${bot.name}: ${(mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing)) * (mob.frequency/100)}`)
-        return (mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing)) * (mob.frequency/100)
+        // console.log(`${mob.type} DPS counter ${bot.name}: ${(mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing)) * (mob.frequency/100)}`)
+        return (mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing)) * mob.frequency
     }
     else if(mob.damage_type == "pure"){
-        console.log(`${mob.type} DPS counter ${bot.name}: ${mob.attack * (mob.frequency/100)}`)
-        return mob.attack * (mob.frequency/100)
+        // console.log(`${mob.type} DPS counter ${bot.name}: ${mob.attack * (mob.frequency/100)}`)
+        return mob.attack * mob.frequency
     }
     return 0
 }
@@ -56,24 +56,17 @@ export function calculate_hps(bot: PingCompensatedCharacter, mobsCount?: number)
         total_hps += (calculate_my_dps(bot) * bot.lifesteal/100) * bot.getEntities().length
     }
     if(bot.ctype == "priest") {
-        total_hps += bot.heal * bot.frequency
+        total_hps += bot.heal * bot.frequency+400
     }
-    if(bot.party) {
-       Object.values(bot.players).filter( e => 
-                                    //check healers in party
-                                    e.name != bot.name && 
-                                    bot.party?.includes(e.name) && 
-                                    e.type == "priest" && Tools.distance(e, bot) < e.range
-                                    )
-                                    .forEach( e => { total_hps += e.heal * e.frequency })
-        Object.values(bot.players).filter( e => 
-                                    //check healers in party
-                                    e.name != bot.name && 
-                                    bot.party?.includes(e.name) && 
-                                    e.type == "priest" && Tools.distance(e, bot) < e.range
-                                    )
-                                    .forEach( e => { total_hps += 400 }) //add HPS for party heal skill
+    if(bot.partyData) {
+        for(let player of bot.partyData.list) {
+            let pm = bot.partyData.party[player]
+            if(pm.type != "priest" || player == bot.name) continue
+            total_hps += 400
+        }
     }
+    let nearHeals = bot.getPlayers({isPartyMember: true}).filter( e => e.ctype == "priest" && Tools.distance(e,bot)<=e.range)
+    if(nearHeals.length>0) nearHeals.forEach(e => total_hps += (e.heal*e.frequency))
     console.log(`HPS for ${bot.name} is ${total_hps}`)
     return total_hps
 }
