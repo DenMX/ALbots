@@ -2,6 +2,8 @@ import {Item, ItemName, BankInfo, PingCompensatedCharacter, Tools, Constants, Ga
 import * as ItemsConfig from "../configs/manage_items_configs"
 import { ResuplyStrategy } from "./resupply_strategy"
 import { MemoryStorage } from "./memory_storage"
+import * as CharacterItems from "../configs/character_items_configs"
+import * as CF from "./common_functions"
 
 
 export type PackItems = [BankPackName, number[]]
@@ -50,11 +52,46 @@ export class ManageItems extends ResuplyStrategy {
         this.upgradeItemsFromBank = this.upgradeItemsFromBank.bind(this)
         this.sellTrash = this.sellTrash.bind(this)
         this.sendItems = this.sendItems.bind(this)
+        this.shinyItems = this.shinyItems.bind(this)
+        this.startManageLogic = this.startManageLogic.bind(this)
 
+        if(bot.ctype != 'merchant') this.startManageLogic()
+    }
+
+    protected async startManageLogic() {
+        if( !this.bot.hasItem(["computer", "supercomputer"])) {
+            
+            if( this.bot.esize>0 ) return setTimeout( this.startManageLogic, 30 * this.bot.esize * 1000 ) //setTimeout to 30sec for each empty slot
+
+            if( !this.bot.smartMoving && !this.bot.map.startsWith("bank") && (!this.memoryStorage.getBank || this.locateEmptyBankSlots().length>0) ) {
+                await this.bot.smartMove("main").catch(console.warn)
+                await this.sellTrash()
+                try {
+                    await this.bot.smartMove("bank")
+                }
+                catch(error) {
+                    console.warn(error)
+                }
+                
+                await this.storeItems()
+            }
+
+            return setTimeout( this.startManageLogic, this.bot.esize * 30 * 1000 )
+        }
+        //we have PC for remote upgrade
+        else {
+            if(Object.values(this.bot.getItems()).filter( e => !e.isLocked() ).length>0) {
+                this.sellTrash()
+                await this.upgradeItems()
+                await this.compoundItems()
+                await this.exchangeItems()
+            }
+        }
+        return setTimeout(this.startManageLogic, 30 * this.bot.esize * 1000)
     }
 
     protected async upgradeItems() {
-        if(!this.bot.locateItem(["computer", "supercomputer"]) && Tools.distance(this.bot, {x: -203, y: -115, map: "main"})>Constants.NPC_INTERACTION_DISTANCE) return
+        if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, {x: -203, y: -115, map: "main"})>Constants.NPC_INTERACTION_DISTANCE) return
 
         level: for(let lvl = 0; lvl < 9; lvl++){
             for(const [slot,item] of this.bot.getItems()) {
@@ -86,7 +123,7 @@ export class ManageItems extends ResuplyStrategy {
 
                 scroll_idx = this.bot.locateItem(scroll_name, this.bot.items)
                 if(!scroll_idx) continue
-                await this.bot.upgrade(slot, scroll_idx, primling)
+                await this.bot.upgrade(slot, scroll_idx, primling).catch(console.warn)
             }
         }
     }
@@ -126,7 +163,7 @@ export class ManageItems extends ResuplyStrategy {
                 scroll_idx = this.bot.locateItem(scroll_name, this.bot.items)
                 if(!scroll_idx) continue
 
-                await this.bot.compound(items[0],items[1],items[2], scroll_idx, primling)
+                await this.bot.compound(items[0],items[1],items[2], scroll_idx, primling).catch(console.warn)
                 
             }
         }
@@ -139,7 +176,7 @@ export class ManageItems extends ResuplyStrategy {
             if(!item.e || item.q < item.e) continue
             for(let q = 0; q< Math.floor(item.e/item.q); q++) {
                 if(this.bot.esize < 1 ) break items;
-                await this.bot.exchange(idx)
+                await this.bot.exchange(idx).catch(console.warn)
             }
         }
     }
@@ -157,9 +194,9 @@ export class ManageItems extends ResuplyStrategy {
         if(!bot.map.startsWith("bank")) return
         if(!bot.bank) console.error("We don't have bank information")
 
-        const emptyBankSlots = this.locateEmptyBankSlots(bot)
+        const emptyBankSlots = this.locateEmptyBankSlots()
         function getEmptySlot(): BankItemPosition {
-            if (!emptyBankSlots.length) throw new Error("No empty slots")
+            if (!emptyBankSlots.length) return undefined//throw new Error("No empty slots")
 
             const [bankPackName, emptyIndexes] = emptyBankSlots[0]
 
@@ -174,19 +211,18 @@ export class ManageItems extends ResuplyStrategy {
         }
 
 
-        for(let i=0 ; i< bot.isize; i++) {
-            let item = bot.items[i]
+        for(const [i, item] of bot.getItems()) {
             if(ItemsConfig.DONT_SEND_ITEMS.includes(item.name)) continue
             if(item.l || ItemsConfig.ITEMS_TO_SELL.includes(item.name)) continue
             if(ItemsConfig.DISMANTLE_ITEMS.includes(item.name)) {
                 if(bot.locateItem(["computer", "supercomputer"])) {
-                    await bot.dismantle(i).catch((ex) => console.warn(ex))
+                    await bot.dismantle(i).catch(console.warn)
                 }
             }
-            if(!item.q){
+            if(!item.q && emptyBankSlots.length>0){
                 let emptyBankSlot = getEmptySlot()
                 await bot.smartMove(emptyBankSlot[0], {getWithin: 9999}).catch(console.warn)
-                await bot.depositItem(i, emptyBankSlot[0])
+                await bot.depositItem(i, emptyBankSlot[0]).catch(console.error)
             }
             if(item.q && Game.G.items[item.name].s > item.q) {
                 const bankItems = this.locateItemsInBank(bot, item.name, {
@@ -198,13 +234,13 @@ export class ManageItems extends ResuplyStrategy {
                 else if(emptyBankSlots.length>0){
                     await bot.smartMove(getEmptySlot()[0], {getWithin: 9999}).catch(console.warn)
                 }
-                await bot.depositItem(i)
+                await bot.depositItem(i).catch(console.error)
             }
         }
         
     }
 
-    protected locateItemsInBank(bot: PingCompensatedCharacter, item: ItemName, filters?: LocateItemFilters) {
+    protected locateItemsInBank(bot: PingCompensatedCharacter, item: ItemName, filters?: LocateItemFilters): BankItems {
         if (!bot.map.startsWith("bank") && !super.getMemoryStorage.getBank) throw new Error("We aren't in the bank")
         if (!bot.bank && !super.getMemoryStorage.getBank) throw new Error("We don't have bank information")
 
@@ -224,13 +260,14 @@ export class ManageItems extends ResuplyStrategy {
         return items.sort(sortByPackNumberAsc)
     }
 
-    private locateEmptyBankSlots(bot: PingCompensatedCharacter) {
+    private locateEmptyBankSlots() {
+        let bot = this.bot
         if (!bot.map.startsWith("bank") && !super.getMemoryStorage.getBank) throw new Error("We aren't in the bank")
         if (!bot.bank && !super.getMemoryStorage.getBank) throw new Error("We don't have bank information")
 
         const empty: BankItems = []
 
-        let bank = (bot.bank) ? bot.bank : super.getMemoryStorage.getBank
+        let bank = (bot.bank) ? bot.bank : this.memoryStorage.getBank
 
         let bankPackName: keyof BankInfo
         for (bankPackName in bank) {
@@ -472,22 +509,29 @@ export class ManageItems extends ResuplyStrategy {
         return count;
     }
 
-    protected async sendItems(name: string) {
-        let me = this.bot
-        if(me.getPlayers({withinRange: Constants.NPC_INTERACTION_DISTANCE}).filter( e=> e.name == name).length>0) {
-            for(const [idx, item] of me.getItems()) {
-                if(ItemsConfig.DONT_SEND_ITEMS.includes(item.name)) continue
-                if(item.isLocked()) continue
-                await me.sendItem(name,idx,item.q)
-            }
+    public async sendItems(name: string) {
+        let personalItems = CF.getBotPersonalItemsList(this.bot)
+        
+        for(const [idx, item] of this.bot.getItems()) {
+            if( ItemsConfig.DONT_SEND_ITEMS.includes(item.name) ) continue
+            if( item.isLocked() ) continue
+            if( personalItems.some(e => e.name == item.name && e.level == item.level) ) continue
+            if( CharacterItems.DEFAULT_ELIXIRS.get(this.bot.ctype).includes(item.name) ) continue
+            await this.bot.sendItem(name,idx,item.q).catch(console.warn)
         }
     }
 
     protected async sellTrash() {
         let bot = this.bot
         for(const [idx,item] of bot.getItems()) {
-            if(item.isLocked()) continue
-            if(ItemsConfig.ITEMS_TO_SELL.includes(item.name) && (!item.level || item.level == 0)) bot.sell(idx,item.q)
+            if( item.isLocked() ) continue
+            if ( 
+                ItemsConfig.ITEMS_TO_SELL.includes(item.name) 
+                && (!item.level || item.level == 0)
+            ) 
+            {
+                await bot.sell(idx,item.q).catch(console.warn)
+            }
         }
     }
 

@@ -1,6 +1,18 @@
 import {ItemName, ItemData} from "alclient"
 
-/// MANAGE ITEMS SECTION ///
+
+//POTS
+export const MPOTS_CAP = 9000
+export const HPOTS_CAP = 1000
+
+export const SCROLLS_CAP: Map<ItemName,number> = new Map([
+        ["scroll0", 500],
+        ["scroll1", 50],
+        ["scroll2", 10],
+        ["cscroll0", 200],
+        ["cscroll1", 50],
+        ["cscroll2", 5]
+    ])
 
 export const DONT_SEND_ITEMS = [
     "tracker", 
@@ -108,6 +120,9 @@ export const ITEMS_TO_SELL: ItemName[] = [
 	'swifty',
 	'phelmet',
 	'cupid',
+	"sword",
+	'sstinger',
+	'hammer',
 
 	//halloween
 	'gphelmet',
@@ -125,15 +140,9 @@ export const ITEMS_TO_SELL: ItemName[] = [
 	'harmor',
 	'hhelmet',
 	'hpants',
-	"sword",
-	'sstinger',
-
-	//heavy useless
+	
 	'hboots',
-	'hgloves',
-	// 'cape'
-	//shields
-	// 'mshield'
+	'hgloves'
 ]
 
 export const DISMANTLE_ITEMS: ItemName[] = [

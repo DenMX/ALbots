@@ -9,6 +9,8 @@ export class MageAttackStrategy extends StateStrategy {
 
     constructor(bot: Mage, memoryStorage: MemoryStorage) {
         super(bot, memoryStorage) 
+        
+        this.mage = bot;
 
         this.attackLoop = this.attackLoop.bind(this)
         this.useReflectionShieldLoop = this.useReflectionShieldLoop.bind(this)
@@ -24,12 +26,22 @@ export class MageAttackStrategy extends StateStrategy {
     private async attackLoop() {
         if( !this.mage.canUse("attack") ) return setTimeout(this.attackLoop, 500)
         if( this.mage.isOnCooldown("attack") ) return setTimeout(this.attackLoop, Math.max(1, this.mage.getCooldown("attack")))
+        let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
+        let totalDps = 0
+        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
+        if( this.bot.c.town && this.bot.hp > totalDps*15 ) return setTimeout(this.attackLoop, 5000)
         let target = this.mage.getTargetEntity()
         if( !target ) return setTimeout(this.attackLoop, 1000)
 
         if( !target.target && this.mage.isOnCooldown("scare") ) return setTimeout(this.attackLoop, this.mage.getCooldown("scare"))
         if( !target.target && CF.calculate_monster_dps(this.mage, target) / CF.calculate_hps(this.mage) >= 2 ) return setTimeout(this.attackLoop, 500)
-
+        
+        if(Tools.distance(this.mage, target) >  this.mage.range) {
+            let location = CF.getHalfWay(this.mage, target)
+            if(!this.mage.moving && !this.mage.smartMoving) CF.moveHalfWay(this.mage, location)
+            return setTimeout(this.attackLoop, 500)
+        }
+        
         await this.mage.basicAttack(target.id).catch(console.warn)
         return setTimeout(this.attackLoop, Math.max(1, this.mage.getCooldown("attack")))
         
@@ -55,7 +67,7 @@ export class MageAttackStrategy extends StateStrategy {
 
     private async useEnergizeLoop() {
         if(this.mage.isOnCooldown("energize")) return setTimeout(this.useEnergizeLoop, Math.max( 1, this.mage.getCooldown("energize")))
-        if(!this.mage.canUse("energize") || this.mage.smartMoving) return setTimeout(this.useEnergizeLoop, 2000)
+        if(!this.mage.canUse("energize") || this.mage.smartMoving || !this.mage.partyData) return setTimeout(this.useEnergizeLoop, 2000)
         
         for( let k of Object.keys(this.mage.partyData.party)) {
             let member = this.mage.partyData.party[k]

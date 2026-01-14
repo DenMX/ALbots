@@ -11,7 +11,7 @@ export class MemoryStorage {
 
     private secretKey: string
 
-    private default_party_leader: string = "frostyHeal"
+    private default_party_leader: string = "frostyRan"
 
     private current_party_leader: string
 
@@ -19,9 +19,14 @@ export class MemoryStorage {
 
     private current_tank: string
 
+    private default_looter: string = this.default_tank
+
+    private current_looter: string 
+
     constructor(bots: PingCompensatedCharacter[]) {
         this.active_bots = bots
-        this.secretKey = fs.readFileSync(`../api_token.txt`, 'utf-8') || ""
+        let credentialFile = fs.readFileSync(`../credentials.json`, 'utf-8')
+        this.secretKey = JSON.parse(credentialFile).apiToken
 
         this.current_party_leader = this.default_party_leader
         this.current_tank = this.default_tank
@@ -31,7 +36,7 @@ export class MemoryStorage {
         })
 
         if(this.secretKey == "") {
-            console.error("Create api_token.txt with secretKey!")
+            console.error("Add apiToken in credentials file!")
             return
         }
         bots.forEach( (e) => {
@@ -61,12 +66,21 @@ export class MemoryStorage {
         return this.current_tank
     }
 
+    public get getDefaultLooter() {
+        return this.default_looter
+    }
+
+    public get getCurrentLooter() {
+        return this.current_looter
+    }
+    
     public set setCurrentPartyLeader(value: string) {
         this.current_party_leader = value
     }
 
     public set setCurrentTank(value: string) {
         this.current_tank = value
+        this.current_looter = value
     } 
 
     public get getBank() {

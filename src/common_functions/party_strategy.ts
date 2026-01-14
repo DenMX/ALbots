@@ -1,4 +1,4 @@
-import { InviteData, PingCompensatedCharacter } from "alclient";
+import { Constants, InviteData, PingCompensatedCharacter, Tools } from "alclient";
 import { MemoryStorage } from "./memory_storage";
 import { my_characters } from "../main";
 
@@ -51,15 +51,18 @@ export class PartyStrategy {
     }
 
     private canLoot() : boolean {
-        let looter = this.memoryStorage.getCurrentTank
+        let looter = this.memoryStorage.getCurrentLooter
+        let defaultLooter = this.memoryStorage.getDefaultLooter
         if(this.bot.name == looter) return true
-        let looterEntity = this.bot.getPlayers({withinRange: 600}).filter( e => e.name == looter)
-        if(!this.bot.partyData || !this.bot.partyData?.list.includes(looter) || looterEntity.length<1) return true
+        let looterEntity = this.bot.getPlayers().filter( e => e.name == looter && Tools.distance(this.bot, e) < Constants.NPC_INTERACTION_DISTANCE)
+        let defaultLooterEntity = this.bot.getPlayers().filter( e => e.name == defaultLooter && Tools.distance(this.bot, e) < Constants.NPC_INTERACTION_DISTANCE)
+        if( !this.bot.partyData || !this.bot.partyData?.list.includes(looter) ) return true
+        if( !looterEntity && (!defaultLooterEntity || this.bot.name == defaultLooter) ) return true
         return false
     }
 
     private async checkParty() {
-        console.log("party loop")
+        // console.log("party loop")
         let pl = this.memoryStorage.getCurrentPartyLeader
         let default_pl = this.memoryStorage.getDefaultPartyLeader
         if(pl != this.bot.name && !this.bot.partyData?.list.includes(pl)) {

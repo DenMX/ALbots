@@ -43,38 +43,38 @@ async function run(){
     // let merchant = class_functions.merchant.start("Merchandiser", "EU", "II")
     // active_players.push(merchant)
 
-    // let merchant = await Game.startMerchant("frostyMerch","EU", "II")
-    // let priest = await Game.startPriest("frostyHeal", "EU", "II")
+    let merchant = await Game.startMerchant("frostyMerch","EU", "II")
+    let priest = await Game.startPriest("frostyHeal", "EU", "II")
     
     let ranger = await Game.startRanger("frostyRan", "EU", "II")
+    // let rogue = await Game.startRogue("frostyRogue", "EU", "II")
+    // let mage = await Game.startMage("frostyMage", "EU", "II")
     
-    // active_players.push(merchant)
-    // active_players.push(priest)
+    active_players.push(merchant)
+    active_players.push(priest)
     
     active_players.push(ranger)
+    // active_players.push(rogue)
+    // active_players.push(mage)
     
-    // console.log(`Warrior created: ${warrior.name}`)
-    // console.log("Smart moving to snowman")
-    // await warrior.smartMove(warrior.S.snowman || "main")
-    // console.log("Smart moved to goo")
-    // console.log(`Current target: ${warrior.target}`)
-    // warrior.target = warrior.getEntities({withinRange: "cleave"})[0].id
-    // console.log(`Got target: ${warrior.target}`)
 
 
     // PROD READY STEADY
     let stateList = []
 
-    // let warrior = await Game.startWarrior("frostyWar", "EU", "II")
-    // active_players.push(warrior)
+    let warrior = await Game.startWarrior("frostyWar", "EU", "II")
+    active_players.push(warrior)
     // active_players.push(priest)
     
     let memoryStorage = new MemoryStorage(active_players)
-    // stateList.push(new PriestsAttackStrategy(priest, memoryStorage))
-    // stateList.push(new WarriorsAttackStrategy(warrior, memoryStorage))
+    stateList.push(new PriestsAttackStrategy(priest, memoryStorage))
+    stateList.push(new WarriorsAttackStrategy(warrior, memoryStorage))
     stateList.push(new RangerAttackStrategy(ranger, memoryStorage))
-    // new MerchantStrategy(merchant, memoryStorage)
-    let stateController = new StateController(stateList)
+    // stateList.push(new RogueAttackStrategy(rogue, memoryStorage))
+    // stateList.push(new MageAttackStrategy(mage, memoryStorage))
+    new MerchantStrategy(merchant, memoryStorage)
+    let stateController = new StateController(stateList, memoryStorage)
     let bwi = new BWIReporter(active_players)
+
 
 }

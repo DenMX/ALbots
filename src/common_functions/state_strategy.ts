@@ -54,6 +54,14 @@ export class StateStrategy extends ManageItems {
         this.state_scheduler.push(state)
     }
 
+    public get currentState() {
+        return this.current_state
+    }
+
+    public get stateScheduler() {
+        return this.state_scheduler
+    }
+
     public get stateBot() {
         return this.bot
     }
@@ -70,7 +78,7 @@ export class StateStrategy extends ManageItems {
     private async loadState() {
 
         return this.current_state = {
-            wantedMob: "goo",
+            wantedMob: "spider",
             state_type: "farm"
         }
         // load saved in DB
@@ -155,7 +163,7 @@ export class StateStrategy extends ManageItems {
     private async checkState() {
         // console.log(`Check state, smartmoving: ${this.bot.smartMoving}`)
         // WE ARE SMARTMOVING => EXIT
-        if( this.bot.smartMoving) return setTimeout(this.checkState, 1000)
+        if( this.bot.smartMoving || this.bot.rip) return setTimeout(this.checkState, 1000)
 
         // console.log(`Check state continue. Current state: ${this.current_state.state_type} : ${this.current_state.wantedMob}`)
         
@@ -202,6 +210,7 @@ export class StateStrategy extends ManageItems {
             }
             //WE HAVE NO OTHER TASKS AND HAVE NO WANTED MOBS NEAR => SMART MOVING
             else if(this.bot.getEntities().filter( e => wanted_monster.includes(e.type)).length < 1) {
+                console.log("there is no monsters, going search some")
                 if(this.current_state.location) await this.bot.smartMove(this.current_state.location).catch(console.warn)
                 else await this.bot.smartMove(wanted_monster[0]).catch(console.warn)
                 return setTimeout(this.checkState, 1000)
@@ -319,7 +328,7 @@ export class StateStrategy extends ManageItems {
         if(entities.length<1) return setTimeout(this.getTargetLoop, 500)
         try {
             if(!target || (target && target.willBurnToDeath())) {
-                console.log("Searching target")
+                // console.log("Searching target")
                 entities = this.sortEntities(entities)
                 this.bot.target = entities[0].id
                 // console.log(`Target found?: ${this.bot.target}`)

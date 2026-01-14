@@ -27,6 +27,10 @@ export class RangerAttackStrategy extends StateStrategy {
     private async basicAttackLoop() {
         if(this.ranger.isOnCooldown("attack")) return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("attack")))
         if(!this.ranger.canUse("attack")) return setTimeout(this.basicAttackLoop, 300)
+        let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
+        let totalDps = 0
+        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
+        if( this.bot.c.town && this.bot.hp > totalDps*15 ) return setTimeout(this.basicAttackLoop, 5000)
         let target = this.ranger.getTargetEntity()
         if(!target) return setTimeout(this.basicAttackLoop, 500)
         if(!target?.target && CF.calculate_monster_dps(this.ranger, this.ranger.getTargetEntity())/CF.calculate_hps(this.ranger) >=2) return setTimeout(this.basicAttackLoop, 500)
@@ -37,14 +41,22 @@ export class RangerAttackStrategy extends StateStrategy {
         let targetsForThreeShot = this.getTargets("3shot")
         
         if(this.ranger.canUse("5shot") && targetsForFiveShot.length>3) {
-            await this.ranger.fiveShot(targetsForFiveShot[0].id,targetsForFiveShot[1].id,targetsForFiveShot[2].id,targetsForFiveShot[3].id,targetsForFiveShot[4].id).catch(console.warn)
+            await this.ranger.fiveShot(targetsForFiveShot[0]?.id,targetsForFiveShot[1]?.id,targetsForFiveShot[2]?.id,targetsForFiveShot[3]?.id,targetsForFiveShot[4]?.id).catch(console.warn)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("5shot")))
         }
         if(this.ranger.canUse("3shot") && targetsForThreeShot.length>1) {
-            await this.ranger.threeShot(targetsForThreeShot[0].id,targetsForThreeShot[1].id,targetsForThreeShot[2].id).catch(console.warn)
+            await this.ranger.threeShot(targetsForThreeShot[0]?.id,targetsForThreeShot[1]?.id,targetsForThreeShot[2]?.id).catch(console.warn)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("3shot")))
         }
-        if(target && Tools.distance(this.ranger,target) < this.ranger.range) {
+        if(Tools.distance(this.ranger, target)> this.ranger.range) {
+            if( !this.ranger.smartMoving && !this.ranger.moving ) {
+                let location = CF.getHalfWay(this.ranger, target)
+                CF.moveHalfWay(this.ranger, location)
+                return setTimeout(this.basicAttackLoop, 500)
+            }
+        }
+        if(Tools.distance(this.ranger,target) < this.ranger.range) {
+            if(CF.calculate_monster_dps(this.ranger,target)/CF.calculate_hps(this.ranger)>=2) return setTimeout(this.basicAttackLoop, 500)
             if(target.armor - this.ranger.apiercing < 250) await this.ranger.basicAttack(this.ranger.target).catch(console.warn) 
             else await this.ranger.piercingShot(this.ranger.target).catch(console.warn)
             return setTimeout(this.basicAttackLoop, this.ranger.getCooldown("attack"))
@@ -76,31 +88,30 @@ export class RangerAttackStrategy extends StateStrategy {
     }
 
     private async changeWeapon() {
+        if(!Items.WEAPON_CONFIGS[this.ranger.name]) return
         let needChangeMainhand = false
         let needChangeOffhand = false
+        let botWC = Items.WEAPON_CONFIGS[this.bot.name]
         if(this.ranger.getEntities({targetingMe: true, targetingPartyMember: true}).length>1) {
-            if(this.ranger.slots.mainhand?.name != Items.aRanDonDon.mass_mainhand!.name) needChangeMainhand = true
-            if(this.ranger.slots.offhand?.name != Items.aRanDonDon.mass_offhand!.name) needChangeOffhand = true
+            if(this.ranger.slots.mainhand?.name != botWC.mass_mainhand?.name) needChangeMainhand = true
+            if(this.ranger.slots.offhand?.name != botWC.mass_offhand?.name) needChangeOffhand = true
             let equipBatch : {num: number, slot: SlotType}[] = []
-            for( let i = 0; i< this.ranger.items.length; i++) {
-                let item = this.ranger.items[i]
-                if(!item) continue
-                if(item.name == Items.aRanDonDon.mass_mainhand!.name && item.level == Items.aRanDonDon.mass_mainhand!.level) equipBatch.push({num: i, slot: "mainhand"})
-                if(item.name == Items.aRanDonDon.mass_offhand!.name && item.level == Items.aRanDonDon.mass_offhand!.level) equipBatch.push({num: i, slot: "offhand"})
+            for( const [i, item] of this.bot.getItems() ) {
+
+                if(item.name == botWC.mass_mainhand?.name && item.level == botWC.mass_mainhand?.level) equipBatch.push({num: i, slot: "mainhand"})
+                if(item.name == botWC.mass_offhand?.name && item.level == botWC.mass_offhand?.level) equipBatch.push({num: i, slot: "offhand"})
             }
-            await this.ranger.equipBatch(equipBatch)
+            await this.ranger.equipBatch(equipBatch).catch(console.warn)
         }
         else {
-            if(this.ranger.slots.mainhand?.name != Items.aRanDonDon.solo_mainhand!.name) needChangeMainhand = true
-            if(this.ranger.slots.offhand?.name != Items.aRanDonDon.solo_offhand!.name) needChangeOffhand = true
+            if(this.ranger.slots.mainhand?.name != botWC.solo_mainhand?.name) needChangeMainhand = true
+            if(this.ranger.slots.offhand?.name != botWC.solo_offhand?.name) needChangeOffhand = true
             let equipBatch : {num: number, slot: SlotType}[] = []
-            for( let i = 0; i< this.ranger.items.length; i++) {
-                let item = this.ranger.items[i]
-                if(!item) continue
-                if(item.name == Items.aRanDonDon.solo_mainhand!.name && item.level == Items.aRanDonDon.solo_mainhand!.level) equipBatch.push({num: i, slot: "mainhand"})
-                if(item.name == Items.aRanDonDon.solo_offhand!.name && item.level == Items.aRanDonDon.solo_offhand!.level) equipBatch.push({num: i, slot: "offhand"})
+            for( const [i, item] of this.bot.getItems() ) {
+                if(item.name == botWC.solo_mainhand?.name && item.level == botWC.solo_mainhand?.level) equipBatch.push({num: i, slot: "mainhand"})
+                if(item.name == botWC.solo_offhand?.name && item.level == botWC.solo_offhand?.level) equipBatch.push({num: i, slot: "offhand"})
             }
-            await this.ranger.equipBatch(equipBatch)
+            await this.ranger.equipBatch(equipBatch).catch(console.warn)
         }
         return setTimeout(this.changeWeapon, 500)
     }
@@ -110,6 +121,7 @@ export class RangerAttackStrategy extends StateStrategy {
         if(this.ranger.isOnCooldown("supershot")) return setTimeout(this.useSupershotLoop, Math.max(1, this.ranger.getCooldown("supershot")))
         let target = this.ranger.getTargetEntity()
         if(!target) return setTimeout(this.useSupershotLoop, 500)
+        if(!target.target && CF.calculate_monster_dps(this.ranger,target)/CF.calculate_hps(this.ranger)>=2) return setTimeout(this.useSupershotLoop, 500)
         if(this.ranger.mp > this.ranger.max_mp * 0.6) {
             await this.ranger.superShot(target.id).catch(console.warn)
             return setTimeout(this.useSupershotLoop, Math.max(1,this.ranger.getCooldown("supershot")))

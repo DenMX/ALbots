@@ -25,6 +25,10 @@ export class PriestsAttackStrategy extends StateStrategy {
     private async attackOrHealLoop() {
         if(this.priest.isOnCooldown("attack")) return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
         if(!this.priest.canUse("attack")) return setTimeout(this.attackOrHealLoop, Math.max(1, this.priest.getCooldown("attack")))
+        let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
+        let totalDps = 0
+        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
+        if( this.bot.c.town && this.bot.hp > totalDps*15 ) return setTimeout(this.attackOrHealLoop, 5000)
         let healTarget = this.whoNeedsHeal()
         if(healTarget !== undefined) {
             let healEntity = this.priest.getPlayers().filter( e => e.name == healTarget)[0]
@@ -45,11 +49,9 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(!target) return setTimeout(this.attackOrHealLoop, 300)
         if(!target.target && CF.calculate_monster_dps(this.priest, target)/CF.calculate_hps(this.priest) >=2) return setTimeout(this.attackOrHealLoop, 500)
         if(!this.priest.smartMoving && !this.priest.moving && Tools.distance(target, this.priest)> this.priest.range) {
-            await this.bot.smartMove(target, {getWithin: this.bot.range}).catch(console.warn)
-            // await this.bot.move(
-            //     this.priest.x + (target.x - this.priest.x)/2,
-            //     this.priest.y + (target.y - this.priest.y)/2
-            // ).catch(console.warn)
+            let location = CF.getHalfWay(this.priest, target)
+            CF.moveHalfWay(this.priest, location)
+            return setTimeout(this.attackOrHealLoop, 500)
         }
         if(Tools.distance(target, this.priest)<= this.priest.range) {
             await this.priest.basicAttack(target.id).catch(console.error)
@@ -59,7 +61,7 @@ export class PriestsAttackStrategy extends StateStrategy {
     }
 
     private whoNeedsHeal() : string  {
-        if(this.priest.hp < this.priest.max_hp*0.7 && this.priest.getEntities({targetingMe: true}).length>0) return this.priest.name
+        if( this.priest.hp < this.priest.max_hp*0.8 ) return this.priest.name
         let party = this.priest.getPlayers({isPartyMember: true, withinRange: this.priest.range*2}).filter( e => e.hp<e.max_hp*0.85)
         let randomPlayers = this.priest.getPlayers({withinRange: "heal", isPartyMember: false}).filter( e => e.hp < e.max_hp*0.7)
         if(party.length == 1) return party[0].name

@@ -1,33 +1,12 @@
-import { ItemName, PingCompensatedCharacter, Ranger, Tools } from "alclient"
+import { ItemName, PingCompensatedCharacter, Game, Tools, Constants } from "alclient"
 import * as CI from "../configs/character_items_configs"
+import * as MIC from "../configs/manage_items_configs"
 import { PartyStrategy } from "./party_strategy"
-import { MemberExpression } from "typescript"
 import { MemoryStorage } from "./memory_storage"
+
 
 export class ResuplyStrategy extends PartyStrategy {
 
-    //POTS
-    private MPOTS_CAP = 9000
-    private HPOTS_CAP = 5000
-
-    private scrolls_cap: Map<ItemName,number> = new Map([
-        ["scroll0", 500],
-        ["scroll1", 50],
-        ["scroll2", 10],
-        ["cscroll0", 200],
-        ["cscroll1", 50],
-        ["cscroll2", 5]
-    ])
-   
-
-    private ressuplyFunction: Function[] = [
-        this.resupplyPots,
-        this.usePotionsLoop,
-        this.scareLoop, 
-        // this.useElixirsLoop,
-        this.checkTomeOfProtection,
-        this.resuplyScrolls
-    ]
 
     constructor (bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
         super(bot as PingCompensatedCharacter, memoryStorage)
@@ -45,7 +24,7 @@ export class ResuplyStrategy extends PartyStrategy {
         this.usePotionsLoop()
         this.scareLoop()
         // this.useElixirsLoop()
-        this.resuplyScrolls()
+        
         this.stayAlive()
         
     }
@@ -79,27 +58,12 @@ export class ResuplyStrategy extends PartyStrategy {
         }
     }
 
-    private getBotitems() : CI.ItemsConfig {
-        switch(this.bot.name){
-            case "Archealer":
-                return CI.ArchealerItems
-            case "Warious":
-                return CI.WariousItems
-            case "arMAGEdon":
-                return CI.arMAGEdonItems
-            case "aRanDonDon":
-                return CI.aRanDonDon
-            case "aRogDonDon":
-                return CI.aRogDonDon
-            default:
-                throw(`There is no config for ${this.bot.name}. Check Resupply strategy.`)
-        }
-    }
 
     private async useElixirsLoop() {
         if(this.bot.slots.elixir?.expires) return setTimeout( () => this.useElixirsLoop(), Date.parse(this.bot.slots.elixir.expires) - Date.now())
         if(!this.bot.slots || (this.bot.slots.elixir?.expires &&  Date.parse(this.bot.slots.elixir.expires) - Date.now() < 60000 )) {
-            await this.bot.equip(this.bot.locateItem(this.getBotitems()?.elixir))
+            let elixir_idx = this.bot.locateItem(CI.DEFAULT_ELIXIRS.get(this.bot.ctype)) 
+            if(elixir_idx) await this.bot.equip(elixir_idx).catch(console.warn)
         }
         return setTimeout( () => this.useElixirsLoop(), 2000)
     }
@@ -132,39 +96,33 @@ export class ResuplyStrategy extends PartyStrategy {
     private async resupplyPots() {
         // console.log("Ressuply pots loop")
         if(!this.bot.items) return setTimeout( () => this.resupplyPots(), 5000)
+        if(this.bot.gold<100_000) return setTimeout(this.resupplyPots, 50000)
         let hpot = this.bot.items[this.bot.locateItem("hpot1")]?.q || 0// let hpot = this.getBot.items[this.bot.locateItem("hpot1")]?.q || 0
         let mpot = this.bot.items[this.bot.locateItem("mpot1")]?.q || 0
         if(this.bot.hasItem(["computer","supercomputer"])) {
-            if(this.HPOTS_CAP > hpot && this.bot.canBuy("hpot1", {quantity: this.HPOTS_CAP - hpot}) ) await this.bot.buy("hpot1", this.HPOTS_CAP - hpot).catch(console.warn)
-            if(this.MPOTS_CAP > mpot && this.bot.canBuy("mpot1", {quantity: this.MPOTS_CAP - mpot}) ) await this.bot.buy("mpot1", this.MPOTS_CAP - mpot).catch(console.warn)
+            if(MIC.HPOTS_CAP > hpot && this.bot.canBuy("hpot1", {quantity: MIC.HPOTS_CAP - hpot}) ) await this.bot.buy("hpot1", MIC.HPOTS_CAP - hpot).catch(console.warn)
+            if(MIC.MPOTS_CAP > mpot && this.bot.canBuy("mpot1", {quantity: MIC.MPOTS_CAP - mpot}) ) await this.bot.buy("mpot1", MIC.MPOTS_CAP - mpot).catch(console.warn)
         }
         else {
             if(mpot < 100 && !this.bot.smartMoving && !this.bot.moving) {
                 await this.bot.smartMove("main").catch(console.warn)
-                await this.bot.buy("hpot1", this.HPOTS_CAP - hpot).catch(console.warn)
-                await this.bot.buy("mpot1", this.MPOTS_CAP - mpot).catch(console.warn)
+                if( Tools.distance(this.bot, {x: -35, y: -162, map: "main"}) > Constants.NPC_INTERACTION_DISTANCE ) return setTimeout( this.resupplyPots, 5000 )
+                if(this.bot.canBuy("mpot1", {quantity: MIC.MPOTS_CAP - mpot}))await this.bot.buy("mpot1", MIC.MPOTS_CAP - mpot).catch(console.warn)
+                else await this.bot.buy("mpot1", Math.floor(this.bot.gold/Game.G.items.mpot1.g)).catch(console.warn)
+
+                if(this.bot.canBuy("hpot1", {quantity: MIC.HPOTS_CAP - hpot}))await this.bot.buy("hpot1", MIC.HPOTS_CAP - hpot).catch(console.warn)
+                else await this.bot.buy("hpot1", Math.floor(this.bot.gold/Game.G.items.hpot1.g)).catch(console.warn)
             }
         }
         return setTimeout( () => this.resupplyPots(), 5000)
     }
 
-    private async resuplyScrolls() {
+    protected async resuplyScrolls() {
         if(this.bot.ctype != "merchant") return
-        console.log("Ressuply scrolls loop")
-        let scrollsCount: ItemName[] =[
-            "scroll0",
-            "scroll1",
-            "scroll2",
-            "cscroll0",
-            "cscroll1",
-            "cscroll2"
-        ]
-
-        scrollsCount.forEach( async (e) => {
-            let scroll_count =this.bot.countItem(e as ItemName)
-            if(scroll_count< this.scrolls_cap[e] && this.bot.canBuy(e)) this.bot.buy(e,this.scrolls_cap[e]-scroll_count).catch(console.warn)
         
-        })
+        for(const [k, v] of MIC.SCROLLS_CAP) {
+            if(this.bot.canBuy(k, {quantity: v-this.bot.countItem(k)})) await this.bot.buy(k,v-this.bot.countItem(k))
+        }
     }
 
     private async scareLoop() {
