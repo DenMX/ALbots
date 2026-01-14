@@ -1,4 +1,4 @@
-import { BankInfo, PingCompensatedCharacter } from "alclient";
+import { BankInfo, BankModel, Database, PingCompensatedCharacter } from "alclient";
 import fs from "fs"
 
 
@@ -31,6 +31,8 @@ export class MemoryStorage {
         this.current_party_leader = this.default_party_leader
         this.current_tank = this.default_tank
 
+        this.loadBankFromMongo().catch(console.warn)
+
         this.active_bots.forEach( (bot) => {
             bot.socket.on("new_map", () => this.updateBank(bot))
         })
@@ -54,6 +56,14 @@ export class MemoryStorage {
         })
     }
 
+    private async loadBankFromMongo() {
+        if(Database.connection) {
+            this.bank = await BankModel.findOne( {
+                owner: this.active_bots[0].owner
+            }) as BankInfo
+        }
+    }
+
     public get getCurrentPartyLeader() {
         return this.current_party_leader
     }
@@ -73,7 +83,7 @@ export class MemoryStorage {
     public get getCurrentLooter() {
         return this.current_looter
     }
-    
+
     public set setCurrentPartyLeader(value: string) {
         this.current_party_leader = value
     }
