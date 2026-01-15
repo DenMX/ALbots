@@ -118,7 +118,7 @@ export class ManageItems extends ResuplyStrategy {
                 let scroll_name = `scroll${scroll_grade}` as ItemName
                 let scroll_idx = this.bot.locateItem(scroll_name, this.bot.items)
                 if(!scroll_idx && scroll_idx<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
-                    await this.bot.buy(scroll_name)
+                    await this.bot.buy(scroll_name).catch(console.warn)
                 }
 
                 scroll_idx = this.bot.locateItem(scroll_name, this.bot.items)
@@ -140,7 +140,7 @@ export class ManageItems extends ResuplyStrategy {
                 const items = this.bot.locateItems(item.name, this.bot.items, {level: item.level, locked: false})
                 if (items.length < 3) continue
                 if(itemConfig.offeringAt >= item.level) {
-                    if(!this.bot.locateItem("offering", this.bot.items) && this.bot.gold > 500000000 && this.bot.esize>0) await this.bot.buy("offering")
+                    if(!this.bot.locateItem("offering", this.bot.items) && this.bot.gold > 500000000 && this.bot.esize>0) await this.bot.buy("offering").catch(console.warn)
                     if(!this.bot.locateItem("offering", this.bot.items)) continue
                 }
                 if(itemConfig.primlingAt >= item.level && (!itemConfig.offeringAt || itemConfig.offeringAt < item.level) && !this.bot.locateItem("offeringp", this.bot.items)) continue
@@ -157,7 +157,7 @@ export class ManageItems extends ResuplyStrategy {
                 let scroll_name = `scroll${scroll_grade}` as ItemName
                 let scroll_idx = this.bot.locateItem(scroll_name, this.bot.items)
                 if(!scroll_idx && scroll_idx<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
-                    await this.bot.buy(scroll_name)
+                    await this.bot.buy(scroll_name).catch(console.warn)
                 }
 
                 scroll_idx = this.bot.locateItem(scroll_name, this.bot.items)
@@ -294,7 +294,7 @@ export class ManageItems extends ResuplyStrategy {
         items.upgrade.forEach( (e) => { itemsToUpgrade+=e.slots.length})
         let itemsToCompound = 0
         items.compound.forEach( (e) => {itemsToCompound+=Math.floor(e.slots.length/3)})
-        if(itemsToUpgrade<10 && itemsToCompound<5) return
+        if(itemsToUpgrade<10 && itemsToCompound<5) return console.log("There not enough items to upgrade")
         
         //get all offerings
         if(Game.G.items["offeringp"].s > bot.items[bot.locateItem("offeringp")]?.q) {

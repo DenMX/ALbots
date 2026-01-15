@@ -4,13 +4,13 @@ import { WANTED_EVENTS } from "../configs/events_and_spots";
 import { MemoryStorage } from "../common_functions/memory_storage";
 
 export class StateController {
-    private bots: StateStrategy[]
+    private bots: StateStrategy<String>[]
 
     private serverObserver: Observer
 
     private memoryStorage: MemoryStorage
 
-    constructor(bots: StateStrategy[], memoryStorage: MemoryStorage) {
+    constructor(bots: StateStrategy<String>[], memoryStorage: MemoryStorage) {
         this.bots = bots
         this.memoryStorage = memoryStorage
         // this.serverObserver = serverObserver

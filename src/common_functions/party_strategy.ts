@@ -40,6 +40,10 @@ export class PartyStrategy {
         }
     }
 
+    public getBot() : PingCompensatedCharacter {
+        return this.bot
+    }
+
     private async loot() {
         if(!this.bot.chests) return setTimeout( this.loot, 500)
         if(this.canLoot()) {

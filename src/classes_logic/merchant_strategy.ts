@@ -4,17 +4,22 @@ import * as CF from "../common_functions/common_functions"
 import * as CharacterItems from "../configs/character_items_configs"
 import { ManageItems } from "../common_functions/manage_items_strategy"
 import { MemoryStorage } from "../common_functions/memory_storage"
+import { IState } from "../controllers/state_interface"
 
 export type State = {
     state_type: string
 }
-export class MerchantStrategy extends ManageItems {
+export class MerchantStrategy<String> extends ManageItems implements IState {
 
     private job_scheduler: Function[] = []
 
     private DEFAULT_STATE : State = { state_type: "Idle"}
 
     private merch_state : State = this.DEFAULT_STATE
+
+    public getStateType(): string {
+        return this.merch_state.state_type
+    }
 
     constructor (bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
         super(bot,memoryStorage)
@@ -61,6 +66,9 @@ export class MerchantStrategy extends ManageItems {
     private async checkBankUpgrades() {
         if(this.bot.esize<10) return setTimeout(() => {this.job_scheduler.push(this.checkBankUpgrades)}, 10 * 60 * 1000) //10min cooldown
 
+        this.changeMerchState("Upgrading bank")
+        await this.upgradeItemsFromBank()
+        this.changeMerchState(this.DEFAULT_STATE.state_type)
 
         setTimeout(() => {this.job_scheduler.push(this.checkBankUpgrades)}, 10 * 60 * 1000) //10min cooldown
     }
@@ -121,6 +129,7 @@ export class MerchantStrategy extends ManageItems {
         this.changeMerchState("Store")
         await this.storeItems()
         await this.sellTrashFromBank()
+        this.changeMerchState("Upgrading bank")
         this.changeMerchState(this.DEFAULT_STATE.state_type)
     }
 
@@ -175,7 +184,7 @@ export class MerchantStrategy extends ManageItems {
                     }
                     this.changeMerchState(`Smartmoving to ${bot.name}`)
                     await this.bot.smartMove(bot).catch(console.warn)
-                    this.changeMerchState('Getting items')
+                    this.changeMerchState('Getting items') // ЗАВИС В ЭТОМ СОСТОЯНИИ?
                     await this.bot.sendItem( bot.name, this.bot.locateItem("hpot1"), hpot ).catch(console.warn)
                     await this.bot.sendItem( bot.name, this.bot.locateItem("mpot1"), mpot ).catch(console.warn)
                     this.changeMerchState(this.DEFAULT_STATE.state_type)

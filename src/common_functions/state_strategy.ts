@@ -1,5 +1,6 @@
 import { Database, Entity, MonsterName, PingCompensatedCharacter, Game, Tools, IPosition, Constants, MapName } from "alclient"
 import { StateModel } from "../database/state/state.model"
+import { IState } from "../controllers/state_interface"
 import fs from "fs"
 import { MemoryStorage } from "./memory_storage"
 import { ManageItems } from "./manage_items_strategy"
@@ -16,7 +17,7 @@ export type State = {
     eventName?: MonsterName | MapName
 }
 
-export class StateStrategy extends ManageItems {
+export class StateStrategy<String> extends ManageItems implements IState {
 
     private current_state : State
 
@@ -41,6 +42,10 @@ export class StateStrategy extends ManageItems {
         //trigger started functions
         
         this.runLoops()
+    }
+
+    public getStateType() : string {
+        return this.current_state.eventName ? this.current_state.eventName as string : this.current_state.state_type as string
     }
 
     private async runLoops() {

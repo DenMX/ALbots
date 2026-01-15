@@ -8,7 +8,7 @@ export type warriorWeaponSwitchConfig = {
     cleave?:  boolean
     stomp?: boolean
 }
-export class WarriorsAttackStrategy extends StateStrategy {
+export class WarriorsAttackStrategy extends StateStrategy<String> {
 
     public warrior: Warrior
 

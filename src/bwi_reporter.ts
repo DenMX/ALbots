@@ -1,6 +1,7 @@
 import { PingCompensatedCharacter } from "alclient";
 import BotWebInterface from "bot-web-interface";
 import prettyMilliseconds from "pretty-ms";
+import { IState } from "./controllers/state_interface";
 
 type BWIMetricSchema = {
     name: string;
@@ -32,15 +33,15 @@ type BWIDataSource = {
     goldHisto: number[];
 };
 
-export class BWIReporter {
+export class BWIReporter<T extends IState> {
     private statBeatIntrval: number;
     private bwiInstance: BotWebInterface;
     private statisticsInterval: NodeJS.Timeout;
-    private bots: PingCompensatedCharacter[];
+    private bots: Array<T>;
 
     private botDataSources = new Map<string, BWIDataSource>();
 
-    public constructor(bots: PingCompensatedCharacter[], port: number = 924, statBeatInterval: number = 500) {
+    public constructor(bots: Array<T>, port: number = 924, statBeatInterval: number = 500) {
         this.statBeatIntrval = statBeatInterval;
         this.bots = bots;
 
@@ -50,8 +51,8 @@ export class BWIReporter {
             updateRate: statBeatInterval
         });
 
-        for (let bot of bots) {
-
+        for (let botState of bots) {
+            let bot = botState.getBot()
             let dataSourceObj: BWIDataSource = {
                 name: bot.id,
                 realm: `${bot.serverData.region}${bot.serverData.name}`,
@@ -83,7 +84,8 @@ export class BWIReporter {
     }
 
     private updateStatistics(): void {
-        for (let bot of this.bots) {
+        for (let b of this.bots) {
+            let bot = b.getBot()
             let dataSource: BWIDataSource = this.botDataSources.get(bot.id);
 
             dataSource.realm = `${bot.serverData.region}${bot.serverData.name}`;
@@ -102,7 +104,7 @@ export class BWIReporter {
             dataSource.esize = bot.esize;
             dataSource.gold = bot.gold;
             dataSource.party = bot.party;
-            dataSource.status = bot.id;
+            dataSource.status = b.getStateType();
             dataSource.target = bot.getTargetEntity()?.name ?? "None";
             dataSource.cc = bot.cc;
 

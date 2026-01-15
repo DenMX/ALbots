@@ -9,6 +9,7 @@ import { MerchantStrategy } from "./classes_logic/merchant_strategy"
 import { MemoryStorage } from "./common_functions/memory_storage"
 import { BWIReporter } from "./bwi_reporter"
 import { StateController } from "./controllers/state_controller"
+import { IState } from "./controllers/state_interface"
 
 
 var active_players: PingCompensatedCharacter[] = []
@@ -74,7 +75,8 @@ async function run(){
     // stateList.push(new MageAttackStrategy(mage, memoryStorage))
     new MerchantStrategy(merchant, memoryStorage)
     let stateController = new StateController(stateList, memoryStorage)
-    let bwi = new BWIReporter(active_players)
+    let bwiList = [...stateList, new MerchantStrategy(merchant, memoryStorage)]
+    let bwi = new BWIReporter(bwiList)
 
 
 }

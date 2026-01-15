@@ -54,7 +54,7 @@ export class ResuplyStrategy extends PartyStrategy {
             if(!this.bot.hasItem(["computer","supercomputer"])) {
                 await this.bot.smartMove("premium").catch(console.warn)
             }
-            await this.bot.buy("xptome")
+            await this.bot.buy("xptome").catch(console.warn)
         }
     }
 
@@ -121,7 +121,7 @@ export class ResuplyStrategy extends PartyStrategy {
         if(this.bot.ctype != "merchant") return
         
         for(const [k, v] of MIC.SCROLLS_CAP) {
-            if(this.bot.canBuy(k, {quantity: v-this.bot.countItem(k)})) await this.bot.buy(k,v-this.bot.countItem(k))
+            if(this.bot.canBuy(k, {quantity: v-this.bot.countItem(k)})) await this.bot.buy(k,v-this.bot.countItem(k)).catch(console.warn)
         }
     }
 
