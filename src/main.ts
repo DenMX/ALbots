@@ -1,6 +1,5 @@
 import {Game, CharacterType, PingCompensatedCharacter, Pathfinder, Observer} from "alclient"
 import { WarriorsAttackStrategy } from "./classes_logic/warriors_attack_strategy"
-// import { WarriorsTestStrategy } from "./classes_logic/warriors_attack_strategy"
 import { PriestsAttackStrategy } from "./classes_logic/priests_attack_strategy"
 import { RangerAttackStrategy } from "./classes_logic/ranger_attack_strategy"
 import { MageAttackStrategy } from "./classes_logic/mage_attack_strategy"
@@ -9,7 +8,6 @@ import { MerchantStrategy } from "./classes_logic/merchant_strategy"
 import { MemoryStorage } from "./common_functions/memory_storage"
 import { BWIReporter } from "./bwi_reporter"
 import { StateController } from "./controllers/state_controller"
-import { IState } from "./controllers/state_interface"
 
 
 var active_players: PingCompensatedCharacter[] = []
@@ -45,37 +43,29 @@ async function run(){
     // active_players.push(merchant)
 
     let merchant = await Game.startMerchant("frostyMerch","EU", "II")
-    let priest = await Game.startPriest("frostyHeal", "EU", "II")
+    // let priest = await Game.startPriest("frostyHeal", "EU", "II")
     
-    let ranger = await Game.startRanger("frostyRan", "EU", "II")
+    // let ranger = await Game.startRanger("frostyRan", "EU", "II")
     // let rogue = await Game.startRogue("frostyRogue", "EU", "II")
     // let mage = await Game.startMage("frostyMage", "EU", "II")
-    
-    active_players.push(merchant)
-    active_players.push(priest)
-    
-    active_players.push(ranger)
-    // active_players.push(rogue)
-    // active_players.push(mage)
-    
-
+        
 
     // PROD READY STEADY
     let stateList = []
 
-    let warrior = await Game.startWarrior("frostyWar", "EU", "II")
-    active_players.push(warrior)
+    // let warrior = await Game.startWarrior("frostyWar", "EU", "II")
+    // active_players.push(warrior)
     // active_players.push(priest)
     
-    let memoryStorage = new MemoryStorage(active_players)
-    stateList.push(new PriestsAttackStrategy(priest, memoryStorage))
-    stateList.push(new WarriorsAttackStrategy(warrior, memoryStorage))
-    stateList.push(new RangerAttackStrategy(ranger, memoryStorage))
+    let memoryStorage = new MemoryStorage()
+    // stateList.push(new PriestsAttackStrategy(priest, memoryStorage))
+    // stateList.push(new WarriorsAttackStrategy(warrior, memoryStorage))
+    // stateList.push(new RangerAttackStrategy(ranger, memoryStorage))
     // stateList.push(new RogueAttackStrategy(rogue, memoryStorage))
     // stateList.push(new MageAttackStrategy(mage, memoryStorage))
-    new MerchantStrategy(merchant, memoryStorage)
+    memoryStorage.addMerchant(new MerchantStrategy(merchant, memoryStorage))
     let stateController = new StateController(stateList, memoryStorage)
-    let bwiList = [...stateList, new MerchantStrategy(merchant, memoryStorage)]
+    let bwiList = [...stateList, memoryStorage.getMerchant]
     let bwi = new BWIReporter(bwiList)
 
 

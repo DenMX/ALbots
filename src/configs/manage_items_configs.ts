@@ -1,4 +1,4 @@
-import {ItemName, ItemData} from "alclient"
+import {ItemName} from "alclient"
 
 
 //POTS
@@ -6,15 +6,15 @@ export const MPOTS_CAP = 9000
 export const HPOTS_CAP = 1000
 
 export const SCROLLS_CAP: Map<ItemName,number> = new Map([
-        ["scroll0", 500],
-        ["scroll1", 50],
-        ["scroll2", 10],
-        ["cscroll0", 200],
-        ["cscroll1", 50],
-        ["cscroll2", 5]
+        ["scroll0", 100],
+        ["scroll1", 25],
+        ["scroll2", 5],
+        ["cscroll0", 75],
+        ["cscroll1", 20],
+        ["cscroll2", 2]
     ])
 
-export const DONT_SEND_ITEMS = [
+export const DONT_SEND_ITEMS: ItemName[] = [
     "tracker", 
     "computer", 
     "supercomputer", 
@@ -24,6 +24,19 @@ export const DONT_SEND_ITEMS = [
     "luckbooster", 
     "goldbooster", 
     "xpbooster"
+]
+
+export const MERCHANT_KEEP_ITEMS: ItemName[] = [
+    "scroll0",
+    "scroll1",
+    "scroll2",
+    "cscroll0",
+    "cscroll1",
+    "cscroll2",
+    "offering",
+    "offeringp",
+    "rod",
+    "pickaxe"
 ]
 
 export const DO_NOT_EXCHANGE: ItemName[] = [
@@ -53,6 +66,7 @@ export const ITEMS_TO_SELL: ItemName[] = [
     'rfangs',
     'bcandle',
     'bandages',
+    'xmace',
 
 	//Elexirs
 	'elixirvit0', 
@@ -179,10 +193,12 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["harbringer", { level: 7 }],
     ["oozingterror", { level: 6 }],
 
+    ["basher", {level: 7}],
 
+    ["cclaw", {level: 8, scrollUpAt: 7}],
     // Halloween
     ["ololipop", { level: 8, primlingAt: 6, scrollUpAt: 3, shouldBeShiny: true }],
-    ["glolipop", { level: 8, primlingAt: 6, scrollUpAt: 3 }],
+    ["glolipop", { level: 8, scrollUpAt: 3 }],
 
     // Bunny stuff
     ["ecape", { level: 7, scrollUpAt: 5 }],

@@ -1,5 +1,8 @@
 import { CharacterType, ItemName, SlotType } from "alclient";
 
+export const KEEP_GOLD: number = 1_500_000;
+export const KEEP_GOLD_WITH_PC: number = 10_000_000;
+
 export const DEFAULT_ELIXIRS: Map<CharacterType, ItemName[]> = new Map([
     ["mage", ["pumpkinspice","elixirluck"]],
     ["priest", ["elixirluck"]],

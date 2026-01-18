@@ -1,6 +1,7 @@
-import { ItemName, PingCompensatedCharacter, Game, Tools, Constants } from "alclient"
+import { ItemName, PingCompensatedCharacter, Game, Tools, Constants, Pathfinder } from "alclient"
 import * as CI from "../configs/character_items_configs"
 import * as MIC from "../configs/manage_items_configs"
+import * as CF from "./common_functions"
 import { PartyStrategy } from "./party_strategy"
 import { MemoryStorage } from "./memory_storage"
 
@@ -24,7 +25,7 @@ export class ResuplyStrategy extends PartyStrategy {
         this.usePotionsLoop()
         this.scareLoop()
         // this.useElixirsLoop()
-        
+        this.resuplyScrolls()
         this.stayAlive()
         
     }
@@ -119,10 +120,18 @@ export class ResuplyStrategy extends PartyStrategy {
 
     protected async resuplyScrolls() {
         if(this.bot.ctype != "merchant") return
-        
+        if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, CF.UPGRADE_POSITION)> Constants.NPC_INTERACTION_DISTANCE) return setTimeout(this.resuplyScrolls, 1000)
         for(const [k, v] of MIC.SCROLLS_CAP) {
-            if(this.bot.canBuy(k, {quantity: v-this.bot.countItem(k)})) await this.bot.buy(k,v-this.bot.countItem(k)).catch(console.warn)
+            if(v - this.bot.countItem(k) < 1) {
+                continue
+            }
+            if(this.bot.canBuy(k, {quantity: v-this.bot.countItem(k)})) {
+                console.debug(`Trying buy ${v-this.bot.countItem(k)} ${k}`)
+                await this.bot.buy(k,v-this.bot.countItem(k)).catch(console.warn)
+            }
         }
+
+        return setTimeout(this.resuplyScrolls, 1000)
     }
 
     private async scareLoop() {

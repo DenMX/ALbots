@@ -4,7 +4,7 @@ import * as Items from "../configs/character_items_configs"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
 
-export class RangerAttackStrategy extends StateStrategy<String> {
+export class RangerAttackStrategy extends StateStrategy {
 
     private ranger : Ranger
 

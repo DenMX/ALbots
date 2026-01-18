@@ -9,13 +9,13 @@ import { IState } from "../controllers/state_interface"
 export type State = {
     state_type: string
 }
-export class MerchantStrategy<String> extends ManageItems implements IState {
+export class MerchantStrategy extends ManageItems implements IState {
 
     private job_scheduler: Function[] = []
 
-    private DEFAULT_STATE : State = { state_type: "Idle"}
+    private DEFAULT_STATE: string =  "Idle"
 
-    private merch_state : State = this.DEFAULT_STATE
+    private merch_state : State = {state_type: this.DEFAULT_STATE}
 
     public getStateType(): string {
         return this.merch_state.state_type
@@ -29,6 +29,7 @@ export class MerchantStrategy<String> extends ManageItems implements IState {
         this.checkBankUpgrades = this.checkBankUpgrades.bind(this)
         this.checkScheduler = this.checkScheduler.bind(this)
         this.shovelInventory = this.shovelInventory.bind(this)
+        this.test = this.test.bind(this)
 
         
         // if(!super.getMemoryStorage.getBank) {
@@ -38,13 +39,29 @@ export class MerchantStrategy<String> extends ManageItems implements IState {
         //         await bot.smartMove("bank").catch(console.warn)
         //         if(!bot.bank) await bot.smartMove("bank_b").catch(console.warn)
         //         this.job_scheduler.push(this.checkBankUpgrades)
-        //         this.changeMerchState(this.DEFAULT_STATE.state_type)
+        //         this.changeMerchState(this.DEFAULT_STATE)
         //     })
         // }
 
+        // this.checkInventory()
+        // this.job_scheduler.push(this.checkBankUpgrades)
+        // // this.checkPartyInventory()
+        // this.checkScheduler(true)
+        this.testStart()
+    }
+
+    private async testStart() {
+        this.job_scheduler.push(this.test)
         this.checkInventory()
-        this.checkPartyInventory()
+        this.job_scheduler.push(this.checkBankUpgrades)
+        // this.checkPartyInventory()
         this.checkScheduler(true)
+    }
+
+    private async test() {
+        this.changeMerchState("smart to bank")
+        await this.bot.smartMove("bank").catch(console.warn)
+        this.changeMerchState(this.DEFAULT_STATE)
     }
 
     /**
@@ -53,9 +70,9 @@ export class MerchantStrategy<String> extends ManageItems implements IState {
      */
     private async checkScheduler(setNextTimeout?: boolean) {
         if(setNextTimeout === undefined) setNextTimeout=true
-        console.debug(`Scheduler loop. in queue ${this.job_scheduler.length} tasks`)
-        console.debug(this.job_scheduler.toString())
-        if(this.DEFAULT_STATE.state_type == this.merch_state.state_type && this.job_scheduler.length>0) {
+        // console.debug(`Scheduler loop. in queue ${this.job_scheduler.length} tasks`)
+        // console.debug(this.job_scheduler.toString())
+        if(this.DEFAULT_STATE == this.merch_state.state_type && this.job_scheduler.length>0) {
             let fn = this.job_scheduler.shift()
             await fn()
         }
@@ -64,13 +81,13 @@ export class MerchantStrategy<String> extends ManageItems implements IState {
     }
 
     private async checkBankUpgrades() {
-        if(this.bot.esize<10) return setTimeout(() => {this.job_scheduler.push(this.checkBankUpgrades)}, 10 * 60 * 1000) //10min cooldown
+        if(this.bot.esize<10) return setTimeout(() => {this.job_scheduler.push(this.checkBankUpgrades)}, 5 * 1000) //10min cooldown
 
         this.changeMerchState("Upgrading bank")
         await this.upgradeItemsFromBank()
-        this.changeMerchState(this.DEFAULT_STATE.state_type)
+        this.changeMerchState(this.DEFAULT_STATE)
 
-        setTimeout(() => {this.job_scheduler.push(this.checkBankUpgrades)}, 10 * 60 * 1000) //10min cooldown
+        setTimeout(() => {this.job_scheduler.push(this.checkBankUpgrades)}, 5 * 1000) //10min cooldown
     }
 
     /**
@@ -80,7 +97,7 @@ export class MerchantStrategy<String> extends ManageItems implements IState {
     private changeMerchState(state: string) {
         this.merch_state.state_type = state
         console.debug(`State was changed to ${state}`)
-        if(this.DEFAULT_STATE.state_type == state) this.checkScheduler(false)
+        if(this.DEFAULT_STATE == state) this.checkScheduler(false)
     }
 
     /**
@@ -88,7 +105,7 @@ export class MerchantStrategy<String> extends ManageItems implements IState {
      * @returns shove in scheduler
      */
     private async checkInventory() {
-        console.debug(`Checking inventory: ${this.bot.esize}`)
+        // console.debug(`Checking inventory: ${this.bot.esize}`)
         if(this.bot.esize<2) {
             if( this.bot.hasItem(["computer", "supercomputer"])) {
                 await this.sellTrash()
@@ -130,11 +147,11 @@ export class MerchantStrategy<String> extends ManageItems implements IState {
         await this.storeItems()
         await this.sellTrashFromBank()
         this.changeMerchState("Upgrading bank")
-        this.changeMerchState(this.DEFAULT_STATE.state_type)
+        this.changeMerchState(this.DEFAULT_STATE)
     }
 
     private async sellTrashFromBank() {
-        if( !this.bot.map.startsWith("bank") || this.bot.esize<=0 ) return
+        if( (!this.bot.bank && !this.getMemoryStorage.getBank) || this.bot.esize<=0 ) return
         this.changeMerchState("Collecting trash")
 
         for(const itemName of MIC.ITEMS_TO_SELL) {
@@ -152,7 +169,7 @@ export class MerchantStrategy<String> extends ManageItems implements IState {
         await this.bot.smartMove("main").catch(console.warn)
         this.changeMerchState("selling")
         this.sellTrash()
-        this.changeMerchState(this.DEFAULT_STATE.state_type)
+        this.changeMerchState(this.DEFAULT_STATE)
     }
 
     private checkPartyInventory() {
@@ -187,7 +204,7 @@ export class MerchantStrategy<String> extends ManageItems implements IState {
                     this.changeMerchState('Getting items') // ЗАВИС В ЭТОМ СОСТОЯНИИ?
                     await this.bot.sendItem( bot.name, this.bot.locateItem("hpot1"), hpot ).catch(console.warn)
                     await this.bot.sendItem( bot.name, this.bot.locateItem("mpot1"), mpot ).catch(console.warn)
-                    this.changeMerchState(this.DEFAULT_STATE.state_type)
+                    this.changeMerchState(this.DEFAULT_STATE)
                     if(!this.job_scheduler.includes(this.checkPartyInventory))setTimeout(this.checkPartyInventory, 30 * 1000)
                 })
                 return

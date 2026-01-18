@@ -17,7 +17,7 @@ export type State = {
     eventName?: MonsterName | MapName
 }
 
-export class StateStrategy<String> extends ManageItems implements IState {
+export class StateStrategy extends ManageItems implements IState {
 
     private current_state : State
 
@@ -154,7 +154,7 @@ export class StateStrategy<String> extends ManageItems implements IState {
 
     public async startQuest() {
         if(this.bot.smartMoving) return setTimeout(this.startQuest, 1000)
-        if(this.bot.target && Constants.ONE_SPAWN_MONSTERS.includes(this.bot.getTargetEntity().type)) return setTimeout(this.startQuest, 1000)
+        if(this.bot.target && Constants.SPECIAL_MONSTERS.includes(this.bot.getTargetEntity().type)) return setTimeout(this.startQuest, 1000)
         if(["boss", "event"].includes(this.current_state.state_type)) return setTimeout(this.startQuest, 1000)
         await this.bot.smartMove("monsterhunter").catch(console.warn)
         await this.bot.getMonsterHuntQuest()
@@ -224,11 +224,11 @@ export class StateStrategy<String> extends ManageItems implements IState {
         // CURRENT STATE BOSS || EVENT
         else if(this.current_state.state_type == "boss" || this.current_state.state_type == "event"){
             // we still fighting
-            if(this.bot.getEntities().filter( e=> Constants.ONE_SPAWN_MONSTERS.includes(e.type)).length>0) {
+            if(this.bot.getEntities().filter( e=> Constants.SPECIAL_MONSTERS.includes(e.type)).length>0) {
                 return setTimeout(this.checkState, 1000)
             }                
             // wanted mobs not found
-            else if(this.bot.getEntities().filter( e=> Constants.ONE_SPAWN_MONSTERS.includes(e.type)).length<1) {
+            else if(this.bot.getEntities().filter( e=> Constants.SPECIAL_MONSTERS.includes(e.type)).length<1) {
                 // if we are too far moving to mob
                 if(!this.current_state.location || Tools.distance(this.current_state.location, this.bot) > 400) {
                     // for bosses we should have location
@@ -246,7 +246,7 @@ export class StateStrategy<String> extends ManageItems implements IState {
                     }
                 }
                 // if we smartmoved and still not found monster return to other tasks or farm
-                if(this.bot.getEntities().filter( e=> Constants.ONE_SPAWN_MONSTERS.includes(e.type)).length<1) {
+                if(this.bot.getEntities().filter( e=> Constants.SPECIAL_MONSTERS.includes(e.type)).length<1) {
                     if(this.state_scheduler.length>0) 
                         this.current_state = this.state_scheduler.shift()
                     else 
@@ -342,9 +342,9 @@ export class StateStrategy<String> extends ManageItems implements IState {
                 entities = this.sortEntities(entities, {sortSpawns: true})
                 if(entities[0].id != target.id) this.bot.target = entities[0].id
             }
-            else if (target && !Constants.ONE_SPAWN_MONSTERS.includes(target.type)) {
+            else if (target && !Constants.SPECIAL_MONSTERS.includes(target.type)) {
                 entities = this.sortEntities(entities)
-                if(!Constants.ONE_SPAWN_MONSTERS.includes(target.type) && Constants.ONE_SPAWN_MONSTERS.includes(entities[0].type)) this.bot.target = entities[0].id
+                if(!Constants.SPECIAL_MONSTERS.includes(target.type) && Constants.SPECIAL_MONSTERS.includes(entities[0].type)) this.bot.target = entities[0].id
             }
             else if (target && target.map != this.bot.map) {
                 entities = this.sortEntities(entities)
@@ -376,8 +376,8 @@ export class StateStrategy<String> extends ManageItems implements IState {
                         return (target.spawns.some(spawn => spawn[1] == curr.type) && target.spawns.some(spawn => spawn[1] != next.type)) ? -1 : 1;
                     }
                 }
-                if(Constants.ONE_SPAWN_MONSTERS.includes(curr.type)!=Constants.ONE_SPAWN_MONSTERS.includes(next.type)) {
-                    return (Constants.ONE_SPAWN_MONSTERS.includes(curr.type) && !Constants.ONE_SPAWN_MONSTERS.includes(next.type)) ? -1 : 1;
+                if(Constants.SPECIAL_MONSTERS.includes(curr.type)!=Constants.SPECIAL_MONSTERS.includes(next.type)) {
+                    return (Constants.SPECIAL_MONSTERS.includes(curr.type) && !Constants.SPECIAL_MONSTERS.includes(next.type)) ? -1 : 1;
                 }
                 if(curr.isAttackingUs(this.bot)!=next.isAttackingUs(this.bot)) {
                     return (curr.isAttackingUs(this.bot) && !next.isAttackingUs(this.bot)) ? -1 : 1;

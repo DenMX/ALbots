@@ -2,6 +2,30 @@ import {Entity, PingCompensatedCharacter, Tools, SkillName, IPosition, Pathfinde
 import * as CharacterItems from "../configs/character_items_configs"
 import * as MIC from "../configs/manage_items_configs"
 
+export const UPGRADE_POSITION: IPosition = {
+    x: -208,
+    y: -137,
+    map: "main"
+}
+
+/*
+Formula for calculationg burning
+
+const burnPadding = highestBurningMob
+    ? dps_multiplier(
+        highestBurningMob.damage_type === "physical"
+          ? characterEntity.armor -
+              (G.monsters[highestBurningMob.mtype].apiercing ?? 0) * 2
+          : highestBurningMob.damage_type === "magical"
+          ? characterEntity.resistance -
+            (G.monsters[highestBurningMob.mtype].rpiercing ?? 0) * 2
+          : 1,
+      ) *
+      ((100 - fireResist) / 100) *
+      (highestBurningMob.abilities.burn.unlimited ? 3 : 1.5) *
+      highestBurningMob.attack
+    : 0;
+*/
 export function calculate_monsters_dps (bot: PingCompensatedCharacter, tank: PingCompensatedCharacter|Player) {
     let dps = 0
     for(let entity of bot.getEntities()){
@@ -150,4 +174,20 @@ export function getBotNotPersonalItemsList(bot: PingCompensatedCharacter): ItemD
     }
 
     return notPersonalItems
+}
+
+export function debugLog(): void {
+    return
+}
+
+export function infoLog(): void {
+    return
+}
+
+export function warnLog(): void {
+    return
+}
+
+export function errorLog(): void {
+    return
 }

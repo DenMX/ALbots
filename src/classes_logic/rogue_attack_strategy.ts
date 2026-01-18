@@ -3,7 +3,7 @@ import * as CF from "../../src/common_functions/common_functions"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
 
-export class RogueAttackStrategy extends StateStrategy<String> {
+export class RogueAttackStrategy extends StateStrategy {
 
     private rogue: Rogue
     constructor(bot: Rogue, memoryStorage: MemoryStorage) {

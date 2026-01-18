@@ -3,7 +3,7 @@ import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
 import * as CF from "../common_functions/common_functions"
 
-export class MageAttackStrategy extends StateStrategy<String> {
+export class MageAttackStrategy extends StateStrategy {
 
     private mage : Mage
 

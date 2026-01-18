@@ -1,11 +1,17 @@
 import { BankInfo, BankModel, Database, PingCompensatedCharacter } from "alclient";
 import fs from "fs"
+import { StateStrategy } from "./state_strategy";
+import { MerchantStrategy } from "../classes_logic/merchant_strategy";
 
 
 
 export class MemoryStorage {
 
-    private active_bots: PingCompensatedCharacter[]
+    private active_bots: PingCompensatedCharacter[] = []
+
+    private fighters: StateStrategy[] = []
+
+    private merchant: MerchantStrategy
     
     private bank: BankInfo
 
@@ -23,8 +29,10 @@ export class MemoryStorage {
 
     private current_looter: string 
 
-    constructor(bots: PingCompensatedCharacter[]) {
-        this.active_bots = bots
+    constructor() {
+        this.loadBankFromMongo = this.loadBankFromMongo.bind(this)
+        this.updateBank = this.updateBank.bind(this)
+        
         let credentialFile = fs.readFileSync(`../credentials.json`, 'utf-8')
         this.secretKey = JSON.parse(credentialFile).apiToken
 
@@ -32,18 +40,15 @@ export class MemoryStorage {
         this.current_tank = this.default_tank
 
         this.loadBankFromMongo().catch(console.warn)
+    }
 
-        this.active_bots.forEach( (bot) => {
-            bot.socket.on("new_map", () => this.updateBank(bot))
-        })
-
+    public addEventListners(bot: PingCompensatedCharacter) {
         if(this.secretKey == "") {
-            console.error("Add apiToken in credentials file!")
-            return
+            return console.error("Add apiToken in credentials file!")
         }
-        bots.forEach( (e) => {
-            e.socket.once("tracker", (data) => {
-            const url = `https://aldata.earthiverse.ca/achievements/${e.id}/${this.secretKey}`;
+        bot.socket.on("new_map", () => this.updateBank(bot))
+        bot.socket.once("tracker", (data) => {
+            const url = `https://aldata.earthiverse.ca/achievements/${bot.id}/${this.secretKey}`;
             const settings = {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -52,16 +57,55 @@ export class MemoryStorage {
             // if response.status == 200, it was successfully updated
             fetch(url, settings).then((response) => console.log(`Sending tracker info code: ${response.status}`));
             });
-            e.socket.emit("tracker");
-        })
+            bot.socket.emit("tracker");
+    }
+
+    public addFighter(fighter: StateStrategy) {
+        this.fighters.push(fighter)
+        this.addEventListners(fighter.getBot())
+        this.active_bots.push(fighter.getBot())
+    }
+
+    public addMerchant(bot: MerchantStrategy) {
+        this.merchant = bot
+        this.addEventListners(bot.getBot())
+        this.active_bots.push(bot.getBot())
+    }
+
+    public replaceBot(old_name: string, newBot: PingCompensatedCharacter) {
+        if(newBot.name == old_name) {
+            let oldBot
+            for(let i = 0; i < this.active_bots.length; i++) {
+                if(this.active_bots[i].name == old_name) {
+                    oldBot = i
+                    break
+                }
+            }
+            this.active_bots[oldBot] = newBot
+            this.addEventListners(newBot)
+            console.debug(`Replaced ${old_name} to ${newBot.name} in bot collection`)
+        }
+        else {
+            console.error(`NEED TO WRITE LOGIC FOR REPLACE ONE BOT FOR ANOTHER`)
+        }
     }
 
     private async loadBankFromMongo() {
+        if(!this.active_bots?.length || this.active_bots.length<1) return setTimeout(this.loadBankFromMongo, 500)
         if(Database.connection) {
             this.bank = await BankModel.findOne( {
                 owner: this.active_bots[0].owner
             }) as BankInfo
+            console.debug('Bank loaded from MONGO')
         }
+    }
+
+    public get getFighters() {
+        return this.fighters
+    }
+
+    public get getMerchant() {
+        return this.merchant
     }
 
     public get getCurrentPartyLeader() {
