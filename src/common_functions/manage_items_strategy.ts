@@ -46,7 +46,7 @@ export class ManageItems extends ResuplyStrategy {
 
         //bind context functions
         this.upgradeItems = this.upgradeItems.bind(this)
-        this.compoundItems = this.upgradeItems.bind(this)
+        this.compoundItems = this.compoundItems.bind(this)
         this.exchangeItems = this.exchangeItems.bind(this)
         this.storeItems = this.storeItems.bind(this)
         this.upgradeItemsFromBank = this.upgradeItemsFromBank.bind(this)
@@ -91,7 +91,7 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected async upgradeItems() {
-        if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, {x: -203, y: -115, map: "main"})>Constants.NPC_INTERACTION_DISTANCE) return
+        if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, CF.UPGRADE_POSITION)>Constants.NPC_INTERACTION_DISTANCE) return
 
         level: for(let lvl = 0; lvl < 9; lvl++){
             let debugItemsInfo = this.bot.items.filter( e => ItemsConfig.MERCHANT_UPGRADE.has(e?.name) && e?.level == lvl && Game.G.items[e.name].upgrade)
@@ -115,16 +115,19 @@ export class ManageItems extends ResuplyStrategy {
                 let primling 
                 if(offering) primling = this.bot.locateItem(offering)
                 
-                let scroll_grade = item.calculateGrade()
-                scroll_grade = (itemConfig.scrollUpAt>= item.level && scroll_grade<2) ? scroll_grade+1 : scroll_grade
+                
+                let scroll_grade = (itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2) ? item.calculateGrade()+1 : item.calculateGrade()
+                console.debug(`[UPGRADE] NEED TO USE SCROLL UP? ${(itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2)}`)
                 let scroll_name = `scroll${scroll_grade}` as ItemName
-                let scroll_idx = this.bot.locateItem(scroll_name)
-                if(!scroll_idx && scroll_idx<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
-                    await this.bot.buy(scroll_name).catch(console.warn)
+                console.debug(`For ${item.name} level ${item.level} needs ${scroll_name}. Has scroll: ${this.bot.hasItem(scroll_name)}`)
+                if(!this.bot.hasItem(scroll_name)) {
+                    if( scroll_grade<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
+                        await this.bot.buy(scroll_name).catch(console.warn)
+                    }
+                    else continue
                 }
 
-                scroll_idx = this.bot.locateItem(scroll_name)
-                if(!scroll_idx) continue
+                let scroll_idx = this.bot.locateItem(scroll_name)
                 if(this.bot instanceof Merchant) {
                     if(this.bot.canUse("massproduction")) await this.bot.massProduction().catch(console.debug)
                     if(this.bot.canUse("massproductionpp")) await this.bot.massProductionPP().catch(console.debug)
@@ -136,11 +139,12 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected async compoundItems() {
-        if(!this.bot.locateItem(["computer", "supercomputer"]) && Tools.distance(this.bot, {x: -203, y: -115, map: "main"})>Constants.NPC_INTERACTION_DISTANCE) return
+        console.debug(`COMPOUND STARTED`)
+        if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, CF.UPGRADE_POSITION)>Constants.NPC_INTERACTION_DISTANCE) return
 
         level: for(let lvl=0; lvl<5; lvl++){
             let debugItemsInfo = this.bot.items.filter( e => ItemsConfig.MERCHANT_UPGRADE.has(e?.name) && e?.level == lvl && Game.G.items[e.name].compound)
-            console.debug(`Compouding to level ${lvl+1}, items should be upgraded: ${debugItemsInfo.length}`)
+            console.debug(`Compouding to level ${lvl+1}, items should be compound: ${debugItemsInfo.length}`)
             debugItemsInfo.forEach( e => console.debug(e.name))
             for(const [, item] of this.bot.getItems()) {
                 if(!item) continue
@@ -160,18 +164,26 @@ export class ManageItems extends ResuplyStrategy {
 
                 let primling 
                 if(offering) primling = this.bot.locateItem(offering)
-                    
-                let scroll_grade = item.calculateGrade()
-                scroll_grade = (itemConfig.scrollUpAt>= item.level && scroll_grade<2) ? scroll_grade+1 : scroll_grade
-                let scroll_name = `scroll${scroll_grade}` as ItemName
-                let scroll_idx = this.bot.locateItem(scroll_name)
-                if(!scroll_idx && scroll_idx<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
-                    await this.bot.buy(scroll_name).catch(console.warn)
+
+                let scroll_grade = (itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2) ? item.calculateGrade()+1 : item.calculateGrade()
+               
+                console.debug(`[UPGRADE] NEED TO USE SCROLL UP? ${(itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2)}`)
+                
+                let scroll_name = `cscroll${scroll_grade}` as ItemName
+                
+                console.debug(`For ${item.name} level ${item.level} needs ${scroll_name}. Has scroll: ${this.bot.hasItem(scroll_name)}`)
+                
+                if(!this.bot.hasItem(scroll_name)) {
+                    if( scroll_grade<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
+                        await this.bot.buy(scroll_name).catch(console.warn)
+                    }
+                    else continue
                 }
 
-                scroll_idx = this.bot.locateItem(scroll_name)
-                if(!scroll_idx) continue
+                let scroll_idx = this.bot.locateItem(scroll_name)
+               
                 console.debug(`Compuond item ${item.name} to ${lvl+1}`)
+                
                 if(this.bot instanceof Merchant) {
                     if(this.bot.canUse("massproduction")) await this.bot.massProduction().catch(console.debug)
                     if(this.bot.canUse("massproductionpp")) await this.bot.massProductionPP().catch(console.debug)
@@ -236,7 +248,7 @@ export class ManageItems extends ResuplyStrategy {
             if(this.bot.ctype == "merchant" && ItemsConfig.MERCHANT_KEEP_ITEMS.includes(item.name)) continue
             
             //left more quantity of elixirs in inventory if we have more than stack
-            if( CharacterItems.DEFAULT_ELIXIRS.get(this.bot.ctype).includes(item.name) && 
+            if( CharacterItems.DEFAULT_ELIXIRS.get(this.bot.ctype)?.includes(item.name) && 
                 Game.G.items[item.name].s < this.bot.countItem(item.name) && 
                 this.bot.locateItem(item.name, this.bot.items, {returnHighestQuantity: true}) == i) continue
 
@@ -365,9 +377,9 @@ export class ManageItems extends ResuplyStrategy {
         }
 
         //withdraw UPGRADE items while have inventory space. Safe 1 slot just in case
-        outer: for(let i = 0; i < items.upgrade.length; i++) {
+        upouter: for(let i = 0; i < items.upgrade.length; i++) {
             for(const it of items.upgrade[i].slots) {
-                if(bot.esize<2) break outer;
+                if(bot.esize<2) break upouter;
                 console.debug(`[upgradeFromBank] smartmove to bankPack`)
                 await bot.smartMove(it[0], {getWithin: 9999}).catch(console.warn)
                 await bot.withdrawItem(it[0], it[1])
@@ -375,31 +387,34 @@ export class ManageItems extends ResuplyStrategy {
         }
 
         //withdraw COMPOUND items
-        outer: for(let i = 0; i < items.compound.length; i++) {
-            for(let it = 0; it < items.compound[i].slots.length; it+=3) {
+        comouter: for(const configItem of items.compound) {
+            let slotsLength = configItem.slots.length - ( configItem.slots.length % 3 )
+            for(let it = 0; it < slotsLength; it++) {
 
-                if(bot.esize<3) break outer;
-
-                // There is less then 3 items, we can't compuond.
-                if(items.compound[i].slots.length-1<it+2) break
-
-                for(let x = 0; i < 3; i++) {
-                    console.debug(`[upgradeFromBank] smartmove to bankPack`)
-                    await bot.smartMove(items.compound[i].slots[it+x][0], {getWithin: 9999}).catch(console.warn)
-                    await bot.withdrawItem(items.compound[i].slots[it+x][0], items.compound[i].slots[it+x][1])
+                if((it == 0 || it%3 == 0) && bot.esize<3) {
+                    console.debug(`[upgradeFromBank] No more space in inventory`)
+                    break comouter;
                 }
+
+                console.debug(`[upgradeFromBank] withdrowing ${configItem.itemName} level ${configItem.level}`)
+                await bot.smartMove(configItem.slots[it][0], {getWithin: 9999}).catch(console.warn)
+                await bot.withdrawItem(configItem.slots[it][0], configItem.slots[it][1])
                 
             }
         }
         console.debug(`[upgradeFromBank] smartmove to upgrade`)
         await bot.smartMove(CF.UPGRADE_POSITION).catch(console.warn)
+        console.debug(`Calling compound function!`)
+        this.compoundItems()
         await this.upgradeItems()
-        await this.compoundItems()
+        
+        
     }
 
     protected getUpgradeListFromBank() : UpgradeItems {
         const bot = this.bot
-        
+        if(!bot.bank && !super.getMemoryStorage.getBank) return { upgrade: [], compound: [] }
+
 
         let bank = (bot.bank) ? bot.bank : super.getMemoryStorage.getBank
         bot.bank ? console.debug('using bank info') : console.debug('using bank info from DB')
@@ -529,6 +544,22 @@ export class ManageItems extends ResuplyStrategy {
                 }
                 return 0
             })
+        }
+
+        //left only compoundable count of items in array
+        for(const compoundConfig of upgradeItems.compound) {
+            if(compoundConfig.slots.length<3) {
+                console.debug(`Items ${compoundConfig.itemName} ${compoundConfig.slots.length} count. Removing this item from coumpound list.`)
+                upgradeItems.compound.splice(upgradeItems.compound.indexOf(compoundConfig), 1) //remove this items
+                continue
+            }
+            if(compoundConfig.slots.length%3>0) {
+                console.debug(`${compoundConfig.itemName} has ${compoundConfig.slots.length}. Removing ${compoundConfig.slots.length%3}`)
+                compoundConfig.slots.splice( 
+                    compoundConfig.slots.length - ( compoundConfig.slots.length % 3 ) -1,
+                    compoundConfig.slots.length-1 
+                )
+            }
         }
 
         if(upgradeItems.compound.length) {
