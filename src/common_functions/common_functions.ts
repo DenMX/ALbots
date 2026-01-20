@@ -26,9 +26,13 @@ const burnPadding = highestBurningMob
       highestBurningMob.attack
     : 0;
 */
-export function calculate_monsters_dps (bot: PingCompensatedCharacter, tank: PingCompensatedCharacter|Player) {
+export function calculate_monsters_dps (bot: PingCompensatedCharacter, tank: PingCompensatedCharacter|Player, entities?: Entity[]) {
+    
+    if(!entities) entities = bot.getEntities()
+
     let dps = 0
-    for(let entity of bot.getEntities()){
+
+    for(let entity of entities){
         if(entity.damage_type == "physical") {
             dps += entity.attack * Tools.damage_multiplier(tank.armor - entity.apiercing)
         }
@@ -122,15 +126,28 @@ export function calculate_my_dps(bot: PingCompensatedCharacter) {
     return bot.attack * (1 + (bot.crit/100)) * 0.9
 }
 
+
+/**
+ * Decide could we or should we use weapon with explosion and blast effects
+ */
 export function shouldUseMassWeapon(bot: PingCompensatedCharacter, tank: string) {
-    if(bot.getEntities({targetingPartyMember: true, targetingMe: true}).length>1) return true
+    let entitiesTargetingUs = bot.getEntities().filter( e => e.target == bot.name || bot.partyData?.list.includes(e.target) )
+    if(entitiesTargetingUs.length>1) return true
+    let target = bot.getTargetEntity()
+    if(!target) return false
     let willTank 
     if(bot.name == tank ) willTank = bot
     else {
         willTank = bot.getPlayers().filter( e => e.name == tank && Tools.distance(e,bot)<200)[0] || bot
     }
-    if(calculate_hps(bot) - calculate_monsters_dps(bot, willTank) > 0) return true
+    let entitiesInRadius = bot.getEntities().filter( e => Tools.distance(e, target) <= 40 && !e.target )
+    
+    if( entitiesInRadius.length>0 && calculate_monsters_dps(bot, willTank, [...entitiesInRadius, ...entitiesTargetingUs]) / calculate_hps(bot) <= 1) return true
     return false
+}
+
+export function shouldUseMassSkill(bot: PingCompensatedCharacter, tank: string, skill: SkillName) {
+
 }
 
 export function isInRange(entity: Entity, bot: PingCompensatedCharacter, skill?: SkillName) {
@@ -189,5 +206,5 @@ export function warnLog(): void {
 }
 
 export function errorLog(): void {
-    return
+    return console.debug()
 }

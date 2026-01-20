@@ -1,4 +1,4 @@
-import { Game, Warrior, ItemName, Tools, PingCompensatedCharacter} from "alclient"
+import { Game, Warrior, ItemName, Tools, PingCompensatedCharacter, LimitDCReportData} from "alclient"
 import * as Items from "../configs/character_items_configs"
 import * as CF from "../../src/common_functions/common_functions"
 import { debugLog } from "../../src/common_functions/common_functions";
@@ -26,15 +26,23 @@ export class WarriorsAttackStrategy extends StateStrategy {
         this.useWarcryLoop = this.useWarcryLoop.bind(this)
         this.useMassAggroLoop = this.useMassAggroLoop.bind(this)
         this.switchWeapons = this.switchWeapons.bind(this)
+        this.switchWeaponsLoop = this.switchWeaponsLoop.bind(this)
         this.useStomp = this.useStomp.bind(this)
         this.useCleave = this.useCleave.bind(this)
 
         //trigger started loops
         this.attackLoop()
+        this.switchWeaponsLoop()
         // this.useMassAggroLoop()
         this.hardShellLoop()
         this.useWarcryLoop()
-        this.switchWeapons()
+
+        let logLimitDCReport = (data: LimitDCReportData) => {
+            console.debug(`=== START LIMITDCREPORT (${bot.id}) ===`)
+            console.debug(data)
+            console.debug(`=== END LIMITDCREPORT ${bot.id} ===`)
+        }
+        bot.socket.on("limitdcreport", logLimitDCReport)
     }
 
     public toogleFireHazard(){
@@ -101,8 +109,9 @@ export class WarriorsAttackStrategy extends StateStrategy {
         let botWC = Items.WEAPON_CONFIGS[this.bot.name] as Items.WarriorWeaponsConfig
         if(!botWC) return
         let mainhand = this.warrior.slots.mainhand.name
-        if( mainhand == botWC.cleave?.name || mainhand == botWC.stomp?.name ) return setTimeout(this.switchWeapons, 500)
-        if(config?.cleave) {
+        if( mainhand == botWC.cleave?.name || mainhand == botWC.stomp?.name ) return 
+        if(config?.cleave && botWC.cleave) {
+            if(!this.bot.hasItem(botWC.cleave.name, undefined, {level: botWC.cleave.level})) return
             if(this.warrior.slots.offhand && this.warrior.esize > 0) {
                 try {
                     
@@ -114,11 +123,11 @@ export class WarriorsAttackStrategy extends StateStrategy {
                 }
             }
             let cleave_weapon = botWC.cleave
-            if(!cleave_weapon) return
-            let cleave_item_idx = this.warrior.locateItem(cleave_weapon!.name as ItemName, [], {level: cleave_weapon!.level})
+            if(!this.bot.hasItem(cleave_weapon.name, undefined, {level: cleave_weapon.level})) return
+            let cleave_item_idx = this.warrior.locateItem(cleave_weapon?.name as ItemName, [], {level: cleave_weapon?.level})
             return this.warrior.equip(cleave_item_idx).catch(console.error)
         }
-        else if(config?.stomp) {
+        else if(config?.stomp && botWC.stomp) {
             if(this.warrior.slots.offhand && this.warrior.esize > 0) {
                 try {
                     
@@ -130,30 +139,78 @@ export class WarriorsAttackStrategy extends StateStrategy {
                 }
             }
             let stomp_item = botWC.stomp
-            if(!stomp_item) return
-            let stop_item_idx = this.warrior.locateItem(stomp_item!.name as ItemName, [], {level: stomp_item!.level})
+            if(!this.bot.hasItem(stomp_item.name, undefined, {level: stomp_item.level})) return
+            let stop_item_idx = this.warrior.locateItem(stomp_item.name as ItemName, [], {level: stomp_item!.level})
             return this.warrior.equip(stop_item_idx).catch(console.error)
         }
-        else {
+        else if(!config || (
+            ( !config?.cleave || config?.cleave != true ) && 
+            ( !config?.stomp || config?.stomp != true )
+        )){
             let mainhand_item
             
             let offhand_item
             
             if(CF.shouldUseMassWeapon(this.warrior, this.memoryStorage.getCurrentTank)) {
-                mainhand_item = botWC.solo_mainhand
-                offhand_item = botWC.solo_offhand
-            }
-            else {
+                // console.debug(`Warrior want mass weapon`)
                 mainhand_item = botWC.mass_mainhand
                 offhand_item = botWC.mass_offhand
             }
-            if(this.warrior.slots.mainhand?.name == mainhand_item?.name  && this.warrior.slots.offhand?.name == offhand_item?.name) return setTimeout(this.switchWeapons, 500)
+            else {
+                // console.debug(`Warrior want solo weapon`)
+                mainhand_item = botWC.solo_mainhand
+                offhand_item = botWC.solo_offhand
+            }
+            if(this.warrior.slots.mainhand?.name == mainhand_item?.name  && this.warrior.slots.offhand?.name == offhand_item?.name) return
             let mainhand_idx = this.warrior.locateItem(mainhand_item.name, undefined, {level: mainhand_item?.level})
-            let offhand_idx = this.warrior.locateItem(offhand_item.name, undefined, {level: offhand_item?.level})
             if( mainhand_idx ) await this.warrior.equip(mainhand_idx,"mainhand").catch(debugLog)
+            let offhand_idx = this.warrior.locateItem(offhand_item.name, undefined, {level: offhand_item?.level})
             if( offhand_idx ) await this.warrior.equip(offhand_idx, "offhand").catch(debugLog)
-            setTimeout(this.switchWeapons, 500)
         }
+    }
+
+    private async switchWeaponsLoop() {
+        let botWC = Items.WEAPON_CONFIGS[this.bot.name] as Items.WarriorWeaponsConfig
+        if(!botWC) return
+        let mainhand = this.warrior.slots.mainhand?.name
+        if( mainhand == botWC.cleave?.name || mainhand == botWC.stomp?.name ) return setTimeout(this.switchWeaponsLoop, 1500)
+
+        let mainhand_item
+            
+        let offhand_item
+        
+        if(CF.shouldUseMassWeapon(this.warrior, this.memoryStorage.getCurrentTank)) {
+            // console.debug(`Warrior want mass weapon`)
+            mainhand_item = botWC.mass_mainhand
+            offhand_item = botWC.mass_offhand
+        }
+        else {
+            // console.debug(`Warrior want solo weapon`)
+            mainhand_item = botWC.solo_mainhand
+            offhand_item = botWC.solo_offhand
+        }
+        if(this.warrior.slots.mainhand?.name == mainhand_item?.name  && this.warrior.slots.offhand?.name == offhand_item?.name) {
+            // console.debug('using weapon as we want')
+            return setTimeout(this.switchWeaponsLoop,1000)
+        }
+        if(mainhand_item.name == offhand_item.name && mainhand_item.level == offhand_item.level) {
+            let items = this.bot.locateItems(mainhand_item.name, undefined, {level: mainhand_item.level})
+            if(!items) return setTimeout(this.switchWeapons, 1000)
+            items.length > 1 ? 
+                await this.bot.equipBatch([{num: items[0], slot: "mainhand"},{num: items[1], slot: "offhand"}])
+                :
+                await this.bot.equipBatch([{num: items[0], slot: "mainhand"}])
+
+            return setTimeout(this.switchWeaponsLoop, 1000)
+        }
+        let mainhand_idx = this.warrior.locateItem(mainhand_item.name, undefined, {level: mainhand_item?.level})
+        // console.debug(`Mainhand ${mainhand_item.name} in ${mainhand_idx} slot.`)
+        if( mainhand_idx !== undefined ) await this.warrior.equip(mainhand_idx,"mainhand").catch(console.debug)
+        let offhand_idx = this.warrior.locateItem(offhand_item.name, undefined, {level: offhand_item?.level})
+        // console.debug(`Offhand ${offhand_item.name} in ${offhand_idx} slot.`)        
+        if( offhand_idx !== undefined ) await this.warrior.equip(offhand_idx, "offhand").catch(console.debug)
+        
+        setTimeout(this.switchWeaponsLoop,1000)
     }
 
     private async useCleave() {

@@ -619,8 +619,8 @@ export class ManageItems extends ResuplyStrategy {
             await this.bot.sendItem(name,idx,item.q).catch(console.warn)
         }
         if(this.bot.ctype != "merchant") {
-            if(this.bot.hasItem(["computer", "supercomputer"]) && this.bot.gold>CharacterItems.KEEP_GOLD_WITH_PC) await this.bot.sendGold(name, CharacterItems.KEEP_GOLD_WITH_PC-this.bot.gold)
-            else if(!this.bot.hasItem(["computer","supercomputer"]) && this.bot.gold>CharacterItems.KEEP_GOLD) await this.bot.sendGold(name, CharacterItems.KEEP_GOLD-this.bot.gold)
+            if(this.bot.hasItem(["computer", "supercomputer"]) && this.bot.gold>CharacterItems.KEEP_GOLD_WITH_PC) await this.bot.sendGold(name, this.bot.gold-CharacterItems.KEEP_GOLD_WITH_PC)
+            else if(!this.bot.hasItem(["computer","supercomputer"]) && this.bot.gold>CharacterItems.KEEP_GOLD) await this.bot.sendGold(name, this.bot.gold-CharacterItems.KEEP_GOLD)
         }
     }
 

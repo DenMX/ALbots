@@ -96,7 +96,7 @@ export class MemoryStorage {
             this.bank = await BankModel.findOne( {
                 owner: this.active_bots[0].owner
             }) as BankInfo
-            console.debug('Bank loaded from MONGO')
+            console.debug(`Bank loaded from MONGO\nCurrent bank: ${JSON.stringify(this.bank)}`)
         }
     }
 

@@ -1,4 +1,4 @@
-import { Game, Constants, InviteData, PingCompensatedCharacter, Tools } from "alclient";
+import { Game, Constants, InviteData, PingCompensatedCharacter, Tools, HitData } from "alclient";
 import { MemoryStorage } from "./memory_storage";
 import { my_characters } from "../main";
 
@@ -17,7 +17,7 @@ export class PartyStrategy {
         this.loot = this.loot.bind(this)
         this.reconnect = this.reconnect.bind(this)
 
-        // this.checkParty()
+        this.checkParty()
         this.loot()
         this.enableEvents()
         
@@ -58,7 +58,17 @@ export class PartyStrategy {
         this.bot.socket.on("invite", (data) => this.onPartyInvite(data))
         this.bot.socket.on("request", (data) => this.onPartyRequest(data))
         this.bot.socket.on("disconnect", (data) => this.reconnect(data))
+        this.bot.socket.on("hit", (data) => this.moveOnTakenDamage(data))
         this.memoryStorage.addEventListners(this.bot)
+    }
+
+    private moveOnTakenDamage(data: HitData) {
+        if(data.stacked?.includes(this.bot.name) && !this.bot.moving && !this.bot.smartMoving) {
+            this.bot.move( 
+                this.bot.x + (-5 + Math.random()*5),
+                this.bot.y + (-5 + Math.random()*5)
+            ).catch(console.debug)
+        } 
     }
 
     private async onPartyInvite(data: InviteData) {

@@ -42,28 +42,43 @@ async function run(){
     // let merchant = class_functions.merchant.start("Merchandiser", "EU", "II")
     // active_players.push(merchant)
 
-    let merchant = await Game.startMerchant("frostyMerch","EU", "II")
-    // let priest = await Game.startPriest("frostyHeal", "EU", "II")
     
-    // let ranger = await Game.startRanger("frostyRan", "EU", "II")
+    
+    
     // let rogue = await Game.startRogue("frostyRogue", "EU", "II")
     // let mage = await Game.startMage("frostyMage", "EU", "II")
         
-
+    let memoryStorage = new MemoryStorage()
     // PROD READY STEADY
     let stateList = []
 
-    // let warrior = await Game.startWarrior("frostyWar", "EU", "II")
+    let merchant = await Game.startMerchant("frostyMerch","EU", "II")
+    memoryStorage.addMerchant(new MerchantStrategy(merchant, memoryStorage))
+
+    let warrior = await Game.startWarrior("frostyWar", "EU", "II")
+    let warriorState = new WarriorsAttackStrategy(warrior, memoryStorage)
+    stateList.push(warriorState)
+    memoryStorage.addFighter(warriorState)
     // active_players.push(warrior)
     // active_players.push(priest)
     
-    let memoryStorage = new MemoryStorage()
-    // stateList.push(new PriestsAttackStrategy(priest, memoryStorage))
-    // stateList.push(new WarriorsAttackStrategy(warrior, memoryStorage))
-    // stateList.push(new RangerAttackStrategy(ranger, memoryStorage))
+    
+    let priest = await Game.startPriest("frostyHeal", "EU", "II")
+    let priestState = new PriestsAttackStrategy(priest, memoryStorage)
+    stateList.push(priestState)
+    memoryStorage.addFighter(priestState)
+    
+    let ranger = await Game.startRanger("frostyRan", "EU", "II")
+    let rangerState = new RangerAttackStrategy(ranger, memoryStorage)
+    stateList.push(rangerState)
+    memoryStorage.addFighter(rangerState)
+    
     // stateList.push(new RogueAttackStrategy(rogue, memoryStorage))
     // stateList.push(new MageAttackStrategy(mage, memoryStorage))
-    memoryStorage.addMerchant(new MerchantStrategy(merchant, memoryStorage))
+    
+    
+    
+    
     let stateController = new StateController(stateList, memoryStorage)
     let bwiList = [...stateList, memoryStorage.getMerchant]
     let bwi = new BWIReporter(bwiList)

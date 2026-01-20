@@ -29,39 +29,11 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.checkBankUpgrades = this.checkBankUpgrades.bind(this)
         this.checkScheduler = this.checkScheduler.bind(this)
         this.shovelInventory = this.shovelInventory.bind(this)
-        this.test = this.test.bind(this)
 
-        
-        // if(!super.getMemoryStorage.getBank) {
-        //     this.job_scheduler.push(async() => {
-        //         console.debug("going load bank in memory")
-        //         this.changeMerchState("Loading bank")
-        //         await bot.smartMove("bank").catch(console.warn)
-        //         if(!bot.bank) await bot.smartMove("bank_b").catch(console.warn)
-        //         this.job_scheduler.push(this.checkBankUpgrades)
-        //         this.changeMerchState(this.DEFAULT_STATE)
-        //     })
-        // }
-
-        // this.checkInventory()
-        // this.job_scheduler.push(this.checkBankUpgrades)
-        // // this.checkPartyInventory()
-        // this.checkScheduler(true)
-        this.testStart()
-    }
-
-    private async testStart() {
-        this.job_scheduler.push(this.test)
         this.checkInventory()
         this.job_scheduler.push(this.checkBankUpgrades)
-        // this.checkPartyInventory()
+        this.checkPartyInventory()
         this.checkScheduler(true)
-    }
-
-    private async test() {
-        this.changeMerchState("smart to bank")
-        await this.bot.smartMove("bank").catch(console.warn)
-        this.changeMerchState(this.DEFAULT_STATE)
     }
 
     /**
@@ -130,7 +102,7 @@ export class MerchantStrategy extends ManageItems implements IState {
     private async shovelInventory() {
         if(!this.bot.hasItem(["computer","supercomputer"])) {
             this.changeMerchState("Move main")
-            await this.bot.smartMove("main").catch(console.warn)
+            await this.bot.smartMove(CF.UPGRADE_POSITION).catch(console.warn)
             this.changeMerchState("selling")
             await this.sellTrash()
             this.changeMerchState("upgrading")
