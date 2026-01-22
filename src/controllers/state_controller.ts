@@ -32,6 +32,13 @@ export class StateController {
         return this.bots
     }
 
+    public addNewBot(bot: IState) {
+        this.bots.push(bot)
+        let b = bot.getBot()
+        b.socket.on("disconnect", (data, b) => this.reconnect(data, b))
+        this.memoryStorage.addEventListners(b)
+    }
+
     private async reconnect(data, bot) {
         console.warn(`${bot.name} disconnected. Cause:\n${JSON.stringify(data)}`)
         for(let i = 0; i<this.bots.length; i++) {

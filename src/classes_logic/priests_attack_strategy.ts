@@ -1,4 +1,4 @@
-import { Priest, Tools, } from "alclient"
+import { Priest, Tools, Game } from "alclient"
 import * as CF from "../../src/common_functions/common_functions"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
@@ -93,7 +93,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(!this.priest.getTargetEntity() || this.priest.smartMoving) return setTimeout(this.useCurseLoop, 2000)
         if(this.priest.getCooldown("curse") || !this.priest.canUse("curse")) return setTimeout(this.useCurseLoop, Math.max(100, this.priest.getCooldown("curse")))
         if(this.priest.getTargetEntity().hp<5000) return setTimeout(this.useCurseLoop, 1000)
-            await this.priest.curse(this.priest.target).catch(console.warn)
+            if(this.priest.getTargetEntity() && Tools.distance(this.priest, this.priest.getTargetEntity()) <= Game.G.skills.curse.range) await this.priest.curse(this.priest.target).catch(console.warn)
         return setTimeout(this.useCurseLoop, this.priest.getCooldown("curse"))
     }
 

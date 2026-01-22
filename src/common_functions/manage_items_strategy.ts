@@ -95,7 +95,7 @@ export class ManageItems extends ResuplyStrategy {
 
         level: for(let lvl = 0; lvl < 9; lvl++){
             let debugItemsInfo = this.bot.items.filter( e => ItemsConfig.MERCHANT_UPGRADE.has(e?.name) && e?.level == lvl && Game.G.items[e.name].upgrade)
-            console.debug(`Upgrading to level ${lvl+1}, items should be upgraded: ${debugItemsInfo.length}`)
+            // console.debug(`Upgrading to level ${lvl+1}, items should be upgraded: ${debugItemsInfo.length}`)
             debugItemsInfo.forEach( e => console.debug(e.name))
             for(const [slot,item] of this.bot.getItems()) {
                 if(!item) continue
@@ -117,9 +117,9 @@ export class ManageItems extends ResuplyStrategy {
                 
                 
                 let scroll_grade = (itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2) ? item.calculateGrade()+1 : item.calculateGrade()
-                console.debug(`[UPGRADE] NEED TO USE SCROLL UP? ${(itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2)}`)
+                // console.debug(`[UPGRADE] NEED TO USE SCROLL UP? ${(itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2)}`)
                 let scroll_name = `scroll${scroll_grade}` as ItemName
-                console.debug(`For ${item.name} level ${item.level} needs ${scroll_name}. Has scroll: ${this.bot.hasItem(scroll_name)}`)
+                // console.debug(`For ${item.name} level ${item.level} needs ${scroll_name}. Has scroll: ${this.bot.hasItem(scroll_name)}`)
                 if(!this.bot.hasItem(scroll_name)) {
                     if( scroll_grade<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
                         await this.bot.buy(scroll_name).catch(console.warn)
@@ -144,7 +144,7 @@ export class ManageItems extends ResuplyStrategy {
 
         level: for(let lvl=0; lvl<5; lvl++){
             let debugItemsInfo = this.bot.items.filter( e => ItemsConfig.MERCHANT_UPGRADE.has(e?.name) && e?.level == lvl && Game.G.items[e.name].compound)
-            console.debug(`Compouding to level ${lvl+1}, items should be compound: ${debugItemsInfo.length}`)
+            // console.debug(`Compouding to level ${lvl+1}, items should be compound: ${debugItemsInfo.length}`)
             debugItemsInfo.forEach( e => console.debug(e.name))
             for(const [, item] of this.bot.getItems()) {
                 if(!item) continue
@@ -167,11 +167,11 @@ export class ManageItems extends ResuplyStrategy {
 
                 let scroll_grade = (itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2) ? item.calculateGrade()+1 : item.calculateGrade()
                
-                console.debug(`[UPGRADE] NEED TO USE SCROLL UP? ${(itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2)}`)
+                // console.debug(`[UPGRADE] NEED TO USE SCROLL UP? ${(itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2)}`)
                 
                 let scroll_name = `cscroll${scroll_grade}` as ItemName
                 
-                console.debug(`For ${item.name} level ${item.level} needs ${scroll_name}. Has scroll: ${this.bot.hasItem(scroll_name)}`)
+                // console.debug(`For ${item.name} level ${item.level} needs ${scroll_name}. Has scroll: ${this.bot.hasItem(scroll_name)}`)
                 
                 if(!this.bot.hasItem(scroll_name)) {
                     if( scroll_grade<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
@@ -291,7 +291,7 @@ export class ManageItems extends ResuplyStrategy {
 
         let bankPackName: keyof BankInfo
         for (bankPackName in bank) {
-            if (bankPackName == "gold") continue
+            if(bankPackName == "gold" || bankPackName == "owner" as BankPackName || bankPackName == "_id" as BankPackName) continue
 
             const itemsInSlot = bot.locateItems(item, bot.bank[bankPackName], filters)
 
@@ -315,7 +315,7 @@ export class ManageItems extends ResuplyStrategy {
 
         let bankPackName: keyof BankInfo
         for (bankPackName in bank) {
-            if (bankPackName == "gold") continue
+            if(bankPackName == "gold" || bankPackName == "owner" as BankPackName || bankPackName == "_id" as BankPackName) continue
 
             const emptyInSlot = []
             for (let i = 0; i < bank[bankPackName].length; i++) {
@@ -612,17 +612,21 @@ export class ManageItems extends ResuplyStrategy {
 
     public async sendItems(name: string) {
         let personalItems = CF.getBotPersonalItemsList(this.bot)
-        
-        for(const [idx, item] of this.bot.getItems()) {
-            if( ItemsConfig.DONT_SEND_ITEMS.includes(item.name) ) continue
-            if( item.isLocked() ) continue
-            if( personalItems.some(e => e.name == item.name && e.level == item.level) ) continue
-            if( CharacterItems.DEFAULT_ELIXIRS.get(this.bot.ctype).includes(item.name) ) continue
-            await this.bot.sendItem(name,idx,item.q).catch(console.warn)
+        try {
+            for(const [idx, item] of this.bot.getItems()) {
+                if( ItemsConfig.DONT_SEND_ITEMS.includes(item.name) ) continue
+                if( item.isLocked() ) continue
+                if( personalItems.some(e => e.name == item.name && e.level == item.level) ) continue
+                if( CharacterItems.DEFAULT_ELIXIRS.get(this.bot.ctype).includes(item.name) ) continue
+                await this.bot.sendItem(name,idx,item.q).catch(console.warn)
+            }
+            if(this.bot.ctype != "merchant") {
+                if(this.bot.hasItem(["computer", "supercomputer"]) && this.bot.gold>CharacterItems.KEEP_GOLD_WITH_PC) await this.bot.sendGold(name, this.bot.gold-CharacterItems.KEEP_GOLD_WITH_PC)
+                else if(!this.bot.hasItem(["computer","supercomputer"]) && this.bot.gold>CharacterItems.KEEP_GOLD) await this.bot.sendGold(name, this.bot.gold-CharacterItems.KEEP_GOLD)
+            }
         }
-        if(this.bot.ctype != "merchant") {
-            if(this.bot.hasItem(["computer", "supercomputer"]) && this.bot.gold>CharacterItems.KEEP_GOLD_WITH_PC) await this.bot.sendGold(name, this.bot.gold-CharacterItems.KEEP_GOLD_WITH_PC)
-            else if(!this.bot.hasItem(["computer","supercomputer"]) && this.bot.gold>CharacterItems.KEEP_GOLD) await this.bot.sendGold(name, this.bot.gold-CharacterItems.KEEP_GOLD)
+        catch(ex) {
+            console.error(`While sending items exception: ${ex}`)
         }
     }
 

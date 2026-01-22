@@ -16,15 +16,6 @@ export const UPGRADE_POSITION: IPosition = {
     map: "main"
 }
 
-export const CLASS_FUNCTIONS = {
-    warrior: { start: Game.startWarrior, mainStrategy: WarriorsAttackStrategy},
-    ranger: { start: Game.startRanger, mainStrategy: RangerAttackStrategy},
-    mage: { start: Game.startMage, mainStrategy: MageAttackStrategy},
-    merchant: { start: Game.startMerchant, mainStrategy: MerchantStrategy},
-    priest: { start: Game.startPriest, mainStrategy: PriestsAttackStrategy},
-    rogue: { start: Game.startRogue, mainStrategy: RogueAttackStrategy}
-}
-
 export async function startBotWithStrategy(ctype: CharacterType, name: string, sRegion: ServerRegion, sID: ServerIdentifier, memory_storage: MemoryStorage): Promise<IState> {
     switch (ctype) {
         case "mage":
@@ -73,45 +64,66 @@ export function calculate_monsters_dps (bot: PingCompensatedCharacter, tank: Pin
 
     let dps = 0
 
-    for(let entity of entities){
-        if(entity.damage_type == "physical") {
-            dps += entity.attack * Tools.damage_multiplier(tank.armor - entity.apiercing)
-        }
-        else if(entity.damage_type == "magical") {
-            dps += (entity.attack * Tools.damage_multiplier(tank.resistance - entity.rpiercing)) * (entity.frequency/100)
-        }
-        else {
-            dps += entity.attack * entity.frequency
-        }
-        
+    entities.forEach( e => dps +=calculate_monster_dps(tank, e) )
+
+    let entitiesWithBurn = entities.filter( e => e.abilities.burn)
+
+    if(entitiesWithBurn.length>0) {
+        entitiesWithBurn.sort((curr, next) => {
+            if(curr.attack != next.attack)
+                return curr.attack > next.attack ? -1 : 1
+            return 0
+        })
+        dps+=calculate_burning_dps(tank, entitiesWithBurn[0])
     }
+
     return dps
 }
 
-export function calculate_monster_dps(bot: PingCompensatedCharacter|Player, mob: Entity): number {
+export function calculate_burning_dps(bot: PingCompensatedCharacter|Player, mob: Entity) {
+    if(!bot || !mob) return 0
+
+    let damage_multiplier = 1 
+
+    switch (mob.damage_type) {
+        case "physical":
+            damage_multiplier = Tools.damage_multiplier(bot.armor - mob.apiercing * 2)
+            break;
+        case "magical":
+            damage_multiplier = Tools.damage_multiplier(bot.resistance - mob.rpiercing * 2)
+            break;
+    }
+    let fireres = (bot instanceof PingCompensatedCharacter) ? bot.firesistance : 0
+    return damage_multiplier * ((100- fireres)/100) * (mob.abilities?.burn?.unlimited ? 3 : 1.5) * mob.attack
+
+}
+
+export function calculate_monster_dps(bot: PingCompensatedCharacter|Player, mob: Entity, calculateBurn: boolean = false): number {
     if(!mob || !bot) return 0
+    let dps = 0
     if(mob.damage_type == "physical") {
         // console.log(`${mob.type} DPS counter ${bot.name}: ${(mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing)) * mob.frequency}`)
-        return (mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing)) * mob.frequency
+        dps = (mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing * 2)) * mob.frequency
     }
     else if(mob.damage_type == "magical"){
         // console.log(`${mob.type} DPS counter ${bot.name}: ${(mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing)) * (mob.frequency/100)}`)
-        return (mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing)) * mob.frequency
+        dps = (mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing * 2)) * mob.frequency
     }
     else if(mob.damage_type == "pure"){
         // console.log(`${mob.type} DPS counter ${bot.name}: ${mob.attack * (mob.frequency/100)}`)
-        return mob.attack * mob.frequency
+        dps = mob.attack * mob.frequency
     }
-    return 0
+    
+    return calculateBurn ? dps + calculate_burning_dps(bot, mob) : dps
 }
 
 export function calculate_ttk(mob: Entity, bot: PingCompensatedCharacter) {
     if(!mob || !bot) return 0
     switch(bot.damage_type) {
         case "physical":
-            return mob.hp / ((bot.attack * 0.9 * Tools.damage_multiplier(mob.armor-bot.apiercing)) * (bot.frequency/100))
+            return mob.hp / ((bot.attack * 0.9 * Tools.damage_multiplier(mob.armor-bot.apiercing*2)) * (bot.frequency/100))
         case "magical":
-            return mob.hp / ((bot.attack * 0.9 * Tools.damage_multiplier(mob.resistance-bot.rpiercing)) * (bot.frequency/100))
+            return mob.hp / ((bot.attack * 0.9 * Tools.damage_multiplier(mob.resistance-bot.rpiercing*2)) * (bot.frequency/100))
         default:
             return 0
     }
@@ -172,8 +184,7 @@ export function calculate_my_dps(bot: PingCompensatedCharacter) {
  * Decide could we or should we use weapon with explosion and blast effects
  */
 export function shouldUseMassWeapon(bot: PingCompensatedCharacter, tank: string) {
-    let entitiesTargetingUs = bot.getEntities().filter( e => e.target == bot.name || bot.partyData?.list.includes(e.target) )
-    if(entitiesTargetingUs.length>1) return true
+    
     let target = bot.getTargetEntity()
     if(!target) return false
     let willTank 
@@ -181,14 +192,24 @@ export function shouldUseMassWeapon(bot: PingCompensatedCharacter, tank: string)
     else {
         willTank = bot.getPlayers().filter( e => e.name == tank && Tools.distance(e,bot)<200)[0] || bot
     }
-    let entitiesInRadius = bot.getEntities().filter( e => Tools.distance(e, target) <= 40 && !e.target )
+    let entitiesTargetingUs = bot.getEntities().filter( e => Tools.distance(e, target)<= 40 && (bot.partyData?.list.includes(e.target) || e.target == willTank.name))
     
-    if( entitiesInRadius.length>0 && calculate_monsters_dps(bot, willTank, [...entitiesInRadius, ...entitiesTargetingUs]) / calculate_hps(bot) <= 1) return true
-    return false
+    if(entitiesTargetingUs.length>1) return true
+
+    let entitiesInRadiusWT = bot.getEntities().filter( e => Tools.distance(e, target) <= 40 && !e.target )
+    
+    return ( entitiesInRadiusWT.length>0 && calculate_monsters_dps(bot, willTank, [...entitiesInRadiusWT, ...entitiesTargetingUs]) / calculate_hps(bot) <= 1.2)
 }
 
 export function shouldUseMassSkill(bot: PingCompensatedCharacter, tank: string, skill: SkillName) {
-
+    let willTank 
+    if(bot.name == tank ) willTank = bot
+    else {
+        willTank = bot.getPlayers().filter( e => e.name == tank && Tools.distance(e,bot)<200)[0] || bot
+    }
+    let entitiesInRange = bot.getEntities({withinRange: skill}).filter( e => !e.target)
+    let targetingUs = bot.getEntities().filter( e => e.target == bot.name || bot.partyData?.list.includes(e.target))
+    return (calculate_monsters_dps(bot, willTank, [...entitiesInRange, ...targetingUs]) / calculate_hps(bot) <= 1.2)
 }
 
 export function isInRange(entity: Entity, bot: PingCompensatedCharacter, skill?: SkillName) {

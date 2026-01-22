@@ -65,8 +65,8 @@ export class WarriorsAttackStrategy extends StateStrategy {
         let target = this.warrior.getTargetEntity()
         if( !target) return setTimeout(this.attackLoop, 100)
         if( this.warrior.isOnCooldown("scare") && this.warrior.getEntities({targetingMe: true, targetingPartyMember:true}).length<1) return setTimeout( this.attackLoop, this.warrior.getCooldown("scare"))
-        if(!target.target && CF.calculate_monster_dps(this.warrior, this.warrior.getTargetEntity())/CF.calculate_hps(this.warrior) >=2) {
-            console.log(`Monster DPS: ${CF.calculate_monster_dps(this.warrior, target)}, ${this.warrior.name} HPS: ${CF.calculate_hps(this.warrior)}`)
+        if(!target.target && CF.calculate_monster_dps(this.warrior, target, true)/CF.calculate_hps(this.warrior) >=2) {
+            console.log(`Monster DPS: ${CF.calculate_monster_dps(this.warrior, target, true)}, ${this.warrior.name} HPS: ${CF.calculate_hps(this.warrior)}`)
             return setTimeout(this.attackLoop, 500)
         }
         try {
@@ -244,7 +244,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
     private async useMassAggroLoop() {
         if(this.warrior.isOnCooldown("scare")) return setTimeout(this.useMassAggroLoop, this.warrior.getCooldown("scare"))
         if(this.warrior.smartMoving) return setTimeout(this.useMassAggroLoop, 2000)
-        if(!CF.shouldUseMassWeapon(this.warrior, this.memoryStorage.getCurrentTank)) return setTimeout(this.useMassAggroLoop, 2000)
+        if(!CF.shouldUseMassSkill(this.warrior, this.memoryStorage.getCurrentTank, "agitate")) return setTimeout(this.useMassAggroLoop, 2000)
         if(this.warrior.getEntities({hasTarget: false}).length<2) return setTimeout(this.useMassAggroLoop, 2000)
 
         await this.warrior.agitate().catch(ex => console.error(ex))

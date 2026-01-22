@@ -187,8 +187,8 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["xarmor", { level: 3, primlingAt: 0 }],
     ["xpants", { level: 3, primlingAt: 0 }],
 
-    ["firestaff", { level: 8, primlingAt: 7, shouldBeShiny: true, scrollUpAt: 5 }],
-    ["fireblade", { level: 8, primlingAt: 7 }],
+    ["firestaff", { level: 8, primlingAt: 7,  scrollUpAt: 5 }],
+    ["fireblade", { level: 8, primlingAt: 7, shouldBeShiny: true, scrollUpAt: 5 }],
 
     ["harbringer", { level: 7 }],
     ["oozingterror", { level: 6 }],
