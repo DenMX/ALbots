@@ -1,4 +1,4 @@
-import { Game, Constants, InviteData, PingCompensatedCharacter, Tools, HitData } from "alclient";
+import { Game, Constants, InviteData, PingCompensatedCharacter, Tools, HitData, LimitDCReportData } from "alclient";
 import { MemoryStorage } from "./memory_storage";
 import { my_characters } from "../main";
 
@@ -19,6 +19,13 @@ export class PartyStrategy {
         this.checkParty()
         this.loot()
         this.enablePartyEvents()
+
+        let logLimitDCReport = (data: LimitDCReportData) => {
+            console.debug(`=== START LIMITDCREPORT (${bot.id}) ===`)
+            console.debug(data)
+            console.debug(`=== END LIMITDCREPORT ${bot.id} ===`)
+        }
+        bot.socket.on("limitdcreport", logLimitDCReport)
         
     }
 

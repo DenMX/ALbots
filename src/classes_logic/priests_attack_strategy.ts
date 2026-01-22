@@ -31,25 +31,34 @@ export class PriestsAttackStrategy extends StateStrategy {
         mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
         if( this.bot.c.town && this.bot.hp > totalDps*15 ) return setTimeout(this.attackOrHealLoop, 5000)
         let healTarget = this.whoNeedsHeal()
-        if(healTarget !== undefined) {
-            let healEntity = this.priest.getPlayers().filter( e => e.name == healTarget)[0]
-            if(healEntity && Tools.distance(healEntity, this.priest) > this.priest.range) {
+        if (healTarget == this.priest.id ) {
+            await this.priest.healSkill(healTarget).catch(console.error)
+            return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
+        }
+        let healEntity = healTarget ? this.priest.getPlayers().filter( e => e.id == healTarget)[0] || undefined : undefined
+        if(healTarget !== undefined && healEntity !== undefined) {
+            console.debug(`Is in range heal target: ${(Tools.distance(this.priest, healEntity) < this.priest.range)}`)
+            if( Tools.distance(this.priest, healEntity) > this.priest.range) {
                 if(!this.priest.smartMoving && Tools.distance(healEntity,this.priest)> this.priest.range) {
                     await this.priest.move( 
                         this.priest.x + (healEntity.x - this.priest.x)/2,
                         this.priest.y + (healEntity.y - this.priest.y)/2
                     ).catch(console.warn)
                 }
-                if(Tools.distance(healEntity, this.priest)<= this.priest.range) {
+                if(Tools.distance(this.priest, healEntity ) < this.priest.range) {
                     console.debug(`[HEALING] ${healEntity.name}`)
                     await this.priest.healSkill(healTarget).catch(console.error)
                     return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
                 }
             }
+            else {
+                await this.priest.healSkill(healTarget).catch(console.error)
+                return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
+            }
         }
         let target = this.priest.getTargetEntity()
         if(!target) return setTimeout(this.attackOrHealLoop, 300)
-        if(!target.target && CF.calculate_monster_dps(this.priest, target)/CF.calculate_hps(this.priest) >=2) return setTimeout(this.attackOrHealLoop, 500)
+        if(!target.target && CF.calculate_monster_dps(this.priest, target, true)/CF.calculate_hps(this.priest) >=2) return setTimeout(this.attackOrHealLoop, 500)
         if(!this.priest.smartMoving && !this.priest.moving && Tools.distance(target, this.priest)> this.priest.range) {
             let location = CF.getHalfWay(this.priest, target)
             CF.moveHalfWay(this.priest, location)
@@ -63,28 +72,30 @@ export class PriestsAttackStrategy extends StateStrategy {
     }
 
     private whoNeedsHeal() : string  {
-        if( this.priest.hp < this.priest.max_hp*0.8 ) return this.priest.name
-        let party = this.priest.getPlayers({isPartyMember: true, withinRange: this.priest.range*2}).filter( e => e.hp<e.max_hp*0.85)
-        let randomPlayers = this.priest.getPlayers({withinRange: "heal", isPartyMember: false}).filter( e => e.hp < e.max_hp*0.7)
-        if(party.length == 1) return party[0].name
-        if(party.length>1) {
-            party = party.sort( (cur, next) => {
-                if(cur.hp != next.hp) {
-                    return cur.hp<next.hp ? -1 : 1
+        //Heal self first
+        if( this.priest.hp < this.priest.max_hp*0.8 ) return this.priest.id
+        //Check all nearby players
+        let woundedPlayers = this.priest.getPlayers().filter( e => e.name != this.priest.name && Tools.distance(this.priest,e) < this.priest.range*2 && e.hp<e.max_hp*0.85)
+        console.debug(`Wounded players: ${woundedPlayers.length}`)
+        if(woundedPlayers.length>0) {
+            //Order party_member => less %hp => less distance
+            woundedPlayers.sort( (curr, next) => {
+                if(this.priest.partyData?.list.includes(curr.name) != this.priest.partyData?.list.includes(next.name)) {
+                    return this.priest.partyData.list.includes(curr.name) ? -1 : 1
+                }
+                if( curr.hp/curr.max_hp*100 != next.hp/next.max_hp*100) {
+                    return curr.hp/curr.max_hp*100 < next.hp/next.max_hp*100 ? -1 : 1
+                }
+                let curr_distance = Tools.distance(this.priest, curr)
+                let next_distance = Tools.distance(this.priest, next)
+                if(curr_distance != next_distance) {
+                    return curr_distance< next_distance ? -1 : 1
                 }
                 return 0
             })
-            return party[0].name
-        }
-        if(randomPlayers.length == 1) return randomPlayers[0].name
-        if(randomPlayers.length > 1) {
-            randomPlayers = randomPlayers.sort( (cur, next) => {
-                if(cur.hp != next.hp) {
-                    return cur.hp<next.hp ? -1 : 1
-                }
-                return 0
-            })
-            return randomPlayers[0].name
+            console.debug(`want to heal ${woundedPlayers[0].id}`)
+
+            return woundedPlayers[0].id
         }
         return undefined
     }

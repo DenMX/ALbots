@@ -389,10 +389,16 @@ export class BWIReporter {
 
     private createModernMonitorUI(ds: BWIDataSource): void {
         const schema: BWIMetricSchema[] = [
-            // Основная информация (горизонтальная группа)
+            // Основная информация
             { name: "name", type: "text", label: "Bot", getter: () => ds.name },
             { name: "realm", type: "text", label: "Realm", getter: () => ds.realm },
-            { name: "status", type: "text", label: "Status", getter: () => ds.rip ? "💀 DEAD" : "✅ ALIVE" },
+            
+            // ВЕРНУЛ обратно поле Alive как true/false
+            { name: "alive", type: "text", label: "Alive", getter: () => ds.rip ? "No (💀)" : "Yes (✅)" },
+            
+            // СОХРАНИЛ поле Status для состояния State
+            { name: "status", type: "text", label: "Status", getter: () => ds.status },
+            
             { name: "level", type: "text", label: "Level", getter: () => ds.level },
             
             // Новые боевые поля
@@ -404,7 +410,7 @@ export class BWIReporter {
             { name: "phys_red", type: "text", label: "➖ Phys Red", getter: () => `${ds.physicalReduction.toFixed(1)}%` },
             { name: "mag_red", type: "text", label: "➖ Mag Red", getter: () => `${ds.magicalReduction.toFixed(1)}%` },
             
-            // Прогресс-бары (должны поддерживаться)
+            // Прогресс-бары
             {
                 name: "health",
                 type: "labelProgressBar",
@@ -433,7 +439,16 @@ export class BWIReporter {
             { name: "gold", type: "text", label: "💰 Gold", getter: () => this.humanizeInt(ds.gold, 1) },
             { name: "gph", type: "text", label: "📊 Gold/h", getter: () => this.humanizeInt(this.calculatePerHour(ds.goldHisto), 1) },
             { name: "xpph", type: "text", label: "⚡ XP/h", getter: () => this.humanizeInt(ds.xpPh, 1) },
-            { name: "cc", type: "text", label: "🎯 CC", getter: () => Math.round(ds.cc) }
+            { name: "cc", type: "text", label: "🎯 CC", getter: () => Math.round(ds.cc) },
+            
+            // Поле инвентаря (было в исходном коде)
+            {
+                name: "inv",
+                type: "labelProgressBar",
+                label: "🎒 Inventory",
+                options: { color: "brown" },
+                getter: () => this.quickBarVal(ds.isize - ds.esize, ds.isize)
+            }
         ];
 
         let ui = this.bwiInstance.publisher.createInterface(

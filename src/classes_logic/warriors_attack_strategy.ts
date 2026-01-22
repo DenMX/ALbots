@@ -33,16 +33,9 @@ export class WarriorsAttackStrategy extends StateStrategy {
         //trigger started loops
         this.attackLoop()
         this.switchWeaponsLoop()
-        // this.useMassAggroLoop()
+        this.useMassAggroLoop()
         this.hardShellLoop()
         this.useWarcryLoop()
-
-        let logLimitDCReport = (data: LimitDCReportData) => {
-            console.debug(`=== START LIMITDCREPORT (${bot.id}) ===`)
-            console.debug(data)
-            console.debug(`=== END LIMITDCREPORT ${bot.id} ===`)
-        }
-        bot.socket.on("limitdcreport", logLimitDCReport)
     }
 
     public toogleFireHazard(){
@@ -70,10 +63,10 @@ export class WarriorsAttackStrategy extends StateStrategy {
             return setTimeout(this.attackLoop, 500)
         }
         try {
-            if(!this.warrior.smartMoving && this.warrior.canUse("stomp", {ignoreEquipped: true})) {
+            if(!this.warrior.smartMoving && this.warrior.canUse("stomp", {ignoreEquipped: true}) && (Items.WEAPON_CONFIGS[this.bot.id] as Items.WarriorWeaponsConfig).stomp) {
                 await this.useStomp()
             }
-            if(!this.warrior.smartMoving && this.warrior.canUse("cleave", {ignoreEquipped: true})) {
+            if(!this.warrior.smartMoving && this.warrior.canUse("cleave", {ignoreEquipped: true}) && (Items.WEAPON_CONFIGS[this.bot.id] as Items.WarriorWeaponsConfig).cleave) {
                 await this.useCleave()
             }
             
@@ -215,7 +208,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
 
     private async useCleave() {
         // console.log("Cealve loop")
-        if(!CF.shouldUseMassWeapon(this.warrior, this.memoryStorage.getCurrentTank)) return //console.log("Don't want to use cleave")
+        if(!CF.shouldUseMassSkill(this.warrior, this.getMemoryStorage.getCurrentTank, "cleave")) return //console.log("Don't want to use cleave")
         await this.switchWeapons({cleave: true})
         if(Game.G.skills.cleave.wtype.includes(Game.G.items[this.warrior.slots.mainhand?.name].wtype))await this.warrior.cleave().catch(ex => console.error(ex))
         await this.switchWeapons()
@@ -243,9 +236,9 @@ export class WarriorsAttackStrategy extends StateStrategy {
 
     private async useMassAggroLoop() {
         if(this.warrior.isOnCooldown("scare")) return setTimeout(this.useMassAggroLoop, this.warrior.getCooldown("scare"))
-        if(this.warrior.smartMoving) return setTimeout(this.useMassAggroLoop, 2000)
+        if(this.warrior.smartMoving || !this.warrior.canUse("agitate")) return setTimeout(this.useMassAggroLoop, 2000)
         if(!CF.shouldUseMassSkill(this.warrior, this.memoryStorage.getCurrentTank, "agitate")) return setTimeout(this.useMassAggroLoop, 2000)
-        if(this.warrior.getEntities({hasTarget: false}).length<2) return setTimeout(this.useMassAggroLoop, 2000)
+        if(this.warrior.getEntities({hasTarget: false, withinRange: "agitate"}).length<2) return setTimeout(this.useMassAggroLoop, 2000)
 
         await this.warrior.agitate().catch(ex => console.error(ex))
 
