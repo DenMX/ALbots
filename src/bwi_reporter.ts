@@ -2,6 +2,7 @@ import { PingCompensatedCharacter } from "alclient";
 import BotWebInterface from "bot-web-interface";
 import prettyMilliseconds from "pretty-ms";
 import { IState } from "./controllers/state_interface";
+import { StateController } from "./controllers/state_controller";
 
 type BWIMetricSchema = {
     name: string;
@@ -37,13 +38,13 @@ export class BWIReporter<T extends IState> {
     private statBeatIntrval: number;
     private bwiInstance: BotWebInterface;
     private statisticsInterval: NodeJS.Timeout;
-    private bots: Array<T>;
+    private stateController: StateController
 
     private botDataSources = new Map<string, BWIDataSource>();
 
-    public constructor(bots: Array<T>, port: number = 924, statBeatInterval: number = 500) {
+    public constructor(sc: StateController, port: number = 924, statBeatInterval: number = 500) {
         this.statBeatIntrval = statBeatInterval;
-        this.bots = bots;
+        this.stateController = sc;
 
         this.bwiInstance = new BotWebInterface({
             port: port,
@@ -51,7 +52,7 @@ export class BWIReporter<T extends IState> {
             updateRate: statBeatInterval
         });
 
-        for (let botState of bots) {
+        for (let botState of this.stateController.getBots) {
             let bot = botState.getBot()
             let dataSourceObj: BWIDataSource = {
                 name: bot.id,
@@ -84,7 +85,7 @@ export class BWIReporter<T extends IState> {
     }
 
     private updateStatistics(): void {
-        for (let b of this.bots) {
+        for (let b of this.stateController.getBots) {
             let bot = b.getBot()
             let dataSource: BWIDataSource = this.botDataSources.get(bot.id);
 

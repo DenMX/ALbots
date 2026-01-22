@@ -1,7 +1,6 @@
 import { ItemData, PingCompensatedCharacter} from "alclient"
 import * as MIC from "../configs/manage_items_configs"
 import * as CF from "../common_functions/common_functions"
-import * as CharacterItems from "../configs/character_items_configs"
 import { ManageItems } from "../common_functions/manage_items_strategy"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { IState } from "../controllers/state_interface"
@@ -145,10 +144,12 @@ export class MerchantStrategy extends ManageItems implements IState {
     }
 
     private checkPartyInventory() {
-        console.debug("checking party")
-        let bots = super.getMemoryStorage.getActiveBots.filter( e => e.serverData.region == this.bot.serverData.region && e.serverData.name == this.bot.serverData.name )
-        console.debug(`Bots on the same server: ${bots.length}`)
-        for(const bot of bots) {
+        // console.debug("checking party")
+        let bots = super.getMemoryStorage.getStateController?.getBots.filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name )
+        if(!bots) return setInterval(() => {this.job_scheduler.push(this.checkPartyInventory)}, 10_000)
+        // console.debug(`Bots on the same server: ${bots?.length}`)
+        for(const b of bots) {
+            let bot = b.getBot() 
             if(bot.name == this.bot.name) continue
             // console.debug(`Checking ${bot.name} inventory`)
             // MAKING PERSONAL ITEMS LIST
@@ -156,13 +157,11 @@ export class MerchantStrategy extends ManageItems implements IState {
             let mpot = MIC.MPOTS_CAP - bot.countItem("mpot1")
             
             let notPersonalItems = CF.getBotNotPersonalItemsList(bot)
-            console.debug(`${bot.name} has ${notPersonalItems.length} NOT personal items`)
+            // console.debug(`${bot.name} has ${notPersonalItems.length} NOT personal items`)
 
             if( notPersonalItems.length>5) {
 
                 console.debug(`Creating task for ${bot.name}`)
-                let hpot = MIC.HPOTS_CAP - bot.countItem("hpot1")
-                let mpot = MIC.MPOTS_CAP - bot.countItem("mpot1")
 
                 this.job_scheduler.push( async() => {
                     if(!this.bot.hasItem(["computer", "supercomputer"])) {

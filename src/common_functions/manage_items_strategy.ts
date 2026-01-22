@@ -318,8 +318,8 @@ export class ManageItems extends ResuplyStrategy {
             if (bankPackName == "gold") continue
 
             const emptyInSlot = []
-            for (let i = 0; i < bot.bank[bankPackName].length; i++) {
-                const bankItem = bot.bank[bankPackName][i]
+            for (let i = 0; i < bank[bankPackName].length; i++) {
+                const bankItem = bank[bankPackName][i]
                 if (bankItem) continue // There's an item here
                 emptyInSlot.push(i)
             }
@@ -341,12 +341,12 @@ export class ManageItems extends ResuplyStrategy {
         items.compound.forEach( (e) => {itemsToCompound+=Math.floor(e.slots.length/3)})
         console.debug(`Items to upgrade: ${itemsToUpgrade}, items to compound: ${itemsToCompound}`)
         if(itemsToUpgrade<10 && itemsToCompound<5) {
-            items.upgrade.forEach(element => {
-                console.debug(`Item for upgrade ${element.itemName} level: ${element.level ?? "none"} count: ${element.slots.length}`)
-            });
-            items.compound.forEach(element => {
-                console.debug(`Item for upgrade ${element.itemName} level: ${element.level ?? "none"} count: ${element.slots.length}`)
-            });
+            // items.upgrade.forEach(element => {
+            //     console.debug(`Item for upgrade ${element.itemName} level: ${element.level ?? "none"} count: ${element.slots.length}`)
+            // });
+            // items.compound.forEach(element => {
+            //     console.debug(`Item for upgrade ${element.itemName} level: ${element.level ?? "none"} count: ${element.slots.length}`)
+            // });
             return console.log("There not enough items to upgrade")
         }
         
@@ -416,10 +416,11 @@ export class ManageItems extends ResuplyStrategy {
         if(!bot.bank && !super.getMemoryStorage.getBank) return { upgrade: [], compound: [] }
 
 
-        let bank = (bot.bank) ? bot.bank : super.getMemoryStorage.getBank
-        bot.bank ? console.debug('using bank info') : console.debug('using bank info from DB')
+        let bank = (bot.map.startsWith("bank")) ? bot.bank : super.getMemoryStorage.getBank;
+        (bot.map.startsWith("bank")) ? console.debug('using bank info') : console.debug('using bank info from DB')
+        // console.debug(`bank in memory storage:\n${JSON.stringify(this.memoryStorage.getBank)}`)
 
-        console.debug(`Packs in bank: ${Object.keys(bank).filter( e => e != "gold").length}`)
+        // console.debug(`Packs in bank: ${Object.keys(bank).filter( e => e != "gold").length}`)
 
         let upgradeItems : UpgradeItems = {
             upgrade: [],
@@ -430,10 +431,11 @@ export class ManageItems extends ResuplyStrategy {
         let primlingCount = this.calculateItemsCountTotal("offeringp")
 
         for(bankPackName in bank) {
-            if(bankPackName == "gold") continue
-
-            itemsFor: for(let i = 0; i < bot.bank[bankPackName].length; i++) {
-                let item = bot.bank[bankPackName][i]
+            // console.debug(`${bankPackName} = \n${bank[bankPackName]}`)
+            if(bankPackName == "gold" || bankPackName == "owner" as BankPackName || bankPackName == "_id" as BankPackName) continue
+            
+            itemsFor: for(let i = 0; i < bank[bankPackName].length; i++) {
+                let item = bank[bankPackName][i]
                 if(!item) continue
                 // console.debug(`Check item - ${item.name} level: ${item.level ?? "none"}`)
                 if(ItemsConfig.MERCHANT_UPGRADE.has(item.name)) {
@@ -457,7 +459,7 @@ export class ManageItems extends ResuplyStrategy {
                         
                         for(let j of upgradeItems[key]) {
                             if(j.itemName == item.name && j.level == item.level) {
-                                console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
+                                // console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
                                 j.slots.push([bankPackName, i])
                                 if(key == "compound" && j.slots.length%3==0) offeringsCount -= 1
                                 continue itemsFor                               
@@ -470,7 +472,7 @@ export class ManageItems extends ResuplyStrategy {
                         itemUpgrade.slots.push([bankPackName, i])
                         upgradeItems[key].push(itemUpgrade)
                         if(key == "upgrade") offeringsCount -= 1
-                        console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
+                        // console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
                         
                         continue
                     }
@@ -482,7 +484,7 @@ export class ManageItems extends ResuplyStrategy {
 
                         for(let j of upgradeItems[key]) {
                             if(j.itemName == item.name && j.level == item.level) {
-                                console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
+                                // console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
                                 j.slots.push([bankPackName, i])
                                 if(key == "compound" && j.slots.length%3==0)primlingCount -= 1
                                 if(key == "upgrade") primlingCount -= 1
@@ -495,7 +497,7 @@ export class ManageItems extends ResuplyStrategy {
                             level: item.level,
                             slots: []
                         }
-                        console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
+                        // console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
                         itemUpgrade.slots.push([bankPackName, i])
                         upgradeItems[key].push(itemUpgrade)
                         if(key == "upgrade") primlingCount -= 1
@@ -508,7 +510,7 @@ export class ManageItems extends ResuplyStrategy {
                         let isThisDuplicate = false
                         for(let j of upgradeItems[key]) {
                             if(j.itemName == item.name && j.level == item.level) {
-                                console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
+                                // console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
                                 j.slots.push([bankPackName, i])
                                 isThisDuplicate = true                                
                             }
@@ -520,7 +522,7 @@ export class ManageItems extends ResuplyStrategy {
                                 level: item.level,
                                 slots: []
                             }
-                            console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
+                            // console.debug(`Added ${item.name} level: ${item.level ?? "none"}`)
                             itemUpgrade.slots.push([bankPackName, i])
                             upgradeItems[key].push(itemUpgrade)
                         }
@@ -549,12 +551,12 @@ export class ManageItems extends ResuplyStrategy {
         //left only compoundable count of items in array
         for(const compoundConfig of upgradeItems.compound) {
             if(compoundConfig.slots.length<3) {
-                console.debug(`Items ${compoundConfig.itemName} ${compoundConfig.slots.length} count. Removing this item from coumpound list.`)
+                // console.debug(`Items ${compoundConfig.itemName} ${compoundConfig.slots.length} count. Removing this item from coumpound list.`)
                 upgradeItems.compound.splice(upgradeItems.compound.indexOf(compoundConfig), 1) //remove this items
                 continue
             }
             if(compoundConfig.slots.length%3>0) {
-                console.debug(`${compoundConfig.itemName} has ${compoundConfig.slots.length}. Removing ${compoundConfig.slots.length%3}`)
+                // console.debug(`${compoundConfig.itemName} has ${compoundConfig.slots.length}. Removing ${compoundConfig.slots.length%3}`)
                 compoundConfig.slots.splice( 
                     compoundConfig.slots.length - ( compoundConfig.slots.length % 3 ) -1,
                     compoundConfig.slots.length-1 
@@ -598,8 +600,8 @@ export class ManageItems extends ResuplyStrategy {
         for(bankPackName in bank) {
             if(bankPackName == "gold") continue
 
-            for(let i =0; i<bot.bank[bankPackName].length; i++) {
-                let itm = bot.bank[bankPackName][i]
+            for(let i =0; i<bank[bankPackName].length; i++) {
+                let itm = bank[bankPackName][i]
                 if(!itm) continue
                 if(itm.name == item) count += itm.q
             }

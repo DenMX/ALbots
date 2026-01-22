@@ -13,51 +13,19 @@ export class PartyStrategy {
         this.bot = bot as PingCompensatedCharacter
         this.memoryStorage = memoryStorage
         this.checkParty = this.checkParty.bind(this)
-        this.enableEvents = this.enableEvents.bind(this)
+        this.enablePartyEvents = this.enablePartyEvents.bind(this)
         this.loot = this.loot.bind(this)
-        this.reconnect = this.reconnect.bind(this)
 
         this.checkParty()
         this.loot()
-        this.enableEvents()
+        this.enablePartyEvents()
         
     }
 
-    private async reconnect(data) {
-        console.debug(`Disconnect reason: \n ${JSON.stringify(data)}`)
-        console.debug(`Trying reconnect ${this.bot.name}. This bot ready: ${this.bot.ready}`)
-        if(!this.bot.ready) {
-            switch (this.bot.ctype) {
-                case "mage":
-                    this.bot = await Game.startMage(this.bot.name, this.bot.serverData.region, this.bot.serverData.name)
-                    break;
-                case "merchant":
-                    this.bot = await Game.startMerchant(this.bot.name, this.bot.serverData.region, this.bot.serverData.name)
-                    break;
-                case "priest":
-                    this.bot = await Game.startPriest(this.bot.name, this.bot.serverData.region, this.bot.serverData.name)
-                    break;
-                case "ranger":
-                    this.bot = await Game.startRanger(this.bot.name, this.bot.serverData.region, this.bot.serverData.name)
-                    break;
-                case "rogue":
-                    this.bot = await Game.startRogue(this.bot.name, this.bot.serverData.region, this.bot.serverData.name)
-                    break;
-                case "warrior":
-                    this.bot = await Game.startWarrior(this.bot.name, this.bot.serverData.region, this.bot.serverData.name)
-                    break;
-                default:
-                    console.error(`No recconect for type ${this.bot.ctype}`)
-            }
-            this.enableEvents()
-            this.getMemoryStorage.replaceBot(this.bot.name, this.bot)
-        }
-    }
 
-    private enableEvents() {
+    private enablePartyEvents() {
         this.bot.socket.on("invite", (data) => this.onPartyInvite(data))
         this.bot.socket.on("request", (data) => this.onPartyRequest(data))
-        this.bot.socket.on("disconnect", (data) => this.reconnect(data))
         this.bot.socket.on("hit", (data) => this.moveOnTakenDamage(data))
         this.memoryStorage.addEventListners(this.bot)
     }

@@ -1,17 +1,10 @@
 import { BankInfo, BankModel, Database, PingCompensatedCharacter } from "alclient";
 import fs from "fs"
-import { StateStrategy } from "./state_strategy";
-import { MerchantStrategy } from "../classes_logic/merchant_strategy";
+import { StateController } from "../controllers/state_controller";
 
 
 
 export class MemoryStorage {
-
-    private active_bots: PingCompensatedCharacter[] = []
-
-    private fighters: StateStrategy[] = []
-
-    private merchant: MerchantStrategy
     
     private bank: BankInfo
 
@@ -28,6 +21,8 @@ export class MemoryStorage {
     private default_looter: string = this.default_tank
 
     private current_looter: string 
+
+    private stateController: StateController
 
     constructor() {
         this.loadBankFromMongo = this.loadBankFromMongo.bind(this)
@@ -60,52 +55,23 @@ export class MemoryStorage {
             bot.socket.emit("tracker");
     }
 
-    public addFighter(fighter: StateStrategy) {
-        this.fighters.push(fighter)
-        this.addEventListners(fighter.getBot())
-        this.active_bots.push(fighter.getBot())
-    }
-
-    public addMerchant(bot: MerchantStrategy) {
-        this.merchant = bot
-        this.addEventListners(bot.getBot())
-        this.active_bots.push(bot.getBot())
-    }
-
-    public replaceBot(old_name: string, newBot: PingCompensatedCharacter) {
-        if(newBot.name == old_name) {
-            let oldBot
-            for(let i = 0; i < this.active_bots.length; i++) {
-                if(this.active_bots[i].name == old_name) {
-                    oldBot = i
-                    break
-                }
-            }
-            this.active_bots[oldBot] = newBot
-            this.addEventListners(newBot)
-            console.debug(`Replaced ${old_name} to ${newBot.name} in bot collection`)
-        }
-        else {
-            console.error(`NEED TO WRITE LOGIC FOR REPLACE ONE BOT FOR ANOTHER`)
-        }
-    }
-
     private async loadBankFromMongo() {
-        if(!this.active_bots?.length || this.active_bots.length<1) return setTimeout(this.loadBankFromMongo, 500)
+        if(!this.stateController?.getBots.length || this.stateController?.getBots.length<1) return setTimeout(this.loadBankFromMongo, 500)
         if(Database.connection) {
             this.bank = await BankModel.findOne( {
-                owner: this.active_bots[0].owner
-            }) as BankInfo
-            console.debug(`Bank loaded from MONGO\nCurrent bank: ${JSON.stringify(this.bank)}`)
+                owner: this.stateController.getBots[0].getBot().owner
+            }).lean<BankInfo>() ?? null
+            // console.debug(`Bank loaded from MONGO\nCurrent bank: ${JSON.stringify(this.bank)}`)
+            setTimeout(this.loadBankFromMongo, 5000)
         }
     }
 
-    public get getFighters() {
-        return this.fighters
+    public set setStateController(stateController: StateController) {
+        this.stateController = stateController
     }
 
-    public get getMerchant() {
-        return this.merchant
+    public get getStateController() {
+        return this.stateController
     }
 
     public get getCurrentPartyLeader() {
@@ -141,10 +107,6 @@ export class MemoryStorage {
         return this.bank
     }
 
-    public get getActiveBots() {
-        return this.active_bots
-    }
-
     private async updateBank(bot: PingCompensatedCharacter) {
         if(!bot.map.startsWith("bank")) return
         if(bot.map.startsWith("bank") && !bot.bank)
@@ -152,7 +114,6 @@ export class MemoryStorage {
             setTimeout(() => { this.updateBank(bot) }, 100)
         }
         if(bot.bank) {
-            this.bank = structuredClone(bot.bank)
             if(this.secretKey == "") return console.error("Create api_token.txt")
             const url = `https://aldata.earthiverse.ca/bank/${bot.owner}/${this.secretKey}`;
             const settings = {

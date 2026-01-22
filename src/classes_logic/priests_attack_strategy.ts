@@ -14,6 +14,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         this.useZap = this.useZap.bind(this)
         this.useDarkBlessingLoop = this.useDarkBlessingLoop.bind(this)
         this.useCurseLoop = this.useCurseLoop.bind(this)
+        this.whoNeedsHeal = this.whoNeedsHeal.bind(this)
 
 
         this.attackOrHealLoop()
@@ -32,7 +33,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         let healTarget = this.whoNeedsHeal()
         if(healTarget !== undefined) {
             let healEntity = this.priest.getPlayers().filter( e => e.name == healTarget)[0]
-            if(healEntity && Tools.distance(healEntity, this.priest)<= this.priest.range*2) {
+            if(healEntity && Tools.distance(healEntity, this.priest) > this.priest.range) {
                 if(!this.priest.smartMoving && Tools.distance(healEntity,this.priest)> this.priest.range) {
                     await this.priest.move( 
                         this.priest.x + (healEntity.x - this.priest.x)/2,
@@ -40,6 +41,7 @@ export class PriestsAttackStrategy extends StateStrategy {
                     ).catch(console.warn)
                 }
                 if(Tools.distance(healEntity, this.priest)<= this.priest.range) {
+                    console.debug(`[HEALING] ${healEntity.name}`)
                     await this.priest.healSkill(healTarget).catch(console.error)
                     return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
                 }

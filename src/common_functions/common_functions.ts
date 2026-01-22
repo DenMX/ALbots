@@ -1,12 +1,53 @@
-import {Entity, PingCompensatedCharacter, Tools, SkillName, IPosition, Pathfinder, ItemData, Player} from "alclient"
+import {Entity, PingCompensatedCharacter, Tools, SkillName, IPosition, Pathfinder, ItemData, Player, Game, CharacterType, ServerRegion, ServerIdentifier} from "alclient"
 import * as CharacterItems from "../configs/character_items_configs"
 import * as MIC from "../configs/manage_items_configs"
+import { WarriorsAttackStrategy } from "../classes_logic/warriors_attack_strategy"
+import { PriestsAttackStrategy } from "../classes_logic/priests_attack_strategy"
+import { RangerAttackStrategy } from "../classes_logic/ranger_attack_strategy"
+import { MageAttackStrategy } from "../classes_logic/mage_attack_strategy"
+import { RogueAttackStrategy } from "../classes_logic/rogue_attack_strategy"
+import { MerchantStrategy } from "../classes_logic/merchant_strategy"
+import { MemoryStorage } from "./memory_storage"
+import { IState } from "../controllers/state_interface"
 
 export const UPGRADE_POSITION: IPosition = {
     x: -208,
     y: -137,
     map: "main"
 }
+
+export const CLASS_FUNCTIONS = {
+    warrior: { start: Game.startWarrior, mainStrategy: WarriorsAttackStrategy},
+    ranger: { start: Game.startRanger, mainStrategy: RangerAttackStrategy},
+    mage: { start: Game.startMage, mainStrategy: MageAttackStrategy},
+    merchant: { start: Game.startMerchant, mainStrategy: MerchantStrategy},
+    priest: { start: Game.startPriest, mainStrategy: PriestsAttackStrategy},
+    rogue: { start: Game.startRogue, mainStrategy: RogueAttackStrategy}
+}
+
+export async function startBotWithStrategy(ctype: CharacterType, name: string, sRegion: ServerRegion, sID: ServerIdentifier, memory_storage: MemoryStorage): Promise<IState> {
+    switch (ctype) {
+        case "mage":
+            return new MageAttackStrategy(await Game.startMage(name, sRegion, sID), memory_storage)
+        case "merchant":
+            return new MerchantStrategy(await Game.startMerchant(name, sRegion, sID), memory_storage)
+        case "priest":
+            return new PriestsAttackStrategy(await Game.startPriest(name, sRegion, sID), memory_storage)
+        case "warrior":
+            return new WarriorsAttackStrategy(await Game.startWarrior(name, sRegion, sID), memory_storage)
+        case "ranger":
+            return new RangerAttackStrategy(await Game.startRanger(name, sRegion, sID), memory_storage)
+        case "rogue":
+            return new RogueAttackStrategy(await Game.startRogue(name, sRegion, sID), memory_storage)
+        case "paladin":
+            console.error("NO CODE FOR PALADIN")
+        default:
+            console.error(`Unknown ctype ${ctype}`)
+    }
+    return undefined
+}
+
+
 
 /*
 Formula for calculationg burning
