@@ -176,7 +176,7 @@ export function calculate_hps(bot: PingCompensatedCharacter, mobsCount?: number)
 }
 
 export function calculate_my_dps(bot: PingCompensatedCharacter) {
-    return bot.attack * (1 + (bot.crit/100)) * 0.9
+    return bot.attack * (1 + (bot.crit/100)) * 0.9 * bot.frequency
 }
 
 

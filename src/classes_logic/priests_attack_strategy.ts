@@ -37,7 +37,6 @@ export class PriestsAttackStrategy extends StateStrategy {
         }
         let healEntity = healTarget ? this.priest.getPlayers().filter( e => e.id == healTarget)[0] || undefined : undefined
         if(healTarget !== undefined && healEntity !== undefined) {
-            console.debug(`Is in range heal target: ${(Tools.distance(this.priest, healEntity) < this.priest.range)}`)
             if( Tools.distance(this.priest, healEntity) > this.priest.range) {
                 if(!this.priest.smartMoving && Tools.distance(healEntity,this.priest)> this.priest.range) {
                     await this.priest.move( 
@@ -46,7 +45,6 @@ export class PriestsAttackStrategy extends StateStrategy {
                     ).catch(console.warn)
                 }
                 if(Tools.distance(this.priest, healEntity ) < this.priest.range) {
-                    console.debug(`[HEALING] ${healEntity.name}`)
                     await this.priest.healSkill(healTarget).catch(console.error)
                     return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
                 }
@@ -76,7 +74,6 @@ export class PriestsAttackStrategy extends StateStrategy {
         if( this.priest.hp < this.priest.max_hp*0.8 ) return this.priest.id
         //Check all nearby players
         let woundedPlayers = this.priest.getPlayers().filter( e => e.name != this.priest.name && Tools.distance(this.priest,e) < this.priest.range*2 && e.hp<e.max_hp*0.85)
-        console.debug(`Wounded players: ${woundedPlayers.length}`)
         if(woundedPlayers.length>0) {
             //Order party_member => less %hp => less distance
             woundedPlayers.sort( (curr, next) => {
@@ -93,7 +90,6 @@ export class PriestsAttackStrategy extends StateStrategy {
                 }
                 return 0
             })
-            console.debug(`want to heal ${woundedPlayers[0].id}`)
 
             return woundedPlayers[0].id
         }

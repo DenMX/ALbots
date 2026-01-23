@@ -392,13 +392,8 @@ export class BWIReporter {
             // Основная информация
             { name: "name", type: "text", label: "Bot", getter: () => ds.name },
             { name: "realm", type: "text", label: "Realm", getter: () => ds.realm },
-            
-            // ВЕРНУЛ обратно поле Alive как true/false
             { name: "alive", type: "text", label: "Alive", getter: () => ds.rip ? "No (💀)" : "Yes (✅)" },
-            
-            // СОХРАНИЛ поле Status для состояния State
             { name: "status", type: "text", label: "Status", getter: () => ds.status },
-            
             { name: "level", type: "text", label: "Level", getter: () => ds.level },
             
             // Новые боевые поля
@@ -432,6 +427,13 @@ export class BWIReporter {
                 options: { color: "green" },
                 getter: () => this.quickBarVal(ds.xp, ds.maxXp, true)
             },
+            {
+                name: "inv",
+                type: "labelProgressBar",
+                label: "🎒 Inventory",
+                options: { color: "brown" },
+                getter: () => this.quickBarVal(ds.isize - ds.esize, ds.isize)
+            },
             
             // Дополнительная информация
             { name: "target", type: "text", label: "🎯 Target", getter: () => ds.target || "None" },
@@ -441,13 +443,16 @@ export class BWIReporter {
             { name: "xpph", type: "text", label: "⚡ XP/h", getter: () => this.humanizeInt(ds.xpPh, 1) },
             { name: "cc", type: "text", label: "🎯 CC", getter: () => Math.round(ds.cc) },
             
-            // Поле инвентаря (было в исходном коде)
-            {
-                name: "inv",
-                type: "labelProgressBar",
-                label: "🎒 Inventory",
-                options: { color: "brown" },
-                getter: () => this.quickBarVal(ds.isize - ds.esize, ds.isize)
+            // ВОЗВРАЩАЮ поле TTLU (Time To Level Up) из исходного интерфейса
+            { 
+                name: "ttlu", 
+                type: "text", 
+                label: "⏱️ TTLU", 
+                getter: () => {
+                    if (ds.rip) return "DEAD";
+                    if (ds.xpPh <= 0) return "N/A";
+                    return prettyMilliseconds(((ds.maxXp - ds.xp) * 3_600_000) / ds.xpPh, { unitCount: 2 });
+                }
             }
         ];
 

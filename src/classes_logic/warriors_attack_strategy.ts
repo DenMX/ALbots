@@ -166,7 +166,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
         let botWC = Items.WEAPON_CONFIGS[this.bot.name] as Items.WarriorWeaponsConfig
         if(!botWC) return
         let mainhand = this.warrior.slots.mainhand?.name
-        if( mainhand == botWC.cleave?.name || mainhand == botWC.stomp?.name ) return setTimeout(this.switchWeaponsLoop, 1500)
+        if( mainhand == botWC.cleave?.name || mainhand == botWC.stomp?.name ) return setTimeout(this.switchWeaponsLoop, 500)
 
         let mainhand_item
             
@@ -203,7 +203,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
         // console.debug(`Offhand ${offhand_item.name} in ${offhand_idx} slot.`)        
         if( offhand_idx !== undefined ) await this.warrior.equip(offhand_idx, "offhand").catch(console.debug)
         
-        setTimeout(this.switchWeaponsLoop,1000)
+        setTimeout(this.switchWeaponsLoop,5000)
     }
 
     private async useCleave() {
