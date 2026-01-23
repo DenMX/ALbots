@@ -1,506 +1,3 @@
-// import { PingCompensatedCharacter } from "alclient";
-// import BotWebInterface from "bot-web-interface";
-// import prettyMilliseconds from "pretty-ms";
-// import { IState } from "./controllers/state_interface";
-// import { StateController } from "./controllers/state_controller";
-// import { Server } from 'socket.io';
-// import { createServer } from 'http';
-
-// type BWIMetricSchema = {
-//     name: string;
-//     type: string;
-//     label: string;
-//     options?: {};
-//     getter: () => any;
-// };
-
-// type BWIDataSource = {
-//     name: string;
-//     realm: string;
-//     rip: boolean;
-//     level: number;
-//     health: number;
-//     maxHealth: number;
-//     mana: number;
-//     maxMana: number;
-//     xp: number;
-//     maxXp: number;
-//     isize: number;
-//     esize: number;
-//     gold: number;
-//     party: string;
-//     status: string;
-//     target: string;
-//     cc: number;
-//     xpPh: number;
-//     xpHisto: number[];
-//     goldHisto: number[];
-//     // Новые поля для статистики боя
-//     attack: number;
-//     frequency: number;
-//     armor: number;
-//     resistance: number;
-//     // Дополнительные метрики
-//     dps: number; // Расчётный DPS = attack * frequency
-//     physicalReduction: number; // % снижения физ. урона
-//     magicalReduction: number; // % снижения маг. урона
-//     // Состояния из bot.s
-//     statusInfo: any;
-// };
-
-// export class BWIReporter {
-//     private statBeatInterval: number;
-//     private bwiInstance: BotWebInterface;
-//     private statisticsInterval: NodeJS.Timeout;
-//     private stateController: StateController;
-//     private botDataSources = new Map<string, BWIDataSource>();
-    
-//     // WebSocket сервер для нового приложения
-//     private wsServer: any = null;
-//     private io: Server | null = null;
-//     private wsPort: number;
-
-//     public constructor(sc: StateController, bwiPort: number = 924, wsPort: number = 925, statBeatInterval: number = 500) {
-//         this.statBeatInterval = statBeatInterval;
-//         this.stateController = sc;
-//         this.wsPort = wsPort;
-
-//         console.log(`Starting: BotWebInterface on port ${bwiPort}, WebSocket on port ${wsPort}`);
-
-//         // 1. Запускаем стандартный BotWebInterface (старый интерфейс)
-//         this.bwiInstance = new BotWebInterface({
-//             port: bwiPort,
-//             password: null,
-//             updateRate: statBeatInterval,
-//             theme: 'dark',
-//             layout: 'grid'
-//         });
-
-//         // 2. Запускаем WebSocket сервер для нового приложения
-//         this.startWebSocketServer(wsPort);
-
-//         // 3. Инициализируем данные и запускаем обновления
-//         this.initializeDataSources();
-//         this.statisticsInterval = setInterval(() => {
-//             this.updateStatistics();
-//             this.broadcastWebSocketData();
-//         }, this.statBeatInterval);
-//     }
-
-//     private startWebSocketServer(port: number): void {
-//         try {
-//             // Создаём минимальный HTTP сервер только для WebSocket
-//             this.wsServer = createServer((req, res) => {
-//                 // Простой ответ для проверки
-//                 res.writeHead(200, { 'Content-Type': 'text/plain' });
-//                 res.end('Bot WebSocket Server. Connect via Socket.IO client.');
-//             });
-
-//             this.io = new Server(this.wsServer, {
-//                 cors: {
-//                     origin: "*", // Разрешаем все источники
-//                     methods: ["GET", "POST"],
-//                     credentials: true
-//                 }
-//             });
-
-//             // Настраиваем обработку подключений
-//             this.io.on('connection', (socket) => {
-//                 console.log(`WebSocket client connected: ${socket.id}`);
-                
-//                 // Отправляем начальные данные
-//                 socket.emit('data', this.getBotsData());
-                
-//                 socket.on('disconnect', () => {
-//                     console.log(`WebSocket client disconnected: ${socket.id}`);
-//                 });
-//             });
-
-//             // Запускаем сервер
-//             this.wsServer.listen(port, () => {
-//                 console.log(`✅ WebSocket server listening on ws://localhost:${port}`);
-//             });
-
-//             // Обработка ошибок сервера
-//             this.wsServer.on('error', (err: any) => {
-//                 if (err.code === 'EADDRINUSE') {
-//                     console.error(`❌ WebSocket port ${port} is already in use!`);
-//                     console.error(`   New Vue app should use a different port or restart the server.`);
-//                 } else {
-//                     console.error('WebSocket server error:', err);
-//                 }
-//             });
-
-//         } catch (error) {
-//             console.error('Failed to start WebSocket server:', error);
-//             console.log('New Vue app will not be available, but old interface will work.');
-//         }
-//     }
-
-//     private initializeDataSources(): void {
-//         for (let botState of this.stateController.getBots) {
-//             let bot = botState.getBot();
-            
-//             // Рассчитываем дополнительные метрики
-//             const dps = bot.attack * bot.frequency;
-//             const physicalReduction = this.calculateDamageReduction(bot.armor);
-//             const magicalReduction = this.calculateDamageReduction(bot.resistance);
-            
-//             let dataSourceObj: BWIDataSource = {
-//                 name: bot.id,
-//                 realm: `${bot.serverData.region}${bot.serverData.name}`,
-//                 rip: bot.rip,
-//                 level: bot.level,
-//                 health: bot.hp,
-//                 maxHealth: bot.max_hp,
-//                 mana: bot.mp,
-//                 maxMana: bot.max_mp,
-//                 xp: bot.xp,
-//                 maxXp: bot.max_xp,
-//                 isize: bot.isize,
-//                 esize: bot.esize,
-//                 gold: bot.gold,
-//                 party: bot.party,
-//                 status: "Initializing...",
-//                 target: "None",
-//                 cc: bot.cc,
-//                 xpPh: 0,
-//                 xpHisto: [],
-//                 goldHisto: [],
-//                 // Новые поля
-//                 attack: bot.attack,
-//                 frequency: bot.frequency,
-//                 armor: bot.armor,
-//                 resistance: bot.resistance,
-//                 // Рассчитанные метрики
-//                 dps: dps,
-//                 physicalReduction: physicalReduction,
-//                 magicalReduction: magicalReduction,
-//                 // Состояния из bot.s
-//                 statusInfo: bot.s || {}
-//             };
-
-//             this.botDataSources.set(bot.id, dataSourceObj);
-//             this.createModernMonitorUI(this.botDataSources.get(bot.id)!);
-//         }
-//     }
-
-//     private updateStatistics(): void {
-//         for (let b of this.stateController.getBots) {
-//             let bot = b.getBot();
-//             let dataSource: BWIDataSource = this.botDataSources.get(bot.id);
-
-//             if (!dataSource) continue;
-
-//             // Обновляем основные данные
-//             dataSource.realm = `${bot.serverData.region}${bot.serverData.name}`;
-//             dataSource.rip = bot.rip;
-            
-//             if (dataSource.level != bot.level) {
-//                 dataSource.xpHisto = [];
-//             }
-            
-//             dataSource.level = bot.level;
-//             dataSource.health = bot.hp;
-//             dataSource.maxHealth = bot.max_hp;
-//             dataSource.mana = bot.mp;
-//             dataSource.maxMana = bot.max_mp;
-//             dataSource.xp = bot.xp;
-//             dataSource.maxXp = bot.max_xp;
-//             dataSource.isize = bot.isize;
-//             dataSource.esize = bot.esize;
-//             dataSource.gold = bot.gold;
-//             dataSource.party = bot.party;
-//             dataSource.status = b.getStateType();
-//             dataSource.target = bot.getTargetEntity()?.name ?? "None";
-//             dataSource.cc = bot.cc;
-            
-//             // Обновляем боевые характеристики
-//             dataSource.attack = bot.attack;
-//             dataSource.frequency = bot.frequency;
-//             dataSource.armor = bot.armor;
-//             dataSource.resistance = bot.resistance;
-//             dataSource.dps = bot.attack * bot.frequency;
-//             dataSource.physicalReduction = this.calculateDamageReduction(bot.armor);
-//             dataSource.magicalReduction = this.calculateDamageReduction(bot.resistance);
-            
-//             // Обновляем состояния из bot.s
-//             dataSource.statusInfo = bot.s || {};
-
-//             // Обновляем исторические данные
-//             dataSource.goldHisto.push(bot.gold);
-//             if (dataSource.goldHisto.length > 100) {
-//                 dataSource.goldHisto = dataSource.goldHisto.slice(-100);
-//             }
-
-//             dataSource.xpHisto.push(bot.xp);
-//             if (dataSource.xpHisto.length > 100) {
-//                 dataSource.xpHisto = dataSource.xpHisto.slice(-100);
-//             }
-            
-//             dataSource.xpPh = this.calculatePerHour(dataSource.xpHisto);
-//         }
-//     }
-
-//     private broadcastWebSocketData(): void {
-//         // Отправляем данные через WebSocket если есть подключённые клиенты
-//         if (this.io) {
-//             const data = this.getBotsData();
-//             this.io.emit('data', data);
-//         }
-//     }
-
-//     private getBotsData(): Record<string, BWIDataSource> {
-//         const result: Record<string, BWIDataSource> = {};
-//         for (const [id, data] of this.botDataSources) {
-//             result[id] = data;
-//         }
-//         return result;
-//     }
-
-//     private createModernMonitorUI(ds: BWIDataSource): void {
-//         const schema: BWIMetricSchema[] = [
-//             // Основная информация
-//             { name: "name", type: "text", label: "Bot", getter: () => ds.name },
-//             { name: "realm", type: "text", label: "Realm", getter: () => ds.realm },
-//             { name: "alive", type: "text", label: "Alive", getter: () => ds.rip ? "No (💀)" : "Yes (✅)" },
-//             { name: "status", type: "text", label: "Status", getter: () => ds.status },
-//             { name: "level", type: "text", label: "Level", getter: () => ds.level },
-            
-//             // Новые боевые поля
-//             { name: "attack", type: "text", label: "⚔️ Attack", getter: () => ds.attack.toFixed(1) },
-//             { name: "frequency", type: "text", label: "🌀 Freq", getter: () => ds.frequency.toFixed(2) },
-//             { name: "dps", type: "text", label: "🔥 DPS", getter: () => this.humanizeInt(ds.dps, 1) },
-//             { name: "armor", type: "text", label: "🛡️ Armor", getter: () => ds.armor },
-//             { name: "resistance", type: "text", label: "✨ Resist", getter: () => ds.resistance },
-//             { name: "phys_red", type: "text", label: "➖ Phys Red", getter: () => `${ds.physicalReduction.toFixed(1)}%` },
-//             { name: "mag_red", type: "text", label: "➖ Mag Red", getter: () => `${ds.magicalReduction.toFixed(1)}%` },
-            
-//             // Группировка состояний по типам
-//             { 
-//                 name: "botstate_buffs", 
-//                 type: "text", 
-//                 label: "📈 Buffs", 
-//                 getter: () => {
-//                     const buffs = this.extractStatesByType(ds.statusInfo, [
-//                         'warcry', 'mluck', 'rspeed', 'newcomersblessing', 
-//                         'young', 'easterluck', 'halloween', 'citizen0aura',
-//                         'citizen4aura', 'darkblessing', 'self_healing'
-//                     ]);
-//                     return buffs.join(', ') || "None";
-//                 }
-//             },
-//             { 
-//                 name: "botstate_debuffs", 
-//                 type: "text", 
-//                 label: "📉 Debuffs", 
-//                 getter: () => {
-//                     const debuffs = this.extractStatesByType(ds.statusInfo, [
-//                         'poisoned', 'cursed', 'slowed', 'stunned', 'sick', 
-//                         'shocked', 'frozen', 'marked', 'weakness', 'stone'
-//                     ]);
-//                     return debuffs.join(', ') || "None";
-//                 }
-//             },
-//             { 
-//                 name: "botstate_special", 
-//                 type: "text", 
-//                 label: "✨ Special", 
-//                 getter: () => {
-//                     const special = [];
-                    
-//                     if (ds.statusInfo?.burned) {
-//                         const intensity = ds.statusInfo.burned.intensity;
-//                         const source = ds.statusInfo.burned.f || "unknown";
-//                         special.push(`burned:${intensity}dps (${source})`);
-//                     }
-                    
-//                     if (ds.statusInfo?.coop) {
-//                         const percent = ds.statusInfo.coop.p;
-//                         const seconds = Math.floor(ds.statusInfo.coop.ms / 1000);
-//                         special.push(`coop:${percent}% (${seconds}s)`);
-//                     }
-                    
-//                     if (ds.statusInfo?.monsterhunt) {
-//                         const remaining = ds.statusInfo.monsterhunt.c;
-//                         const monster = ds.statusInfo.monsterhunt.id;
-//                         special.push(`hunt:${remaining} ${monster}`);
-//                     }
-                    
-//                     if (ds.statusInfo?.blink) {
-//                         special.push(`blink:${ds.statusInfo.blink.map}`);
-//                     }
-                    
-//                     if (ds.statusInfo?.typing) {
-//                         const seconds = Math.floor(ds.statusInfo.typing.ms / 1000);
-//                         special.push(`typing:${seconds}s`);
-//                     }
-                    
-//                     if (ds.statusInfo?.healed) {
-//                         const seconds = Math.floor(ds.statusInfo.healed.ms / 1000);
-//                         special.push(`healed:${seconds}s`);
-//                     }
-                    
-//                     return special.join(', ') || "None";
-//                 }
-//             },
-            
-//             // Прогресс-бары
-//             {
-//                 name: "health",
-//                 type: "labelProgressBar",
-//                 label: "❤️ Health",
-//                 options: { color: "red" },
-//                 getter: () => this.quickBarVal(ds.health, ds.maxHealth)
-//             },
-//             {
-//                 name: "mana",
-//                 type: "labelProgressBar",
-//                 label: "🔵 Mana",
-//                 options: { color: "blue" },
-//                 getter: () => this.quickBarVal(ds.mana, ds.maxMana)
-//             },
-//             {
-//                 name: "xp",
-//                 type: "labelProgressBar",
-//                 label: "📈 XP",
-//                 options: { color: "green" },
-//                 getter: () => this.quickBarVal(ds.xp, ds.maxXp, true)
-//             },
-//             {
-//                 name: "inv",
-//                 type: "labelProgressBar",
-//                 label: "🎒 Inventory",
-//                 options: { color: "brown" },
-//                 getter: () => this.quickBarVal(ds.isize - ds.esize, ds.isize)
-//             },
-            
-//             // Дополнительная информация
-//             { name: "target", type: "text", label: "🎯 Target", getter: () => ds.target || "None" },
-//             { name: "party", type: "text", label: "👥 Party", getter: () => ds.party || "Solo" },
-//             { name: "gold", type: "text", label: "💰 Gold", getter: () => this.humanizeInt(ds.gold, 1) },
-//             { name: "gph", type: "text", label: "📊 Gold/h", getter: () => this.humanizeInt(this.calculatePerHour(ds.goldHisto), 1) },
-//             { name: "xpph", type: "text", label: "⚡ XP/h", getter: () => this.humanizeInt(ds.xpPh, 1) },
-//             { name: "cc", type: "text", label: "🎯 CC", getter: () => Math.round(ds.cc) },
-            
-//             // Поле TTLU
-//             { 
-//                 name: "ttlu", 
-//                 type: "text", 
-//                 label: "⏱️ TTLU", 
-//                 getter: () => {
-//                     if (ds.rip) return "DEAD";
-//                     if (ds.xpPh <= 0) return "N/A";
-//                     return prettyMilliseconds(((ds.maxXp - ds.xp) * 3_600_000) / ds.xpPh, { unitCount: 2 });
-//                 }
-//             }
-//         ];
-
-//         let ui = this.bwiInstance.publisher.createInterface(
-//             schema.map((x) => ({
-//                 name: x.name,
-//                 type: x.type,
-//                 label: x.label,
-//                 options: x.options
-//             }))
-//         );
-
-//         ui.setDataSource(() => {
-//             let result = {};
-//             schema.forEach((x) => (result[x.name] = x.getter()));
-//             return result;
-//         });
-//     }
-
-//     // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
-
-//     private calculateDamageReduction(defense: number): number {
-//         return Math.min(95, (defense / (defense + 1000)) * 100);
-//     }
-
-//     private calculatePerHour(arr: number[]): number {
-//         if (arr.length < 2) {
-//             return 0;
-//         }
-//         return ((arr[arr.length - 1] - arr[0]) * 3600000) / (arr.length - 1) / this.statBeatInterval;
-//     }
-
-//     private extractStatesByType(statusInfo: any, statesList: string[]): string[] {
-//         if (!statusInfo) return [];
-        
-//         const result = [];
-//         for (const state of statesList) {
-//             if (statusInfo[state]?.ms) {
-//                 const seconds = Math.floor(statusInfo[state].ms / 1000);
-//                 result.push(`${state}:${seconds}s`);
-//             }
-//         }
-//         return result;
-//     }
-
-//     private humanizeInt(num: number, digits: number): string {
-//         num = Math.round(num);
-//         const lookup = [
-//             { value: 1e3, symbol: "" },
-//             { value: 1e6, symbol: "k" },
-//             { value: 1e9, symbol: "M" },
-//             { value: 1e12, symbol: "B" },
-//             { value: 1e15, symbol: "T" }
-//         ];
-
-//         const regexp = /\.0+$|(\.[0-9]*[1-9])0+$/;
-//         const item = lookup.find(item => Math.abs(num) < item.value);
-
-//         return item 
-//             ? ((num * 1e3) / item.value).toFixed(digits).replace(regexp, "$1") + item.symbol 
-//             : num.toExponential(digits);
-//     }
-
-//     private quickBarVal(num: number, denom: number, humanize: boolean = false): [number, string] {
-//         let modif = (x: number): string => x.toString();
-//         if (humanize) {
-//             modif = (x: number): string => this.humanizeInt(x, 1);
-//         }
-
-//         const percentage = denom > 0 ? (100 * num) / denom : 0;
-//         return [percentage, `${modif(num)} / ${modif(denom)}`];
-//     }
-
-//     // Метод для очистки ресурсов
-//     public async destroy(): Promise<void> {
-//         console.log('Shutting down BWIReporter...');
-        
-//         // Останавливаем интервалы
-//         if (this.statisticsInterval) {
-//             clearInterval(this.statisticsInterval);
-//         }
-
-//         // Закрываем WebSocket сервер
-//         if (this.io) {
-//             this.io.disconnectSockets();
-//             this.io.close();
-//             this.io = null;
-//         }
-
-//         if (this.wsServer) {
-//             await new Promise<void>((resolve) => {
-//                 this.wsServer.close(() => {
-//                     console.log('WebSocket server closed');
-//                     resolve();
-//                 });
-//             });
-//             this.wsServer = null;
-//         }
-
-//         // Очищаем данные
-//         this.botDataSources.clear();
-
-//         console.log('BWIReporter shutdown complete');
-//     }
-// }
-
-
-
 import { PingCompensatedCharacter } from "alclient";
 import BotWebInterface from "bot-web-interface";
 import prettyMilliseconds from "pretty-ms";
@@ -514,6 +11,14 @@ import { fileURLToPath } from 'url';
 // Получаем __dirname и __filename для ES модулей
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+type BWIMetricSchema = {
+    name: string;
+    type: string;
+    label: string;
+    options?: {};
+    getter: () => any;
+};
 
 type BWIDataSource = {
     name: string;
@@ -536,13 +41,16 @@ type BWIDataSource = {
     xpPh: number;
     xpHisto: number[];
     goldHisto: number[];
+    // Новые поля для статистики боя
     attack: number;
     frequency: number;
     armor: number;
     resistance: number;
-    dps: number;
-    physicalReduction: number;
-    magicalReduction: number;
+    // Дополнительные метрики
+    dps: number; // Расчётный DPS = attack * frequency
+    physicalReduction: number; // % снижения физ. урона
+    magicalReduction: number; // % снижения маг. урона
+    // Состояния из bot.s
     statusInfo: any;
 };
 
@@ -619,7 +127,7 @@ export class BWIReporter {
             });
         } else {
             // Если Vue build не найден, показываем fallback
-            this.app.get('*', (req, res) => {
+            this.app.get(/^(?!\/api).*$/, (req, res) => {
                 res.send(this.getFallbackHTML());
             });
         }
@@ -930,54 +438,13 @@ export class BWIReporter {
         
         for (let botState of this.stateController.getBots) {
             let bot = botState.getBot();
-            this.updateOrCreateBotDataSource(bot, botState.getStateType?.() || "Unknown");
-        }
-    }
-
-    private updateOrCreateBotDataSource(bot: PingCompensatedCharacter, status: string): void {
-        const existing = this.botDataSources.get(bot.id);
-        
-        if (existing) {
-            // Обновляем существующего бота
-            existing.realm = `${bot.serverData.region}${bot.serverData.name}`;
-            existing.rip = bot.rip;
-            existing.level = bot.level;
-            existing.health = bot.hp;
-            existing.maxHealth = bot.max_hp;
-            existing.mana = bot.mp;
-            existing.maxMana = bot.max_mp;
-            existing.xp = bot.xp;
-            existing.maxXp = bot.max_xp;
-            existing.isize = bot.isize;
-            existing.esize = bot.esize;
-            existing.gold = bot.gold;
-            existing.party = bot.party;
-            existing.status = status;
-            existing.target = bot.getTargetEntity?.()?.name ?? "None";
-            existing.cc = bot.cc;
-            existing.attack = bot.attack;
-            existing.frequency = bot.frequency;
-            existing.armor = bot.armor;
-            existing.resistance = bot.resistance;
-            existing.dps = bot.attack * bot.frequency;
-            existing.physicalReduction = this.calculateDamageReduction(bot.armor);
-            existing.magicalReduction = this.calculateDamageReduction(bot.resistance);
-            existing.statusInfo = bot.s || {};
             
-            existing.goldHisto.push(bot.gold);
-            if (existing.goldHisto.length > 100) existing.goldHisto = existing.goldHisto.slice(-100);
-            
-            existing.xpHisto.push(bot.xp);
-            if (existing.xpHisto.length > 100) existing.xpHisto = existing.xpHisto.slice(-100);
-            
-            existing.xpPh = this.calculatePerHour(existing.xpHisto);
-        } else {
-            // Создаём нового бота
+            // Рассчитываем дополнительные метрики
             const dps = bot.attack * bot.frequency;
             const physicalReduction = this.calculateDamageReduction(bot.armor);
             const magicalReduction = this.calculateDamageReduction(bot.resistance);
             
-            const dataSource: BWIDataSource = {
+            let dataSourceObj: BWIDataSource = {
                 name: bot.id,
                 realm: `${bot.serverData.region}${bot.serverData.name}`,
                 rip: bot.rip,
@@ -992,71 +459,302 @@ export class BWIReporter {
                 esize: bot.esize,
                 gold: bot.gold,
                 party: bot.party,
-                status: status,
+                status: botState.getStateType?.(),
                 target: bot.getTargetEntity?.()?.name ?? "None",
                 cc: bot.cc,
                 xpPh: 0,
                 xpHisto: [bot.xp],
                 goldHisto: [bot.gold],
+                // Новые поля
                 attack: bot.attack,
                 frequency: bot.frequency,
                 armor: bot.armor,
                 resistance: bot.resistance,
+                // Рассчитанные метрики
                 dps: dps,
                 physicalReduction: physicalReduction,
                 magicalReduction: magicalReduction,
+                // Состояния из bot.s
                 statusInfo: bot.s || {}
             };
-            
-            this.botDataSources.set(bot.id, dataSource);
-            
-            // Добавляем в старый интерфейс если он есть
-            if (this.bwiInstance && this.createModernMonitorUI) {
-                this.createModernMonitorUI(dataSource);
-            }
+
+            this.botDataSources.set(bot.id, dataSourceObj);
+            this.createModernMonitorUI(dataSourceObj);
         }
     }
 
     private updateStatistics(): void {
         if (!this.stateController?.getBots) return;
         
-        for (let botState of this.stateController.getBots) {
-            let bot = botState.getBot();
-            this.updateOrCreateBotDataSource(bot, botState.getStateType?.() || "Unknown");
+        for (let b of this.stateController.getBots) {
+            let bot = b.getBot();
+            let dataSource: BWIDataSource = this.botDataSources.get(bot.id);
+
+            if (!dataSource) continue;
+
+            // Обновляем основные данные
+            dataSource.realm = `${bot.serverData.region}${bot.serverData.name}`;
+            dataSource.rip = bot.rip;
+            
+            if (dataSource.level != bot.level) {
+                dataSource.xpHisto = [];
+            }
+            
+            dataSource.level = bot.level;
+            dataSource.health = bot.hp;
+            dataSource.maxHealth = bot.max_hp;
+            dataSource.mana = bot.mp;
+            dataSource.maxMana = bot.max_mp;
+            dataSource.xp = bot.xp;
+            dataSource.maxXp = bot.max_xp;
+            dataSource.isize = bot.isize;
+            dataSource.esize = bot.esize;
+            dataSource.gold = bot.gold;
+            dataSource.party = bot.party;
+            dataSource.status = b.getStateType();
+            dataSource.target = bot.getTargetEntity?.()?.name ?? "None";
+            dataSource.cc = bot.cc;
+            
+            // Обновляем боевые характеристики
+            dataSource.attack = bot.attack;
+            dataSource.frequency = bot.frequency;
+            dataSource.armor = bot.armor;
+            dataSource.resistance = bot.resistance;
+            dataSource.dps = bot.attack * bot.frequency;
+            dataSource.physicalReduction = this.calculateDamageReduction(bot.armor);
+            dataSource.magicalReduction = this.calculateDamageReduction(bot.resistance);
+            
+            // Обновляем состояния из bot.s
+            dataSource.statusInfo = bot.s || {};
+
+            // Обновляем исторические данные
+            dataSource.goldHisto.push(bot.gold);
+            if (dataSource.goldHisto.length > 100) {
+                dataSource.goldHisto = dataSource.goldHisto.slice(-100);
+            }
+
+            dataSource.xpHisto.push(bot.xp);
+            if (dataSource.xpHisto.length > 100) {
+                dataSource.xpHisto = dataSource.xpHisto.slice(-100);
+            }
+            
+            dataSource.xpPh = this.calculatePerHour(dataSource.xpHisto);
         }
     }
+
+    private createModernMonitorUI(ds: BWIDataSource): void {
+        // Минимальная реализация для совместимости
+        if (!this.bwiInstance?.publisher?.createInterface) return;
+        
+        try {
+            const schema: BWIMetricSchema[] = [
+                // Основная информация
+                { name: "name", type: "text", label: "Bot", getter: () => ds.name },
+                { name: "realm", type: "text", label: "Realm", getter: () => ds.realm },
+                { name: "alive", type: "text", label: "Alive", getter: () => ds.rip ? "No (💀)" : "Yes (✅)" },
+                { name: "status", type: "text", label: "Status", getter: () => ds.status },
+                { name: "level", type: "text", label: "Level", getter: () => ds.level },
+                
+                // Новые боевые поля
+                { name: "attack", type: "text", label: "⚔️ Attack", getter: () => ds.attack.toFixed(1) },
+                { name: "frequency", type: "text", label: "🌀 Freq", getter: () => ds.frequency.toFixed(2) },
+                { name: "dps", type: "text", label: "🔥 DPS", getter: () => this.humanizeInt(ds.dps, 1) },
+                { name: "armor", type: "text", label: "🛡️ Armor", getter: () => ds.armor },
+                { name: "resistance", type: "text", label: "✨ Resist", getter: () => ds.resistance },
+                { name: "phys_red", type: "text", label: "➖ Phys Red", getter: () => `${ds.physicalReduction.toFixed(1)}%` },
+                { name: "mag_red", type: "text", label: "➖ Mag Red", getter: () => `${ds.magicalReduction.toFixed(1)}%` },
+                
+                // Группировка состояний по типам
+                { 
+                    name: "botstate_buffs", 
+                    type: "text", 
+                    label: "📈 Buffs", 
+                    getter: () => {
+                        const buffs = this.extractStatesByType(ds.statusInfo, [
+                            'warcry', 'mluck', 'rspeed', 'newcomersblessing', 
+                            'young', 'easterluck', 'halloween', 'citizen0aura',
+                            'citizen4aura', 'darkblessing', 'self_healing'
+                        ]);
+                        return buffs.join(', ') || "None";
+                    }
+                },
+                { 
+                    name: "botstate_debuffs", 
+                    type: "text", 
+                    label: "📉 Debuffs", 
+                    getter: () => {
+                        const debuffs = this.extractStatesByType(ds.statusInfo, [
+                            'poisoned', 'cursed', 'slowed', 'stunned', 'sick', 
+                            'shocked', 'frozen', 'marked', 'weakness', 'stone'
+                        ]);
+                        return debuffs.join(', ') || "None";
+                    }
+                },
+                { 
+                    name: "botstate_special", 
+                    type: "text", 
+                    label: "✨ Special", 
+                    getter: () => {
+                        const special = [];
+                        
+                        if (ds.statusInfo?.burned) {
+                            const intensity = ds.statusInfo.burned.intensity;
+                            const source = ds.statusInfo.burned.f || "unknown";
+                            special.push(`burned:${intensity}dps (${source})`);
+                        }
+                        
+                        if (ds.statusInfo?.coop) {
+                            const percent = ds.statusInfo.coop.p;
+                            const seconds = Math.floor(ds.statusInfo.coop.ms / 1000);
+                            special.push(`coop:${percent}% (${seconds}s)`);
+                        }
+                        
+                        if (ds.statusInfo?.monsterhunt) {
+                            const remaining = ds.statusInfo.monsterhunt.c;
+                            const monster = ds.statusInfo.monsterhunt.id;
+                            special.push(`hunt:${remaining} ${monster}`);
+                        }
+                        
+                        if (ds.statusInfo?.blink) {
+                            special.push(`blink:${ds.statusInfo.blink.map}`);
+                        }
+                        
+                        if (ds.statusInfo?.typing) {
+                            const seconds = Math.floor(ds.statusInfo.typing.ms / 1000);
+                            special.push(`typing:${seconds}s`);
+                        }
+                        
+                        if (ds.statusInfo?.healed) {
+                            const seconds = Math.floor(ds.statusInfo.healed.ms / 1000);
+                            special.push(`healed:${seconds}s`);
+                        }
+                        
+                        return special.join(', ') || "None";
+                    }
+                },
+                
+                // Прогресс-бары
+                {
+                    name: "health",
+                    type: "labelProgressBar",
+                    label: "❤️ Health",
+                    options: { color: "red" },
+                    getter: () => this.quickBarVal(ds.health, ds.maxHealth)
+                },
+                {
+                    name: "mana",
+                    type: "labelProgressBar",
+                    label: "🔵 Mana",
+                    options: { color: "blue" },
+                    getter: () => this.quickBarVal(ds.mana, ds.maxMana)
+                },
+                {
+                    name: "xp",
+                    type: "labelProgressBar",
+                    label: "📈 XP",
+                    options: { color: "green" },
+                    getter: () => this.quickBarVal(ds.xp, ds.maxXp, true)
+                },
+                {
+                    name: "inv",
+                    type: "labelProgressBar",
+                    label: "🎒 Inventory",
+                    options: { color: "brown" },
+                    getter: () => this.quickBarVal(ds.isize - ds.esize, ds.isize)
+                },
+                
+                // Дополнительная информация
+                { name: "target", type: "text", label: "🎯 Target", getter: () => ds.target || "None" },
+                { name: "party", type: "text", label: "👥 Party", getter: () => ds.party || "Solo" },
+                { name: "gold", type: "text", label: "💰 Gold", getter: () => this.humanizeInt(ds.gold, 1) },
+                { name: "gph", type: "text", label: "📊 Gold/h", getter: () => this.humanizeInt(this.calculatePerHour(ds.goldHisto), 1) },
+                { name: "xpph", type: "text", label: "⚡ XP/h", getter: () => this.humanizeInt(ds.xpPh, 1) },
+                { name: "cc", type: "text", label: "🎯 CC", getter: () => Math.round(ds.cc) },
+                
+                // Поле TTLU
+                { 
+                    name: "ttlu", 
+                    type: "text", 
+                    label: "⏱️ TTLU", 
+                    getter: () => {
+                        if (ds.rip) return "DEAD";
+                        if (ds.xpPh <= 0) return "N/A";
+                        return prettyMilliseconds(((ds.maxXp - ds.xp) * 3_600_000) / ds.xpPh, { unitCount: 2 });
+                    }
+                }
+            ];
+
+            const ui = this.bwiInstance.publisher.createInterface(
+                schema.map((x) => ({
+                    name: x.name,
+                    type: x.type,
+                    label: x.label,
+                    options: x.options
+                }))
+            );
+
+            ui.setDataSource(() => {
+                let result: Record<string, any> = {};
+                schema.forEach((x) => (result[x.name] = x.getter()));
+                return result;
+            });
+        } catch (err) {
+            console.error('Error creating modern monitor UI:', err);
+        }
+    }
+
+    // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
 
     private calculateDamageReduction(defense: number): number {
         return Math.min(95, (defense / (defense + 1000)) * 100);
     }
 
     private calculatePerHour(arr: number[]): number {
-        if (arr.length < 2) return 0;
-        const timeWindow = (arr.length - 1) * this.statBeatInterval;
-        if (timeWindow === 0) return 0;
-        return ((arr[arr.length - 1] - arr[0]) * 3600000) / timeWindow;
+        if (arr.length < 2) {
+            return 0;
+        }
+        return ((arr[arr.length - 1] - arr[0]) * 3600000) / (arr.length - 1) / this.statBeatInterval;
     }
 
-    // Метод для старого интерфейса
-    private createModernMonitorUI(ds: BWIDataSource): void {
-        // Минимальная реализация для совместимости
-        if (!this.bwiInstance?.publisher?.createInterface) return;
+    private extractStatesByType(statusInfo: any, statesList: string[]): string[] {
+        if (!statusInfo) return [];
         
-        try {
-            const ui = this.bwiInstance.publisher.createInterface([
-                { name: "name", type: "text", label: "Bot" },
-                { name: "level", type: "text", label: "Level" },
-                { name: "health", type: "labelProgressBar", label: "Health", options: { color: "red" } }
-            ]);
-            
-            ui.setDataSource(() => ({
-                name: ds.name,
-                level: ds.level,
-                health: [ds.health / ds.maxHealth * 100, `${ds.health}/${ds.maxHealth}`]
-            }));
-        } catch (err) {
-            // Игнорируем ошибки старого интерфейса
+        const result = [];
+        for (const state of statesList) {
+            if (statusInfo[state]?.ms) {
+                const seconds = Math.floor(statusInfo[state].ms / 1000);
+                result.push(`${state}:${seconds}s`);
+            }
         }
+        return result;
+    }
+
+    private humanizeInt(num: number, digits: number): string {
+        num = Math.round(num);
+        const lookup = [
+            { value: 1e3, symbol: "" },
+            { value: 1e6, symbol: "k" },
+            { value: 1e9, symbol: "M" },
+            { value: 1e12, symbol: "B" },
+            { value: 1e15, symbol: "T" }
+        ];
+
+        const regexp = /\.0+$|(\.[0-9]*[1-9])0+$/;
+        const item = lookup.find(item => Math.abs(num) < item.value);
+
+        return item 
+            ? ((num * 1e3) / item.value).toFixed(digits).replace(regexp, "$1") + item.symbol 
+            : num.toExponential(digits);
+    }
+
+    private quickBarVal(num: number, denom: number, humanize: boolean = false): [number, string] {
+        let modif = (x: number): string => x.toString();
+        if (humanize) {
+            modif = (x: number): string => this.humanizeInt(x, 1);
+        }
+
+        const percentage = denom > 0 ? (100 * num) / denom : 0;
+        return [percentage, `${modif(num)} / ${modif(denom)}`];
     }
 
     public async destroy(): Promise<void> {
