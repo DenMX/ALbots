@@ -180,7 +180,13 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["cape", { level: 7 }],
     ["sshield", { level: 8 }],
     ["mshield", { level: 6 }],
-    ["wbreeches", { level: 8 }],
+
+    //wanderer set
+    ["wbreeches", { level: 9, scrollUpAt: 8 }],
+    ["wcap", { level: 9, scrollUpAt: 8}],
+    ["wattire", { level: 9, scrollUpAt: 8}],
+    ["wgloves", { level: 9, scrollUpAt: 8}],
+    ["wshoes", { level: 9, scrollUpAt: 8}],
 
     // Darkforge set
     ["xhelmet", { level: 3, primlingAt: 0 }],

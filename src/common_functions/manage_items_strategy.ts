@@ -293,7 +293,7 @@ export class ManageItems extends ResuplyStrategy {
         for (bankPackName in bank) {
             if(bankPackName == "gold" || bankPackName == "owner" as BankPackName || bankPackName == "_id" as BankPackName) continue
 
-            const itemsInSlot = bot.locateItems(item, bot.bank[bankPackName], filters)
+            const itemsInSlot = bot.locateItems(item, bank[bankPackName], filters)
 
             if (itemsInSlot.length) items.push([bankPackName, itemsInSlot])
         }
@@ -358,7 +358,7 @@ export class ManageItems extends ResuplyStrategy {
                     console.debug(`[upgradeFromBank] smartmove to bankPack`)
                     await bot.smartMove(bankPack[0], {getWithin: 9999}).catch(console.warn)
                     for(const pack of bankPack[1]) {
-                        await bot.withdrawItem(bankPack[0], pack)
+                        await bot.withdrawItem(bankPack[0], pack).catch(console.debug)
                     }
                 }
             }
@@ -370,7 +370,7 @@ export class ManageItems extends ResuplyStrategy {
                     console.debug(`[upgradeFromBank] smartmove to bankPack`)
                     await bot.smartMove(bankPack[0], {getWithin: 9999}).catch(console.warn)
                     for(const pack of bankPack[1]) {
-                        await bot.withdrawItem(bankPack[0], pack)
+                        await bot.withdrawItem(bankPack[0], pack).catch(console.debug)
                     }
                 }
             }
@@ -382,7 +382,7 @@ export class ManageItems extends ResuplyStrategy {
                 if(bot.esize<2) break upouter;
                 console.debug(`[upgradeFromBank] smartmove to bankPack`)
                 await bot.smartMove(it[0], {getWithin: 9999}).catch(console.warn)
-                await bot.withdrawItem(it[0], it[1])
+                await bot.withdrawItem(it[0], it[1]).catch(console.debug)
             }
         }
 
@@ -398,7 +398,7 @@ export class ManageItems extends ResuplyStrategy {
 
                 console.debug(`[upgradeFromBank] withdrowing ${configItem.itemName} level ${configItem.level}`)
                 await bot.smartMove(configItem.slots[it][0], {getWithin: 9999}).catch(console.warn)
-                await bot.withdrawItem(configItem.slots[it][0], configItem.slots[it][1])
+                await bot.withdrawItem(configItem.slots[it][0], configItem.slots[it][1]).catch(console.debug)
                 
             }
         }

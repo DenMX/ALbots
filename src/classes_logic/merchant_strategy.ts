@@ -176,14 +176,12 @@ export class MerchantStrategy extends ManageItems implements IState {
                     await this.bot.sendItem( bot.name, this.bot.locateItem("hpot1"), hpot ).catch(console.warn)
                     await this.bot.sendItem( bot.name, this.bot.locateItem("mpot1"), mpot ).catch(console.warn)
                     this.changeMerchState(this.DEFAULT_STATE)
-                    if(!this.job_scheduler.includes(this.checkPartyInventory))setTimeout(() => {this.checkPartyInventory}, 30 * 1000)
                 })
-                return
             }
                 
         }
 
-        setTimeout(()=>{this.job_scheduler.push(this.checkPartyInventory)}, 30 * 1000)
+        setTimeout(()=>{this.job_scheduler.push(this.checkPartyInventory)}, 60 * 1000)
     }
 
     

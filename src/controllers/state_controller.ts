@@ -1,6 +1,6 @@
 import { Constants, MapName, MonsterName, Observer, Tools } from "alclient";
 import { StateStrategy } from "../common_functions/state_strategy";
-import * as CF from "../common_functions/common_functions"
+import { startBotWithStrategy } from "../common_functions/common_functions"
 import { WANTED_EVENTS } from "../configs/events_and_spots";
 import { MemoryStorage } from "../common_functions/memory_storage";
 import { IState } from "./state_interface";
@@ -24,7 +24,7 @@ export class StateController {
 
         for(let i of bots) {
             let bot = i.getBot()
-            bot.socket.on("disconnect", (data, bot) => this.reconnect(data, bot))
+            bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
         }
     }
 
@@ -32,11 +32,11 @@ export class StateController {
         return this.bots
     }
 
-    public addNewBot(bot: IState) {
-        this.bots.push(bot)
-        let b = bot.getBot()
-        b.socket.on("disconnect", (data, b) => this.reconnect(data, b))
-        this.memoryStorage.addEventListners(b)
+    public addNewBot(state: IState) {
+        this.bots.push(state)
+        let bot = state.getBot()
+        bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
+        this.memoryStorage.addEventListners(bot)
     }
 
     private async reconnect(data, bot) {
@@ -44,7 +44,7 @@ export class StateController {
         for(let i = 0; i<this.bots.length; i++) {
             let state = this.bots[i]
             if( state.getBot().name == bot.name ) {
-                let new_bot = await CF.startBotWithStrategy(bot.ctype, bot.name, bot.serverData.ServerRegion, bot.serverData.name, this.memoryStorage)
+                let new_bot = await startBotWithStrategy(bot.ctype, bot.name, bot.serverData.ServerRegion, bot.serverData.name, this.memoryStorage)
                 this.memoryStorage.addEventListners(new_bot.getBot())
             }
         }

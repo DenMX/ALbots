@@ -28,7 +28,7 @@ export class MemoryStorage {
         this.loadBankFromMongo = this.loadBankFromMongo.bind(this)
         this.updateBank = this.updateBank.bind(this)
         
-        let credentialFile = fs.readFileSync(`../credentials.json`, 'utf-8')
+        let credentialFile = fs.readFileSync(`./credentials.json`, 'utf-8')
         this.secretKey = JSON.parse(credentialFile).apiToken
 
         this.current_party_leader = this.default_party_leader

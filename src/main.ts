@@ -25,52 +25,16 @@ export const my_characters: Map<string, CharacterType> = new Map([
     ["RogerThat", "rogue"]
 ])
 
-
+let bwiReporter
 
 
 run()
 async function run(){
-    await Promise.all([Game.loginJSONFile("../credentials.json"), Game.getGData()])
+    await Promise.all([Game.loginJSONFile("./credentials.json"), Game.getGData()])
     await Pathfinder.prepare(Game.G)
-
-    // let merchant = class_functions.merchant.start("Merchandiser", "EU", "II")
-    // active_players.push(merchant)
-
-    
-    
-    
-    // let rogue = await Game.startRogue("frostyRogue", "EU", "II")
-    // let mage = await Game.startMage("frostyMage", "EU", "II")
         
     let memoryStorage = new MemoryStorage()
     // PROD READY STEADY
-    // let stateList = []
-
-    // let merchant = await Game.startMerchant("frostyMerch","EU", "II")
-    // new MerchantStrategy(merchant, memoryStorage)
-    // stateList.push(await startBotWithStrategy("merchant", "frostyMerch", "EU", "II", memoryStorage)[1])
-    // stateList.push(await startBotWithStrategy("warrior","frostyWar", "EU", "II", memoryStorage)[1])
-
-    // let warrior = await Game.startWarrior("frostyWar", "EU", "II")
-    // let warriorState = new WarriorsAttackStrategy(warrior, memoryStorage)
-    // stateList.push(warriorState)
-    // active_players.push(warrior)
-    // active_players.push(priest)
-    
-    
-    // let priest = await Game.startPriest("frostyHeal", "EU", "II")
-    // let priestState = new PriestsAttackStrategy(priest, memoryStorage)
-    // stateList.push(priestState)
-    
-    // let ranger = await Game.startRanger("frostyRan", "EU", "II")
-    // let rangerState = new RangerAttackStrategy(ranger, memoryStorage)
-    // stateList.push(rangerState)
-    
-    // stateList.push(new RogueAttackStrategy(rogue, memoryStorage))
-    // stateList.push(new MageAttackStrategy(mage, memoryStorage))
-    
-    
-    
     
     let stateController = new StateController([
         await startBotWithStrategy("merchant", "frostyMerch", "EU", "II", memoryStorage),
@@ -79,7 +43,53 @@ async function run(){
         await startBotWithStrategy("priest","frostyHeal", "EU", "II", memoryStorage)
     ], memoryStorage)
     memoryStorage.setStateController = stateController
-    new BWIReporter(stateController)
-
+    bwiReporter = new BWIReporter(stateController, 924, 3000);
+    try{
+        
+        
+        await new Promise<void>((resolve) => {
+                process.on('SIGINT', async () => {
+                    console.log('\n🛑 Received shutdown signal...');
+                    if (bwiReporter) {
+                        await bwiReporter.destroy();
+                    }
+                    resolve();
+                });
+                
+                // Альтернативный способ завершения
+                process.on('SIGTERM', async () => {
+                    console.log('\n🛑 Received termination signal...');
+                    if (bwiReporter) {
+                        await bwiReporter.destroy();
+                    }
+                    process.exit(0);
+                });
+            });
+        
+    } catch (error) {
+        console.error('❌ Fatal error:', error);
+        if (bwiReporter) {
+            await bwiReporter.destroy();
+        }
+        process.exit(1);
+    }
 
 }
+
+
+// Обработка необработанных исключений
+process.on('uncaughtException', async (error) => {
+    console.error('❌ Uncaught exception:', error);
+    if (bwiReporter) {
+        await bwiReporter.destroy();
+    }
+    process.exit(1);
+});
+
+process.on('unhandledRejection', async (reason, promise) => {
+    console.error('❌ Unhandled rejection at:', promise, 'reason:', reason);
+    if (bwiReporter) {
+        await bwiReporter.destroy();
+    }
+    process.exit(1);
+});

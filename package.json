@@ -5,22 +5,27 @@
   "description": "Adventure Land TypeScript bots",
   "main": "src/main.ts",
   "scripts": {
-    "dev": "npx tsx src/main.ts",
+    "dev": "concurrently \"tsx src/main.ts\" \"cd src/vue-monitor && npm run dev\"",
     "build": "tsc",
-    "start": "node src/main.js",
-    "obs": "npx tsx src/GlobalObserver.ts"
+    "build-vue": "node scripts/simple-build-vue.js",
+    "start": "tsx src/main.ts",
+    "obs": "npx tsx src/GlobalObserver.ts",
+    "clean": "rm -rf dist node_modules"
   },
-  "author": "Fotum",
+  "author": "DenMX",
   "license": "MIT",
   "dependencies": {
     "alclient": "^0.23.2",
     "bot-web-interface": "^2.0.14",
     "dependencies": "^0.0.1",
+    "express": "^5.2.1",
     "fastpriorityqueue": "^0.7.5",
-    "pretty-ms": "^9.2.0",
-    "typescript": "^5.7.3"
+    "pretty-ms": "^9.2.0"
   },
   "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/express": "^4.17.0",
+    "@types/node": "^25.0.10",
     "tsx": "^4.19.2"
   },
   "keywords": []
