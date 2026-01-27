@@ -8,6 +8,7 @@
     "dev": "concurrently \"tsx src/main.ts\" \"cd src/vue-monitor && npm run dev\"",
     "build": "tsc",
     "build-vue": "node scripts/simple-build-vue.js",
+    "build-cursor-ui": "cd src/cursor-ui && npm install && npm run build",
     "start": "tsx src/main.ts",
     "obs": "npx tsx src/GlobalObserver.ts",
     "clean": "rm -rf dist node_modules"

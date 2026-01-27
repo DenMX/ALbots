@@ -9,6 +9,7 @@ import { MemoryStorage } from "./common_functions/memory_storage"
 import { startBotWithStrategy } from "./common_functions/common_functions"
 import { BWIReporter } from "./bwi_reporter"
 import { StateController } from "./controllers/state_controller"
+import { startCursorUI } from "./cursor-ui/server"
 
 
 var active_players: PingCompensatedCharacter[] = []
@@ -26,7 +27,7 @@ export const my_characters: Map<string, CharacterType> = new Map([
 ])
 
 let bwiReporter
-
+const CURSOR_UI_PORT = Number(process.env.CURSOR_UI_PORT) || 3001
 
 run()
 async function run(){
@@ -44,52 +45,37 @@ async function run(){
     ], memoryStorage)
     memoryStorage.setStateController = stateController
     bwiReporter = new BWIReporter(stateController, 924, 3000);
-    try{
-        
-        
-        await new Promise<void>((resolve) => {
-                process.on('SIGINT', async () => {
-                    console.log('\n🛑 Received shutdown signal...');
-                    if (bwiReporter) {
-                        await bwiReporter.destroy();
-                    }
-                    resolve();
-                });
-                
-                // Альтернативный способ завершения
-                process.on('SIGTERM', async () => {
-                    console.log('\n🛑 Received termination signal...');
-                    if (bwiReporter) {
-                        await bwiReporter.destroy();
-                    }
-                    process.exit(0);
-                });
-            });
-        
-    } catch (error) {
-        console.error('❌ Fatal error:', error);
-        if (bwiReporter) {
-            await bwiReporter.destroy();
-        }
-        process.exit(1);
-    }
-
+    startCursorUI(stateController, CURSOR_UI_PORT);
 }
 
+// process.on('SIGINT', async () => {
+//                     console.log('\n🛑 Received shutdown signal...');
+//                     if (bwiReporter) {
+//                         bwiReporter.destroy();
+//                     }
+//                 });
+                
+// process.on('SIGTERM', async () => {
+//     console.log('\n🛑 Received termination signal...');
+//     if (bwiReporter) {
+//         await bwiReporter.destroy();
+//     }
+//     process.exit(0);
+// });
 
-// Обработка необработанных исключений
-process.on('uncaughtException', async (error) => {
-    console.error('❌ Uncaught exception:', error);
-    if (bwiReporter) {
-        await bwiReporter.destroy();
-    }
-    process.exit(1);
-});
+// // Обработка необработанных исключений
+// process.on('uncaughtException', async (error) => {
+//     console.error('❌ Uncaught exception:', error);
+//     if (bwiReporter) {
+//         await bwiReporter.destroy();
+//     }
+//     process.exit(1);
+// });
 
-process.on('unhandledRejection', async (reason, promise) => {
-    console.error('❌ Unhandled rejection at:', promise, 'reason:', reason);
-    if (bwiReporter) {
-        await bwiReporter.destroy();
-    }
-    process.exit(1);
-});
+// process.on('unhandledRejection', async (reason, promise) => {
+//     console.error('❌ Unhandled rejection at:', promise, 'reason:', reason);
+//     if (bwiReporter) {
+//         await bwiReporter.destroy();
+//     }
+//     process.exit(1);
+// });

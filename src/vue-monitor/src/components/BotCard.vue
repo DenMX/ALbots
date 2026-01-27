@@ -6,94 +6,94 @@
         <h3 class="bot-name">{{ bot.name }}</h3>
         <div class="bot-meta">
           <span class="bot-level">Lvl {{ bot.level }}</span>
-          <span class="bot-realm">{{ bot.realm }}</span>
+          <span class="bot-realm">{{ bot.realm || 'Unknown' }}</span>
           <span class="bot-alive" :class="{ alive: !bot.rip, dead: bot.rip }">
             {{ bot.rip ? '💀 DEAD' : '✅ ALIVE' }}
           </span>
         </div>
       </div>
-      <button @click="$emit('update-requested')" class="refresh-bot" title="Refresh">
-        🔄
-      </button>
+      <div class="bot-status">
+        <span class="status-badge">{{ bot.status || 'Unknown' }}</span>
+      </div>
     </div>
 
-    <!-- Прогресс-бары -->
-    <div class="bot-progress">
-      <ProgressBar 
-        label="❤️ Health"
-        :value="bot.health"
-        :max="bot.maxHealth"
-        color="#ef4444"
-        :percentage="true"
-      />
-      <ProgressBar 
-        label="🔵 Mana"
-        :value="bot.mana"
-        :max="bot.maxMana"
-        color="#3b82f6"
-        :percentage="true"
-      />
-      <ProgressBar 
-        label="📈 XP"
-        :value="bot.xp"
-        :max="bot.maxXp"
-        color="#10b981"
-        :humanize="true"
-      />
-      <ProgressBar 
-        label="🎒 Inventory"
-        :value="bot.isize - bot.esize"
-        :max="bot.isize"
-        color="#a16207"
-        :percentage="true"
-      />
+    <!-- Основные показатели -->
+    <div class="bot-main-stats">
+      <div class="main-stat">
+        <div class="stat-label">❤️ Health</div>
+        <div class="stat-value">{{ bot.hp || 0 }}/{{ bot.max_hp || 0 }}</div>
+        <div class="stat-bar">
+          <div class="stat-fill health" :style="`width: ${getPercentage(bot.hp, bot.max_hp)}%`"></div>
+        </div>
+      </div>
+      
+      <div class="main-stat">
+        <div class="stat-label">🔵 Mana</div>
+        <div class="stat-value">{{ bot.mp || 0 }}/{{ bot.max_mp || 0 }}</div>
+        <div class="stat-bar">
+          <div class="stat-fill mana" :style="`width: ${getPercentage(bot.mp, bot.max_mp)}%`"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Боевые характеристики -->
-    <div class="bot-stats">
+    <div class="combat-stats">
       <h4 class="section-title">⚔️ Combat Stats</h4>
       <div class="stats-grid">
         <div class="stat-item">
-          <div class="stat-value">{{ bot.attack.toFixed(1) }}</div>
+          <div class="stat-value">{{ formatNumber(bot.attack || 0) }}</div>
           <div class="stat-label">Attack</div>
         </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ bot.frequency.toFixed(2) }}</div>
-          <div class="stat-label">Freq</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value">{{ formatNumber(bot.dps) }}</div>
+        
+        <div class="stat-item highlight">
+          <div class="stat-value">{{ formatNumber(bot.dps || 0) }}</div>
           <div class="stat-label">DPS</div>
         </div>
+        
         <div class="stat-item">
-          <div class="stat-value">{{ Math.round(bot.cc) }}</div>
-          <div class="stat-label">CC</div>
+          <div class="stat-value">{{ (bot.cc || 0).toFixed(1) }}%</div>
+          <div class="stat-label">Crit</div>
         </div>
+        
+        <div class="stat-item">
+          <div class="stat-value">{{ (bot.frequency || 0).toFixed(2) }}</div>
+          <div class="stat-label">Freq</div>
+        </div>
+        
         <div class="stat-item armor">
-          <div class="stat-value">{{ bot.armor }}</div>
+          <div class="stat-value">{{ bot.armor || 0 }}</div>
           <div class="stat-label">Armor</div>
-          <div class="stat-subtext">{{ bot.physicalReduction.toFixed(1) }}% reduction</div>
         </div>
+        
         <div class="stat-item resistance">
-          <div class="stat-value">{{ bot.resistance }}</div>
-          <div class="stat-label">Resistance</div>
-          <div class="stat-subtext">{{ bot.magicalReduction.toFixed(1) }}% reduction</div>
+          <div class="stat-value">{{ bot.resistance || 0 }}</div>
+          <div class="stat-label">Resist</div>
         </div>
       </div>
     </div>
 
-    <!-- Состояния -->
-    <div class="bot-states" v-if="hasStates">
-      <div class="states-group" v-if="buffs.length > 0">
-        <h5>📈 Buffs</h5>
-        <div class="states-list">
-          <span v-for="buff in buffs" :key="buff" class="state-badge buff">{{ buff }}</span>
+    <!-- Экономические показатели -->
+    <div class="economic-stats">
+      <h4 class="section-title">💰 Economy</h4>
+      <div class="stats-grid">
+        <div class="stat-item gold">
+          <div class="stat-value">{{ formatNumber(bot.gold || 0) }}</div>
+          <div class="stat-label">Gold</div>
         </div>
-      </div>
-      <div class="states-group" v-if="debuffs.length > 0">
-        <h5>📉 Debuffs</h5>
-        <div class="states-list">
-          <span v-for="debuff in debuffs" :key="debuff" class="state-badge debuff">{{ debuff }}</span>
+        
+        <div class="stat-item">
+          <div class="stat-value">{{ formatNumber(bot.gph || 0) }}</div>
+          <div class="stat-label">GPH</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-value">{{ formatNumber(bot.xp || 0) }}</div>
+          <div class="stat-label">XP</div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-value">{{ formatNumber(bot.xpPh || 0) }}</div>
+          <div class="stat-label">XP/h</div>
         </div>
       </div>
     </div>
@@ -109,99 +109,76 @@
         <span class="info-value">{{ bot.party || 'Solo' }}</span>
       </div>
       <div class="info-row">
-        <span class="info-label">💰 Gold:</span>
-        <span class="info-value">{{ formatNumber(bot.gold) }}</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">⚡ XP/h:</span>
-        <span class="info-value">{{ formatNumber(bot.xpPh) }}</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Status:</span>
-        <span class="info-value status">{{ bot.status }}</span>
+        <span class="info-label">🎒 Inventory:</span>
+        <span class="info-value">{{ bot.esize || 0 }}/{{ bot.isize || 0 }}</span>
       </div>
     </div>
 
     <!-- Время обновления -->
     <div class="bot-updated">
-      Updated: {{ new Date().toLocaleTimeString() }}
+      Last update: {{ getTimeAgo(bot.lastUpdate) }}
     </div>
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { computed } from 'vue'
-import ProgressBar from './ProgressBar.vue'
-import type { Bot } from '../types/bot'
 
-defineProps<{
-  bot: Bot
-}>()
+const props = defineProps({
+  bot: {
+    type: Object,
+    required: true,
+    default: () => ({})
+  }
+})
 
-defineEmits<{
-  'update-requested': []
-}>()
+const getPercentage = (current, max) => {
+  if (!max || max <= 0) return 0
+  return Math.min(100, (current / max) * 100)
+}
 
-// Форматирование чисел
-const formatNumber = (num: number): string => {
+const formatNumber = (num) => {
   if (num >= 1e9) return `${(num / 1e9).toFixed(1)}B`
   if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`
   if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`
-  return num.toFixed(0)
+  return Math.round(num).toString()
 }
 
-// Извлечение состояний из statusInfo
-const buffs = computed(() => {
-  const buffList = ['warcry', 'mluck', 'rspeed', 'newcomersblessing', 'young']
-  const result: string[] = []
+const getTimeAgo = (timestamp) => {
+  if (!timestamp) return 'unknown'
+  const now = Date.now()
+  const diff = now - timestamp
+  const seconds = Math.floor(diff / 1000)
   
-  buffList.forEach(buff => {
-    if (props.bot.statusInfo?.[buff]?.ms) {
-      const seconds = Math.floor(props.bot.statusInfo[buff].ms / 1000)
-      result.push(`${buff}:${seconds}s`)
-    }
-  })
-  
-  return result
-})
-
-const debuffs = computed(() => {
-  const debuffList = ['poisoned', 'cursed', 'slowed', 'stunned', 'sick']
-  const result: string[] = []
-  
-  debuffList.forEach(debuff => {
-    if (props.bot.statusInfo?.[debuff]?.ms) {
-      const seconds = Math.floor(props.bot.statusInfo[debuff].ms / 1000)
-      result.push(`${debuff}:${seconds}s`)
-    }
-  })
-  
-  return result
-})
-
-const hasStates = computed(() => buffs.value.length > 0 || debuffs.value.length > 0)
+  if (seconds < 60) return `${seconds}s ago`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+  return `${Math.floor(seconds / 86400)}d ago`
+}
 </script>
 
 <style scoped>
 .bot-card {
-  background: var(--bg-secondary);
-  border-radius: 12px;
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  border-radius: 16px;
   padding: 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.05);
   transition: all 0.3s ease;
-  border: 2px solid transparent;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .bot-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
   border-color: rgba(79, 70, 229, 0.3);
 }
 
 .bot-card.bot-dead {
-  opacity: 0.7;
-  filter: grayscale(0.5);
+  opacity: 0.6;
+  filter: grayscale(0.8);
 }
 
 .bot-header {
@@ -219,8 +196,9 @@ const hasStates = computed(() => buffs.value.length > 0 || debuffs.value.length 
 
 .bot-name {
   margin: 0 0 8px 0;
-  font-size: 1.4em;
-  color: var(--text-primary);
+  font-size: 1.5em;
+  color: #ffffff;
+  font-weight: 700;
 }
 
 .bot-meta {
@@ -231,62 +209,97 @@ const hasStates = computed(() => buffs.value.length > 0 || debuffs.value.length 
 }
 
 .bot-level {
-  background: var(--accent);
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
   color: white;
-  padding: 3px 10px;
-  border-radius: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
   font-size: 0.85em;
   font-weight: 600;
 }
 
 .bot-realm {
-  color: var(--text-secondary);
+  color: #94a3b8;
   font-size: 0.85em;
+  padding: 4px 8px;
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 6px;
 }
 
 .bot-alive {
   font-size: 0.85em;
   font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
 }
 
 .bot-alive.alive {
-  background: rgba(16, 185, 129, 0.2);
-  color: var(--success);
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
 }
 
 .bot-alive.dead {
   background: rgba(239, 68, 68, 0.2);
-  color: var(--danger);
+  color: #f87171;
 }
 
-.refresh-bot {
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--text-secondary);
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s;
+.status-badge {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
 }
 
-.refresh-bot:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-}
-
-.bot-progress {
+/* Основные показатели */
+.bot-main-stats {
   margin: 20px 0;
 }
 
+.main-stat {
+  margin-bottom: 15px;
+}
+
+.stat-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 0.9em;
+  color: #cbd5e1;
+}
+
+.stat-value {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.stat-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.stat-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.stat-fill.health {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.stat-fill.mana {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+/* Боевые характеристики */
 .section-title {
   margin: 25px 0 15px 0;
-  color: var(--text-primary);
+  color: #e2e8f0;
   font-size: 1.1em;
   display: flex;
   align-items: center;
@@ -295,101 +308,72 @@ const hasStates = computed(() => buffs.value.length > 0 || debuffs.value.length 
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
 }
 
 .stat-item {
   background: rgba(255, 255, 255, 0.05);
-  padding: 12px;
-  border-radius: 8px;
+  padding: 15px;
+  border-radius: 10px;
   text-align: center;
   transition: all 0.3s;
+  border: 1px solid transparent;
 }
 
 .stat-item:hover {
   background: rgba(255, 255, 255, 0.1);
   transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.stat-item.highlight {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.stat-item.highlight .stat-value {
+  color: #f59e0b;
+  font-size: 1.3em;
 }
 
 .stat-item.armor {
-  border-left: 3px solid #3b82f6;
+  border-left: 4px solid #3b82f6;
 }
 
 .stat-item.resistance {
-  border-left: 3px solid #8b5cf6;
+  border-left: 4px solid #8b5cf6;
+}
+
+.stat-item.gold .stat-value {
+  color: #fbbf24;
 }
 
 .stat-value {
-  font-size: 1.3em;
+  font-size: 1.2em;
   font-weight: bold;
-  color: var(--text-primary);
+  color: #ffffff;
   margin-bottom: 4px;
 }
 
 .stat-label {
   font-size: 0.85em;
-  color: var(--text-secondary);
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.stat-subtext {
-  font-size: 0.75em;
-  color: var(--text-secondary);
-  margin-top: 4px;
-  opacity: 0.8;
-}
-
-.bot-states {
+/* Экономические показатели */
+.economic-stats {
   margin: 20px 0;
-  padding: 15px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
 }
 
-.states-group {
-  margin-bottom: 15px;
-}
-
-.states-group:last-child {
-  margin-bottom: 0;
-}
-
-.states-group h5 {
-  margin: 0 0 8px 0;
-  font-size: 0.9em;
-  color: var(--text-secondary);
-}
-
-.states-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.state-badge {
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.8em;
-  font-weight: 500;
-}
-
-.state-badge.buff {
-  background: rgba(16, 185, 129, 0.2);
-  color: var(--success);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.state-badge.debuff {
-  background: rgba(239, 68, 68, 0.2);
-  color: var(--danger);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
+/* Информация */
 .bot-info {
-  margin: 20px 0;
-  padding: 15px;
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
+  border-radius: 10px;
+  padding: 15px;
+  margin: 20px 0;
 }
 
 .info-row {
@@ -404,25 +388,35 @@ const hasStates = computed(() => buffs.value.length > 0 || debuffs.value.length 
 }
 
 .info-label {
-  color: var(--text-secondary);
+  color: #94a3b8;
   font-weight: 500;
 }
 
 .info-value {
-  color: var(--text-primary);
+  color: #e2e8f0;
   font-weight: 500;
 }
 
-.info-value.status {
-  color: var(--accent);
-}
-
+/* Время обновления */
 .bot-updated {
   font-size: 0.8em;
-  color: var(--text-secondary);
+  color: #64748b;
   text-align: center;
   padding-top: 15px;
+  margin-top: auto;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-  margin-top: 15px;
+}
+
+/* Адаптивность */
+@media (min-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

@@ -1,5 +1,5 @@
 {
-  "name": "vue-monitor",
+  "name": "cursor-ui",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,9 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.4.0",
-    "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "vue": "^3.4.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.0",
