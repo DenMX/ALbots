@@ -8,7 +8,7 @@
         <div class="stat"><span class="stat-val">{{ aliveCount }}</span><span class="stat-lbl">Alive</span></div>
         <div class="stat gold"><span class="stat-val">{{ formatNum(totalGold) }}</span><span class="stat-lbl">Gold</span></div>
         <div class="stat"><span class="stat-val">{{ formatNum(totalDPS) }}</span><span class="stat-lbl">DPS</span></div>
-        <div class="stat"><span class="stat-val">{{ avgCC }}%</span><span class="stat-lbl">Avg CC</span></div>
+        <div class="stat"><span class="stat-val">{{ avgCC }}</span><span class="stat-lbl">Avg CC</span></div>
         <div class="stat muted"><span class="stat-val">{{ formatTime(lastUpdate) }}</span><span class="stat-lbl">Updated</span></div>
       </div>
     </header>

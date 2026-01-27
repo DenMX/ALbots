@@ -58,7 +58,7 @@
         <div class="k"><span class="v">{{ bot.resistance || 0 }}</span><span class="l">Resist</span></div>
         <div class="k"><span class="v">{{ (bot.physicalReduction || 0).toFixed(1) }}%</span><span class="l">Phys▼</span></div>
         <div class="k"><span class="v">{{ (bot.magicalReduction || 0).toFixed(1) }}%</span><span class="l">Mag▼</span></div>
-        <div class="k"><span class="v">{{ Math.round(bot.cc || 0) }}%</span><span class="l">CC</span></div>
+        <div class="k"><span class="v">{{ Math.round(bot.cc || 0) }}</span><span class="l">CC</span></div>
       </div>
     </section>
 
@@ -75,55 +75,97 @@
       </div>
     </section>
 
-    <!-- Collapsible: Buffs -->
+    <!-- Collapsible: Buffs / Debuffs / Special (вместе) -->
     <section class="section collapsible">
-      <h4 class="section-title toggle" @click="openBuffs = !openBuffs">
-        <span>Buffs</span>
-        <span class="count">({{ (bot.buffs || []).length }})</span>
-        <span class="chevron" :class="{ up: openBuffs }">▼</span>
+      <h4 class="section-title toggle" @click="openEffects = !openEffects">
+        <span>Buffs / Debuffs / Special</span>
+        <span class="count">({{ totalEffects }})</span>
+        <span class="chevron" :class="{ up: openEffects }">▼</span>
       </h4>
-      <div v-show="openBuffs" class="effect-list">
-        <div v-for="(e, i) in (bot.buffs || [])" :key="'b'+i" class="effect-line">{{ e }}</div>
-        <div v-if="!(bot.buffs || []).length" class="effect-line muted">None</div>
+      <div v-show="openEffects" class="effect-blocks">
+        <div class="effect-group">
+          <div class="effect-sublabel">Buffs</div>
+          <div v-for="(e, i) in (bot.buffs || [])" :key="'b'+i" class="effect-line">{{ e }}</div>
+          <div v-if="!(bot.buffs || []).length" class="effect-line muted">None</div>
+        </div>
+        <div class="effect-group">
+          <div class="effect-sublabel">Debuffs</div>
+          <div v-for="(e, i) in (bot.debuffs || [])" :key="'d'+i" class="effect-line debuff">{{ e }}</div>
+          <div v-if="!(bot.debuffs || []).length" class="effect-line muted">None</div>
+        </div>
+        <div class="effect-group">
+          <div class="effect-sublabel">Special</div>
+          <div v-for="(e, i) in (bot.special || [])" :key="'s'+i" class="effect-line special">{{ e }}</div>
+          <div v-if="!(bot.special || []).length" class="effect-line muted">None</div>
+        </div>
       </div>
     </section>
 
-    <!-- Collapsible: Debuffs -->
-    <section class="section collapsible">
-      <h4 class="section-title toggle" @click="openDebuffs = !openDebuffs">
-        <span>Debuffs</span>
-        <span class="count">({{ (bot.debuffs || []).length }})</span>
-        <span class="chevron" :class="{ up: openDebuffs }">▼</span>
-      </h4>
-      <div v-show="openDebuffs" class="effect-list">
-        <div v-for="(e, i) in (bot.debuffs || [])" :key="'d'+i" class="effect-line debuff">{{ e }}</div>
-        <div v-if="!(bot.debuffs || []).length" class="effect-line muted">None</div>
-      </div>
-    </section>
-
-    <!-- Collapsible: Special -->
-    <section class="section collapsible">
-      <h4 class="section-title toggle" @click="openSpecial = !openSpecial">
-        <span>Special</span>
-        <span class="count">({{ (bot.special || []).length }})</span>
-        <span class="chevron" :class="{ up: openSpecial }">▼</span>
-      </h4>
-      <div v-show="openSpecial" class="effect-list">
-        <div v-for="(e, i) in (bot.special || [])" :key="'s'+i" class="effect-line special">{{ e }}</div>
-        <div v-if="!(bot.special || []).length" class="effect-line muted">None</div>
+    <!-- Equipment 4x4 -->
+    <section class="section">
+      <h4 class="section-title">Equipment</h4>
+      <div class="equip-grid">
+        <div
+          v-for="slot in equipSlots"
+          :key="slot"
+          class="equip-slot"
+          :title="equipTitle(slot)"
+        >
+          <img
+            v-if="(bot.equipment || {})[slot]"
+            :src="itemImgUrl((bot.equipment || {})[slot].name)"
+            :alt="(bot.equipment || {})[slot].name"
+            class="equip-img"
+            @error="(e) => (e.target.style.display = 'none')"
+          />
+          <span v-if="(bot.equipment || {})[slot]" class="equip-badge">
+            {{ equipBadge((bot.equipment || {})[slot]) }}
+          </span>
+        </div>
       </div>
     </section>
   </article>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
-defineProps({ bot: { type: Object, required: true } })
+const props = defineProps({ bot: { type: Object, required: true } })
 
-const openBuffs = ref(true)
-const openDebuffs = ref(true)
-const openSpecial = ref(true)
+const openEffects = ref(true)
+
+const totalEffects = computed(() =>
+  (props.bot.buffs || []).length + (props.bot.debuffs || []).length + (props.bot.special || []).length
+)
+
+const equipSlots = [
+  'earring1', 'helmet', 'earring2', 'amulet',
+  'mainhand', 'chest', 'gloves', 'cape',
+  'ring1', 'pants', 'ring2', 'elixir',
+  'belt', 'shoes', 'offhand', 'orb'
+]
+
+const AL_IMG = 'https://cdn.jsdelivr.net/gh/kaansoral/adventureland@main/images/misc'
+
+function itemImgUrl(name) {
+  if (!name) return ''
+  return `${AL_IMG}/${String(name).toLowerCase()}.png`
+}
+
+function equipTitle(slot) {
+  const it = (props.bot.equipment || {})[slot]
+  if (!it) return slot
+  const lvl = it.level != null ? ` Lv${it.level}` : ''
+  const q = it.q > 1 ? ` x${it.q}` : ''
+  return `${it.name}${lvl}${q}`
+}
+
+function equipBadge(it) {
+  if (!it) return ''
+  if (it.q > 1) return it.q
+  if (it.level != null && it.level > 0) return it.level
+  return ''
+}
 
 function pct(a, b) {
   if (!b || b <= 0) return 0
@@ -241,6 +283,9 @@ function fmt(n) {
 .chevron { font-size: 0.65rem; margin-left: auto; transition: transform 0.2s; }
 .chevron.up { transform: rotate(-180deg); }
 
+.effect-blocks { display: flex; flex-direction: column; gap: 10px; }
+.effect-group { padding-left: 4px; }
+.effect-sublabel { font-size: 0.7rem; color: #71717a; margin-bottom: 4px; text-transform: uppercase; }
 .effect-list { display: flex; flex-direction: column; gap: 4px; padding-left: 4px; }
 .effect-line {
   font-family: 'JetBrains Mono', monospace;
@@ -254,4 +299,37 @@ function fmt(n) {
 .effect-line.debuff { border-left-color: #ef4444; }
 .effect-line.special { border-left-color: #a855f7; }
 .effect-line.muted { color: #71717a; border-left-color: #3f3f46; }
+
+/* Equipment grid 4x4 */
+.equip-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.equip-slot {
+  aspect-ratio: 1;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.equip-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 2px;
+}
+.equip-badge {
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #facc15;
+  text-shadow: 0 0 2px #0c0c10;
+}
 </style>

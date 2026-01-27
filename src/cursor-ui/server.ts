@@ -9,6 +9,8 @@ import prettyMilliseconds from "pretty-ms";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+export type EquipSlotData = { name: string; level?: number; q?: number } | null;
+
 export type CursorUIBotData = {
     name: string;
     realm: string;
@@ -41,6 +43,7 @@ export type CursorUIBotData = {
     debuffs: string[];
     special: string[];
     ttlu: string;
+    equipment: Record<string, EquipSlotData>;
 };
 
 type BotDataInternal = CursorUIBotData & {
@@ -173,12 +176,18 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
                 debuffs: [],
                 special: [],
                 ttlu: "N/A",
+                equipment: {},
                 goldHisto: [],
                 xpHisto: [],
             });
         }
         return botMap.get(id)!;
     }
+
+    const EQUIP_SLOTS: string[] = [
+        "earring1", "helmet", "earring2", "amulet", "mainhand", "chest", "gloves", "cape",
+        "ring1", "pants", "ring2", "elixir", "belt", "shoes", "offhand", "orb"
+    ];
 
     function collectBots() {
         const bots = sc?.getBots;
@@ -217,6 +226,13 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
             d.buffs = extractStates(d.statusInfo, BUFF_KEYS);
             d.debuffs = extractStates(d.statusInfo, DEBUFF_KEYS);
             d.special = extractSpecial(d.statusInfo);
+
+            const sl = (bot as { slots?: Record<string, { name?: string; level?: number; q?: number } | null> }).slots;
+            d.equipment = {};
+            for (const k of EQUIP_SLOTS) {
+                const it = sl?.[k];
+                d.equipment[k] = it && it.name != null ? { name: String(it.name), level: it.level, q: it.q } : null;
+            }
 
             d.goldHisto.push(bot.gold);
             if (d.goldHisto.length > 100) d.goldHisto = d.goldHisto.slice(-100);
