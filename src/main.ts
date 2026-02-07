@@ -44,38 +44,21 @@ async function run(){
         await startBotWithStrategy("priest","frostyHeal", "EU", "II", memoryStorage)
     ], memoryStorage)
     memoryStorage.setStateController = stateController
-    bwiReporter = new BWIReporter(stateController, 924, 3000);
+    // bwiReporter = new BWIReporter(stateController, 924, 3000);
     startCursorUI(stateController, CURSOR_UI_PORT);
 }
 
-// process.on('SIGINT', async () => {
-//                     console.log('\n🛑 Received shutdown signal...');
-//                     if (bwiReporter) {
-//                         bwiReporter.destroy();
-//                     }
-//                 });
-                
-// process.on('SIGTERM', async () => {
-//     console.log('\n🛑 Received termination signal...');
-//     if (bwiReporter) {
-//         await bwiReporter.destroy();
-//     }
-//     process.exit(0);
-// });
+// Немедленный выход по Ctrl+C без запроса "Завершить выполнение пакетного файла" в Windows
+process.on('SIGINT', () => {
+    if (bwiReporter && typeof bwiReporter.destroy === 'function') {
+        try { bwiReporter.destroy(); } catch (_) {}
+    }
+    process.exit(0);
+});
 
-// // Обработка необработанных исключений
-// process.on('uncaughtException', async (error) => {
-//     console.error('❌ Uncaught exception:', error);
-//     if (bwiReporter) {
-//         await bwiReporter.destroy();
-//     }
-//     process.exit(1);
-// });
-
-// process.on('unhandledRejection', async (reason, promise) => {
-//     console.error('❌ Unhandled rejection at:', promise, 'reason:', reason);
-//     if (bwiReporter) {
-//         await bwiReporter.destroy();
-//     }
-//     process.exit(1);
-// });
+process.on('SIGTERM', () => {
+    if (bwiReporter && typeof bwiReporter.destroy === 'function') {
+        try { bwiReporter.destroy(); } catch (_) {}
+    }
+    process.exit(0);
+});

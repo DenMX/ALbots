@@ -235,9 +235,9 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
             }
 
             d.goldHisto.push(bot.gold);
-            if (d.goldHisto.length > 100) d.goldHisto = d.goldHisto.slice(-100);
+            if (d.goldHisto.length > 500) d.goldHisto = d.goldHisto.slice(-500);
             d.xpHisto.push(bot.xp);
-            if (d.xpHisto.length > 100) d.xpHisto = d.xpHisto.slice(-100);
+            if (d.xpHisto.length > 500) d.xpHisto = d.xpHisto.slice(-500);
 
             d.xpPh = calculatePerHour(d.xpHisto, STAT_BEAT);
             d.gph = calculatePerHour(d.goldHisto, STAT_BEAT);
@@ -270,6 +270,92 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
             count: list.length,
             bots: list,
         });
+    });
+
+    app.get("/api/panels-frame", (req, res) => {
+        const player = typeof req.query.player === "string" ? req.query.player.trim() : "";
+        const playerAttr = player.replace(/"/g, "&quot;").replace(/</g, "&lt;");
+        res.type("html").send(`
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Comm & Players</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:#0c0c10}
+.layout{display:flex;flex-direction:column;height:100%;gap:0}
+.comm-wrap{flex:1;min-height:0;border:1px solid #27272a;border-radius:10px;overflow:hidden}
+.player-wrap{height:320px;min-height:0;flex-shrink:0;border:1px solid #27272a;border-radius:10px;overflow:hidden}
+.comm-wrap iframe,.player-wrap iframe{width:100%;height:100%;border:none;display:block}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="comm-wrap"><iframe src="https://adventure.land/comm" loading="lazy"></iframe></div>
+  <div class="player-wrap"><iframe id="pf" data-player="${playerAttr}" loading="lazy"></iframe></div>
+</div>
+<script>
+(function(){var e=document.getElementById('pf');var p=e.getAttribute('data-player');e.src=p?'https://adventure.land/player/'+encodeURIComponent(p):'about:blank';})();
+</script>
+</body>
+</html>`);
+    });
+
+    app.get("/api/proxy/comm", async (_req, res) => {
+        try {
+            const response = await fetch("https://adventure.land/comm", {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                },
+            });
+            if (!response.ok) {
+                res.status(response.status).send(`Error: ${response.statusText}`);
+                return;
+            }
+            const html = await response.text();
+            // Rewrite relative URLs to absolute URLs
+            const rewrittenHtml = html
+                .replace(/href="\//g, 'href="https://adventure.land/')
+                .replace(/src="\//g, 'src="https://adventure.land/')
+                .replace(/action="\//g, 'action="https://adventure.land/');
+            res.type("html").send(rewrittenHtml);
+        } catch (err) {
+            res.status(500).send(`Proxy error: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    });
+
+    const credentialsPath = path.join(process.cwd(), "credentials.json");
+    app.get("/api/adventure-login", (_req, res) => {
+        let email = "";
+        let password = "";
+        try {
+            if (fs.existsSync(credentialsPath)) {
+                const raw = fs.readFileSync(credentialsPath, "utf-8");
+                const creds = JSON.parse(raw) as { email?: string; password?: string };
+                email = String(creds.email ?? "").replace(/"/g, "&quot;");
+                password = String(creds.password ?? "").replace(/"/g, "&quot;");
+            }
+        } catch {
+            /* ignore */
+        }
+        res.type("html").send(`
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Adventure Land Login</title></head>
+<body>
+<form id="f" action="https://adventure.land/comm" method="POST" target="_self">
+<input type="text" name="email" value="${email}" />
+<input type="password" name="password" value="${password}" />
+<button type="submit">Login</button>
+</form>
+<script>
+(function(){
+var f = document.getElementById('f');
+if (f.email.value && f.password.value) {
+  f.submit();
+} else {
+  window.location.href = 'https://adventure.land/comm';
+}
+})();
+</script>
+</body></html>`);
     });
 
     const distPath = path.join(process.cwd(), "dist", "cursor-ui");

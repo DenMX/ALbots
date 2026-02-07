@@ -1,8 +1,9 @@
-import { BankInfo, BankModel, Database, PingCompensatedCharacter } from "alclient";
+import { BankInfo, BankModel, Database, PingCompensatedCharacter, ServerIdentifier, ServerRegion } from "alclient";
 import fs from "fs"
 import { StateController } from "../controllers/state_controller";
 
-
+export const DEFAULT_SERVER_REGION: ServerRegion = "EU"
+export const DEFAULT_SERVER_NAME: ServerIdentifier = "II"
 
 export class MemoryStorage {
     

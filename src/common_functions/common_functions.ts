@@ -7,7 +7,7 @@ import { RangerAttackStrategy } from "../classes_logic/ranger_attack_strategy"
 import { MageAttackStrategy } from "../classes_logic/mage_attack_strategy"
 import { RogueAttackStrategy } from "../classes_logic/rogue_attack_strategy"
 import { MerchantStrategy } from "../classes_logic/merchant_strategy"
-import { MemoryStorage } from "./memory_storage"
+import { MemoryStorage, DEFAULT_SERVER_NAME, DEFAULT_SERVER_REGION } from "./memory_storage"
 import { IState } from "../controllers/state_interface"
 
 export const UPGRADE_POSITION: IPosition = {
@@ -17,6 +17,10 @@ export const UPGRADE_POSITION: IPosition = {
 }
 
 export async function startBotWithStrategy(ctype: CharacterType, name: string, sRegion: ServerRegion, sID: ServerIdentifier, memory_storage: MemoryStorage): Promise<IState> {
+    if(!sRegion || !sID) {
+        sRegion = DEFAULT_SERVER_REGION;
+        sID = DEFAULT_SERVER_NAME;
+    }
     switch (ctype) {
         case "mage":
             return new MageAttackStrategy(await Game.startMage(name, sRegion, sID), memory_storage)
@@ -184,7 +188,7 @@ export function calculate_my_dps(bot: PingCompensatedCharacter) {
  * Decide could we or should we use weapon with explosion and blast effects
  */
 export function shouldUseMassWeapon(bot: PingCompensatedCharacter, tank: string) {
-    
+    if(bot.getEntities().filter( e => e.target == bot.id || bot.partyData?.list.includes(e.target)).length>1) return true
     let target = bot.getTargetEntity()
     if(!target) return false
     let willTank 

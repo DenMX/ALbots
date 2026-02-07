@@ -64,10 +64,10 @@ export class WarriorsAttackStrategy extends StateStrategy {
         }
         try {
             if(!this.warrior.smartMoving && this.warrior.canUse("stomp", {ignoreEquipped: true}) && (Items.WEAPON_CONFIGS[this.bot.id] as Items.WarriorWeaponsConfig).stomp) {
-                await this.useStomp()
+                this.useStomp()
             }
             if(!this.warrior.smartMoving && this.warrior.canUse("cleave", {ignoreEquipped: true}) && (Items.WEAPON_CONFIGS[this.bot.id] as Items.WarriorWeaponsConfig).cleave) {
-                await this.useCleave()
+                this.useCleave()
             }
             
             if(Tools.distance(this.warrior,target)<this.warrior.range) {

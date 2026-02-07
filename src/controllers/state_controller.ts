@@ -41,11 +41,40 @@ export class StateController {
 
     private async reconnect(data, bot) {
         console.warn(`${bot.name} disconnected. Cause:\n${JSON.stringify(data)}`)
-        for(let i = 0; i<this.bots.length; i++) {
-            let state = this.bots[i]
-            if( state.getBot().name == bot.name ) {
-                let new_bot = await startBotWithStrategy(bot.ctype, bot.name, bot.serverData.ServerRegion, bot.serverData.name, this.memoryStorage)
-                this.memoryStorage.addEventListners(new_bot.getBot())
+        let new_bot
+        try{
+
+            for(let i = 0; i<this.bots.length; i++) {
+                let state = this.bots[i]
+                if( state.getBot().name == bot.name ) {
+                    new_bot = await startBotWithStrategy(bot.ctype, bot.name, bot.serverData.ServerRegion, bot.serverData.name, this.memoryStorage)
+                    this.bots[i] = new_bot
+                    this.memoryStorage.addEventListners(new_bot.getBot())
+                    new_bot.getBot().socket.on("disconnect", (data) => this.reconnect(data, new_bot.getBot()))
+                    break
+                }
+            }
+        }
+        catch(ex) {
+            if(new_bot) {
+                const newBotChar = new_bot.getBot()
+                newBotChar.socket.removeAllListeners("disconnect")
+                newBotChar.disconnect()
+            }
+
+            console.error(`Couldn't recconect ${bot?.name}\n Cause:\n${ex}`)
+            let wait = /wait_(\d+)_seconds/.exec(ex)
+            if(wait && wait[1]) {
+                setTimeout( () => this.reconnect(ex, bot), Number.parseInt(wait[1]))
+            }
+            else if (/limits/.test(ex)) {
+                setTimeout( () => this.reconnect(ex, bot), Constants.RECONNECT_TIMEOUT_MS )
+            }
+            else if (/nouser/.test(ex)) {
+                throw new Error(`Authorization failed for ${bot.name}! No longer trying to reconnect...`);
+            }
+            else {
+                setTimeout( () => this.reconnect(ex, bot), 10_000)
             }
         }
 

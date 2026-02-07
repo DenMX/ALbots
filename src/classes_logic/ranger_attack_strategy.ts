@@ -3,6 +3,7 @@ import * as CF from "../../src/common_functions/common_functions"
 import * as Items from "../configs/character_items_configs"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
+import { debugLog } from "../common_functions/common_functions"
 
 export class RangerAttackStrategy extends StateStrategy {
 
@@ -41,11 +42,11 @@ export class RangerAttackStrategy extends StateStrategy {
         let targetsForThreeShot = this.getTargets("3shot")
         
         if(this.ranger.canUse("5shot") && targetsForFiveShot.length>3) {
-            await this.ranger.fiveShot(targetsForFiveShot[0]?.id,targetsForFiveShot[1]?.id,targetsForFiveShot[2]?.id,targetsForFiveShot[3]?.id,targetsForFiveShot[4]?.id).catch(console.warn)
+            await this.ranger.fiveShot(targetsForFiveShot[0]?.id,targetsForFiveShot[1]?.id,targetsForFiveShot[2]?.id,targetsForFiveShot[3]?.id,targetsForFiveShot[4]?.id).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("5shot")))
         }
         if(this.ranger.canUse("3shot") && targetsForThreeShot.length>1) {
-            await this.ranger.threeShot(targetsForThreeShot[0]?.id,targetsForThreeShot[1]?.id,targetsForThreeShot[2]?.id).catch(console.warn)
+            await this.ranger.threeShot(targetsForThreeShot[0]?.id,targetsForThreeShot[1]?.id,targetsForThreeShot[2]?.id).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("3shot")))
         }
         if(Tools.distance(this.ranger, target)> this.ranger.range) {
@@ -57,8 +58,8 @@ export class RangerAttackStrategy extends StateStrategy {
         }
         if(Tools.distance(this.ranger,target) < this.ranger.range) {
             if(CF.calculate_monster_dps(this.ranger,target)/CF.calculate_hps(this.ranger)>=2) return setTimeout(this.basicAttackLoop, 500)
-            if(target.armor - this.ranger.apiercing < 250) await this.ranger.basicAttack(this.ranger.target).catch(console.warn) 
-            else await this.ranger.piercingShot(this.ranger.target).catch(console.warn)
+            if(target.armor - this.ranger.apiercing < 250) await this.ranger.basicAttack(this.ranger.target).catch(CF.debugLog) 
+            else await this.ranger.piercingShot(this.ranger.target).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, this.ranger.getCooldown("attack"))
         }
         return setTimeout(this.basicAttackLoop, this.ranger.frequency)

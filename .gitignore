@@ -1,6 +1,6 @@
 node_modules/
 dist/
-credentials.json
+*credentials.json
 .env
 *.log
 api_token.txt

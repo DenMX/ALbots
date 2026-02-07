@@ -2,6 +2,7 @@ import { Priest, Tools, Game } from "alclient"
 import * as CF from "../../src/common_functions/common_functions"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
+import { debugLog } from "../../src/common_functions/common_functions"
 
 export class PriestsAttackStrategy extends StateStrategy {
 
@@ -32,7 +33,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         if( this.bot.c.town && this.bot.hp > totalDps*15 ) return setTimeout(this.attackOrHealLoop, 5000)
         let healTarget = this.whoNeedsHeal()
         if (healTarget == this.priest.id ) {
-            await this.priest.healSkill(healTarget).catch(console.error)
+            await this.priest.healSkill(healTarget).catch(debugLog)
             return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
         }
         let healEntity = healTarget ? this.priest.getPlayers().filter( e => e.id == healTarget)[0] || undefined : undefined
@@ -45,12 +46,12 @@ export class PriestsAttackStrategy extends StateStrategy {
                     ).catch(console.warn)
                 }
                 if(Tools.distance(this.priest, healEntity ) < this.priest.range) {
-                    await this.priest.healSkill(healTarget).catch(console.error)
+                    await this.priest.healSkill(healTarget).catch(debugLog)
                     return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
                 }
             }
             else {
-                await this.priest.healSkill(healTarget).catch(console.error)
+                await this.priest.healSkill(healTarget).catch(debugLog)
                 return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
             }
         }
