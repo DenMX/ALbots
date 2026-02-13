@@ -1,5 +1,5 @@
 <template>
-  <article class="card" :class="{ dead: bot.rip }">
+  <article class="card" :class="{ dead: bot.rip, 'card-min': isCompact }">
     <!-- Header -->
     <header class="card-header">
       <div class="name-row">
@@ -68,7 +68,7 @@
             <div class="k full"><span class="l">Party</span><span class="v">{{ bot.party || 'Solo' }}</span></div>
           </div>
         </section>
-        <section v-if="showEffectsInline" class="section section-effects-inline">
+        <section v-if="effectiveShowEffectsInline" class="section section-effects-inline">
           <div class="effect-blocks">
             <div class="effect-group">
               <div class="effect-sublabel">Buffs</div>
@@ -91,7 +91,7 @@
     </div>
 
     <!-- Combat -->
-    <section v-if="showCombat" class="section">
+    <section v-if="effectiveShowCombat" class="section">
       <h4 class="section-title">Combat</h4>
       <div class="kv">
         <div class="k"><span class="v">{{ (bot.attack || 0).toFixed(1) }}</span><span class="l">Attack</span></div>
@@ -120,7 +120,7 @@
     </section>
 
     <!-- Collapsible: Buffs / Debuffs / Special (вместе) -->
-    <section v-if="showEffects" class="section collapsible">
+    <section v-if="effectiveShowEffects" class="section collapsible">
       <h4 class="section-title toggle" @click="openEffects = !openEffects">
         <span>Buffs / Debuffs / Special</span>
         <span class="count">({{ totalEffects }})</span>
@@ -156,11 +156,24 @@ const props = defineProps({
   showCombat: { type: Boolean, default: true },
   showEffects: { type: Boolean, default: true },
   showEffectsInline: { type: Boolean, default: false },
-  defaultMinMode: { type: Boolean, default: false }
+  defaultMinMode: { type: Boolean, default: false },
+  // Пропсы для режима min (используются когда isMinMode = true)
+  minShowCombat: { type: Boolean, default: false },
+  minShowEffects: { type: Boolean, default: false },
+  minShowEffectsInline: { type: Boolean, default: true },
+  // Пропсы для режима max (используются когда isMinMode = false)
+  maxShowCombat: { type: Boolean, default: true },
+  maxShowEffects: { type: Boolean, default: true },
+  maxShowEffectsInline: { type: Boolean, default: false }
 })
 
 const isMinMode = ref(props.defaultMinMode)
 const isCompact = computed(() => isMinMode.value)
+
+// Computed свойства для отображения секций в зависимости от режима
+const effectiveShowCombat = computed(() => isMinMode.value ? props.minShowCombat : props.maxShowCombat)
+const effectiveShowEffects = computed(() => isMinMode.value ? props.minShowEffects : props.maxShowEffects)
+const effectiveShowEffectsInline = computed(() => isMinMode.value ? props.minShowEffectsInline : props.maxShowEffectsInline)
 
 function toggleMode() {
   isMinMode.value = !isMinMode.value
@@ -233,13 +246,24 @@ function fmt(n) {
   transition: all 0.2s ease;
   font-family: 'JetBrains Mono', monospace;
   text-transform: uppercase;
+  z-index: 10;
+  flex-shrink: 0;
 }
 .card-toggle-btn:hover {
   background: rgba(63, 63, 70, 0.9);
   border-color: #52525b;
   color: #e4e4e7;
 }
-.name-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.name-row { 
+  display: flex; 
+  align-items: center; 
+  gap: 10px; 
+  margin-bottom: 8px; 
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+  padding-right: 50px;
+}
 .name-row .realm { font-size: 0.8rem; color: #71717a; }
 .name-row .alive {
   font-size: 0.75rem;
@@ -260,7 +284,14 @@ function fmt(n) {
   font-weight: 600;
 }
 
-.meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.meta { 
+  display: flex; 
+  flex-wrap: wrap; 
+  gap: 8px; 
+  align-items: center;
+  padding-right: 50px;
+  min-width: 0;
+}
 .realm { font-size: 0.8rem; color: #71717a; }
 .alive {
   font-size: 0.75rem;

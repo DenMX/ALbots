@@ -190,18 +190,18 @@ export class WarriorsAttackStrategy extends StateStrategy {
             let items = this.bot.locateItems(mainhand_item.name, undefined, {level: mainhand_item.level})
             if(!items) return setTimeout(this.switchWeapons, 1000)
             items.length > 1 ? 
-                await this.bot.equipBatch([{num: items[0], slot: "mainhand"},{num: items[1], slot: "offhand"}])
+                await this.bot.equipBatch([{num: items[0], slot: "mainhand"},{num: items[1], slot: "offhand"}]).catch(debugLog)
                 :
-                await this.bot.equipBatch([{num: items[0], slot: "mainhand"}])
+                await this.bot.equipBatch([{num: items[0], slot: "mainhand"}]).catch(debugLog)
 
             return setTimeout(this.switchWeaponsLoop, 1000)
         }
         let mainhand_idx = this.warrior.locateItem(mainhand_item.name, undefined, {level: mainhand_item?.level})
         // console.debug(`Mainhand ${mainhand_item.name} in ${mainhand_idx} slot.`)
-        if( mainhand_idx !== undefined ) await this.warrior.equip(mainhand_idx,"mainhand").catch(console.debug)
+        if( mainhand_idx !== undefined ) await this.warrior.equip(mainhand_idx,"mainhand").catch(debugLog)
         let offhand_idx = this.warrior.locateItem(offhand_item.name, undefined, {level: offhand_item?.level})
         // console.debug(`Offhand ${offhand_item.name} in ${offhand_idx} slot.`)        
-        if( offhand_idx !== undefined ) await this.warrior.equip(offhand_idx, "offhand").catch(console.debug)
+        if( offhand_idx !== undefined ) await this.warrior.equip(offhand_idx, "offhand").catch(debugLog)
         
         setTimeout(this.switchWeaponsLoop,5000)
     }
@@ -210,7 +210,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
         // console.log("Cealve loop")
         if(!CF.shouldUseMassSkill(this.warrior, this.getMemoryStorage.getCurrentTank, "cleave")) return //console.log("Don't want to use cleave")
         await this.switchWeapons({cleave: true})
-        if(Game.G.skills.cleave.wtype.includes(Game.G.items[this.warrior.slots.mainhand?.name].wtype))await this.warrior.cleave().catch(ex => console.error(ex))
+        if(Game.G.skills.cleave.wtype.includes(Game.G.items[this.warrior.slots.mainhand?.name].wtype))await this.warrior.cleave().catch(debugLog)
         await this.switchWeapons()
     }
 
@@ -224,7 +224,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
         if(CF.calculate_hps(this.warrior)/dps < 2) {
             console.log("we want to use stomp")
             await this.switchWeapons({stomp: true})
-            if( Game.G.skills.stomp.wtype?.includes(Game.G.items[this.warrior.slots.mainhand?.name].wtype) )await this.warrior.stomp().catch(console.error)
+            if( Game.G.skills.stomp.wtype?.includes(Game.G.items[this.warrior.slots.mainhand?.name].wtype) )await this.warrior.stomp().catch(debugLog)
             await this.switchWeapons()
         }
         // console.log("we won't use stomp")

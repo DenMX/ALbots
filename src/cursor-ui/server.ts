@@ -322,27 +322,14 @@ html,body{height:100%;background:#0c0c10}
         }
     });
 
-    const credentialsPath = path.join(process.cwd(), "credentials.json");
     app.get("/api/adventure-login", (_req, res) => {
-        let email = "";
-        let password = "";
-        try {
-            if (fs.existsSync(credentialsPath)) {
-                const raw = fs.readFileSync(credentialsPath, "utf-8");
-                const creds = JSON.parse(raw) as { email?: string; password?: string };
-                email = String(creds.email ?? "").replace(/"/g, "&quot;");
-                password = String(creds.password ?? "").replace(/"/g, "&quot;");
-            }
-        } catch {
-            /* ignore */
-        }
         res.type("html").send(`
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Adventure Land Login</title></head>
 <body>
 <form id="f" action="https://adventure.land/comm" method="POST" target="_self">
-<input type="text" name="email" value="${email}" />
-<input type="password" name="password" value="${password}" />
+<input type="text" name="email" placeholder="Email" />
+<input type="password" name="password" placeholder="Password" />
 <button type="submit">Login</button>
 </form>
 <script>

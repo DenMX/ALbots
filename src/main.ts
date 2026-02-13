@@ -7,7 +7,6 @@ import { RogueAttackStrategy } from "./classes_logic/rogue_attack_strategy"
 import { MerchantStrategy } from "./classes_logic/merchant_strategy"
 import { MemoryStorage } from "./common_functions/memory_storage"
 import { startBotWithStrategy } from "./common_functions/common_functions"
-import { BWIReporter } from "./bwi_reporter"
 import { StateController } from "./controllers/state_controller"
 import { startCursorUI } from "./cursor-ui/server"
 

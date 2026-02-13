@@ -7,7 +7,6 @@
         <nav class="tabs">
           <button class="tab" :class="{ active: activeTab === 'main' }" @click="activeTab = 'main'">Main</button>
           <button class="tab" :class="{ active: activeTab === 'docs' }" @click="activeTab = 'docs'">Docs</button>
-          <button class="tab" :class="{ active: activeTab === 'test' }" @click="activeTab = 'test'">Test</button>
           <button class="tab" :class="{ active: activeTab === 'comm' }" @click="activeTab = 'comm'">Comm</button>
         </nav>
       </div>
@@ -38,7 +37,19 @@
         </div>
         <div v-else class="content-row">
           <div class="grid">
-            <BotCard v-for="b in sortedBots" :key="b.name" :bot="b" :default-effects-open="true" :default-min-mode="false" />
+            <BotCard 
+              v-for="b in sortedBots" 
+              :key="b.name" 
+              :bot="b" 
+              :default-effects-open="true" 
+              :default-min-mode="false"
+              :max-show-combat="true"
+              :max-show-effects="true"
+              :max-show-effects-inline="false"
+              :min-show-combat="false"
+              :min-show-effects="false"
+              :min-show-effects-inline="true"
+            />
           </div>
           <section v-if="playerUrl" class="player-panel">
             <div class="player-header">
@@ -53,17 +64,39 @@
         </div>
       </template>
       <template v-else-if="activeTab === 'docs'">
-        <section class="docs-panel">
-          <div class="docs-header">
-            <h2 class="docs-title">Adventure Land Docs</h2>
-            <a class="docs-link" href="https://adventure.land/docs" target="_blank" rel="noopener noreferrer">Open in new tab</a>
+        <div class="docs-layout docs-layout-scrollable">
+          <div class="docs-top-panels">
+            <section class="docs-panel">
+              <div class="docs-header">
+                <h2 class="docs-title">Adventure Land Docs</h2>
+                <a class="docs-link" href="https://adventure.land/docs" target="_blank" rel="noopener noreferrer">Open in new tab</a>
+              </div>
+              <div class="docs-frame-wrap">
+                <iframe class="docs-frame" src="https://adventure.land/docs" loading="lazy" />
+              </div>
+            </section>
+            <section class="docs-panel">
+              <div class="docs-header">
+                <h2 class="docs-title">Bank Data</h2>
+                <a class="docs-link" href="https://aldata.adventureland.community/bank" target="_blank" rel="noopener noreferrer">Open in new tab</a>
+              </div>
+              <div class="docs-frame-wrap">
+                <iframe class="docs-frame" src="https://aldata.adventureland.community/bank" loading="lazy" />
+              </div>
+            </section>
           </div>
-          <div class="docs-frame-wrap">
-            <iframe class="docs-frame" src="https://adventure.land/docs" loading="lazy" />
-          </div>
-        </section>
+          <section class="docs-panel docs-panel-full">
+            <div class="docs-header">
+              <h2 class="docs-title">Adventure Land Map</h2>
+              <a class="docs-link" href="https://almap.zinals.dev/" target="_blank" rel="noopener noreferrer">Open in new tab</a>
+            </div>
+            <div class="docs-frame-wrap">
+              <iframe class="docs-frame" src="https://almap.zinals.dev/" loading="lazy" />
+            </div>
+          </section>
+        </div>
       </template>
-      <template v-else-if="activeTab === 'test'">
+      <template v-else-if="activeTab === 'comm'">
         <div class="tab-pane" :class="{ 'tab-pane--fill': !loading && !error && bots.length > 0 }">
           <div v-if="loading && bots.length === 0" class="loading">
             <div class="spinner" />
@@ -108,8 +141,20 @@
                 <h3 class="test-bots-panel-title">Bots</h3>
                 <span class="test-bots-panel-count">{{ sortedBots.length }} active</span>
               </div>
-              <div class="test-bots-grid">
-                <BotCard v-for="b in sortedBots.slice(0, 4)" :key="'comm-' + b.name" :bot="b" :default-effects-open="false" :default-min-mode="true" :show-combat="false" :show-effects="false" :show-effects-inline="false" />
+              <div class="test-bots-grid test-bots-grid-auto">
+                <BotCard 
+                  v-for="b in sortedBots" 
+                  :key="'comm-' + b.name" 
+                  :bot="b" 
+                  :default-effects-open="false" 
+                  :default-min-mode="true"
+                  :max-show-combat="true"
+                  :max-show-effects="true"
+                  :max-show-effects-inline="false"
+                  :min-show-combat="false"
+                  :min-show-effects="false"
+                  :min-show-effects-inline="true"
+                />
               </div>
             </aside>
           </div>
@@ -117,7 +162,7 @@
       </template>
     </main>
 
-    <footer v-if="activeTab !== 'test' && activeTab !== 'comm'" class="footer">
+    <footer v-if="activeTab !== 'comm'" class="footer">
       <span>Auto-refresh · Cursor UI</span>
     </footer>
   </div>
@@ -356,6 +401,8 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .main .tab-pane {
@@ -387,6 +434,70 @@ body {
   grid-template-columns: repeat(4, 1fr);
   gap: 20px;
   flex: 1;
+}
+
+/* Карточки в режиме min на Main вкладке - в 2 раза меньше по высоте */
+.grid .card.card-min {
+  padding: 8px 10px;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.grid .card.card-min .card-header {
+  margin-bottom: 2px;
+}
+
+.grid .card.card-min .name-row {
+  margin-bottom: 4px;
+  gap: 6px;
+}
+
+.grid .card.card-min .name {
+  font-size: 1rem;
+}
+
+.grid .card.card-min .lvl {
+  font-size: 0.7rem;
+  padding: 2px 5px;
+}
+
+.grid .card.card-min .bars-and-stats {
+  gap: 6px;
+}
+
+.grid .card.card-min .bars {
+  gap: 4px;
+}
+
+.grid .card.card-min .bar-head {
+  font-size: 0.65rem;
+  margin-bottom: 2px;
+}
+
+.grid .card.card-min .bar-track {
+  height: 4px;
+}
+
+.grid .card.card-min .section-title {
+  font-size: 0.7rem;
+  margin-bottom: 4px;
+  padding-bottom: 2px;
+}
+
+.grid .card.card-min .kv {
+  gap: 2px;
+}
+
+.grid .card.card-min .k {
+  padding: 3px 5px;
+}
+
+.grid .card.card-min .k .v {
+  font-size: 0.75rem;
+}
+
+.grid .card.card-min .k .l {
+  font-size: 0.65rem;
 }
 
 @media (max-width: 1400px) { .grid { grid-template-columns: repeat(2, 1fr); } }
@@ -473,6 +584,28 @@ body {
   min-height: 940px;
 }
 
+.docs-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: fit-content;
+}
+
+.docs-layout-scrollable {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.docs-top-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  flex-shrink: 0;
+  height: calc(100vh - 120px);
+  min-height: 800px;
+}
+
 .docs-panel {
   flex: 1;
   display: flex;
@@ -482,6 +615,13 @@ body {
   border-radius: 14px;
   border: 1px solid #1f2937;
   padding: 16px 20px 12px;
+  overflow: hidden;
+}
+
+.docs-panel-full {
+  flex-shrink: 0;
+  height: calc(100vh - 120px);
+  min-height: 800px;
 }
 
 .docs-header {
@@ -510,7 +650,7 @@ body {
 
 .docs-frame-wrap {
   flex: 1;
-  min-height: 400px;
+  min-height: 0;
   border-radius: 10px;
   overflow: auto;
   border: 1px solid #111827;
@@ -520,7 +660,7 @@ body {
 .docs-frame {
   width: 100%;
   height: 100%;
-  min-height: 800px;
+  min-height: 100%;
   border: none;
   display: block;
 }
