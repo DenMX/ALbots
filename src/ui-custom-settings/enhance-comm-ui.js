@@ -1174,12 +1174,16 @@
                             && e.ctype !== 'merchant'
                             && e.s?.coop?.p > 0
                     )
-                    .sort((a, b) => b.s.coop.p - a.s.coop.p)
+                    .map((e) => ({
+                        ...e,
+                        transformedContribution: Math.pow(e.s.coop.p, 0.65)
+                    }))
+                    .sort((a, b) => b.transformedContribution - a.transformedContribution)
             }, [entities])
 
-            const maxContribution = React.useMemo(() => Math.max(...players.map((p) => p.s.coop.p)), [players])
+            const maxContribution = React.useMemo(() => Math.max(...players.map((p) => p.transformedContribution)), [players])
 
-            const totalContribution = React.useMemo(() => players.map((p) => p.s.coop.p).reduce((acc,a) => acc + a, 0), [players])
+            const totalContribution = React.useMemo(() => players.map((p) => p.transformedContribution).reduce((acc,a) => acc + a, 0), [players])
 
             if (!maxContribution || players.length === 0) {
                 return
@@ -1220,7 +1224,7 @@
                             position: 'absolute',
                             top: 0,
                             bottom: 0,
-                            width: getPercent(player.s.coop.p / maxContribution, 1),
+                            width: getPercent(player.transformedContribution / maxContribution, 1),
                             background: classColors[player.ctype],
                         } },
                     ),
@@ -1244,7 +1248,7 @@
                             textShadow: '0 0 2px black',
                             position: 'relative',
                         } },
-                        `${getPercent(player.s.coop.p / totalContribution, 1)} | ${(player.s.coop.p).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                        `${getPercent(player.transformedContribution / totalContribution, 1)} | ${(player.transformedContribution).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                     ),
                 )),
             )
