@@ -20,6 +20,7 @@ export class ResuplyStrategy extends PartyStrategy {
         this.resuplyScrolls = this.resuplyScrolls.bind(this)
         this.respawnStrat = this.respawnStrat.bind(this)
         this.stayAlive = this.stayAlive.bind(this)
+        this.saveXpOnDeath = this.saveXpOnDeath.bind(this)
 
         this.resupplyPots()
         this.usePotionsLoop()
@@ -27,10 +28,11 @@ export class ResuplyStrategy extends PartyStrategy {
         // this.useElixirsLoop()
         this.resuplyScrolls()
         this.stayAlive()
-        
+        this.saveXpOnDeath()
     }
 
     private async stayAlive(){
+        if(this.deactivate) return
         if(this.bot.rip) {
             this.respawnStrat()
             return setTimeout(this.stayAlive,20000)
@@ -43,17 +45,20 @@ export class ResuplyStrategy extends PartyStrategy {
         if(!this.bot.rip) {
             return this.checkTomeOfProtection()
         }
-        setTimeout( () => this.bot.respawn(), 15000)
+        setTimeout( () => this.bot.respawn().catch(CF.debugLog), 15000)
         setTimeout(() => {
             this.checkTomeOfProtection()
         }, 15500)
     }
 
     private async checkTomeOfProtection(){
-        if(this.bot.smartMoving) return setTimeout( () => this.checkTomeOfProtection(), 5000)
+        if(this.deactivate) return
+        if(this.bot.smartMoving) {
+            return setTimeout( () => this.checkTomeOfProtection(), 5000)
+        }
         if(this.bot.locateItem("xptome") === undefined && this.bot.gold > 3200000) {
             if(!this.bot.hasItem(["computer","supercomputer"])) {
-                await this.bot.smartMove("premium").catch(console.warn)
+                await this.bot.smartMove("premium", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
             }
             await this.bot.buy("xptome").catch(console.warn)
         }
@@ -61,7 +66,10 @@ export class ResuplyStrategy extends PartyStrategy {
 
 
     private async useElixirsLoop() {
-        if(this.bot.slots.elixir?.expires) return setTimeout( () => this.useElixirsLoop(), Date.parse(this.bot.slots.elixir.expires) - Date.now())
+        if(this.deactivate) return
+        if(this.bot.slots.elixir?.expires) {
+            return setTimeout( () => this.useElixirsLoop(), Date.parse(this.bot.slots.elixir.expires) - Date.now())
+        }
         if(!this.bot.slots || (this.bot.slots.elixir?.expires &&  Date.parse(this.bot.slots.elixir.expires) - Date.now() < 60000 )) {
             let elixir_idx = this.bot.locateItem(CI.DEFAULT_ELIXIRS.get(this.bot.ctype)) 
             if(elixir_idx) await this.bot.equip(elixir_idx).catch(console.warn)
@@ -70,9 +78,14 @@ export class ResuplyStrategy extends PartyStrategy {
     }
 
     private async usePotionsLoop() {
+        if(this.deactivate) return
         // console.log("Use potions loop")
-        if(!this.bot.canUse("use_hp")) return setTimeout(this.usePotionsLoop, 1000)
-        if(this.bot.isOnCooldown("use_hp")) return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
+        if(!this.bot.canUse("use_hp")) {
+            return setTimeout(this.usePotionsLoop, 1000)
+        }
+        if(this.bot.isOnCooldown("use_hp")) {
+            return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
+        }
         if(this.bot.hp < this.bot.max_hp * 0.5) {
             let hpot = this.bot.locateItem("hpot1")
             hpot>=0 ? await this.bot.usePotion(hpot).catch(console.warn) : await this.bot.regenHP().catch(console.warn)
@@ -95,9 +108,14 @@ export class ResuplyStrategy extends PartyStrategy {
     }
 
     private async resupplyPots() {
+        if(this.deactivate) return
         // console.log("Ressuply pots loop")
-        if(!this.bot.items) return setTimeout( () => this.resupplyPots(), 5000)
-        if(this.bot.gold<100_000) return setTimeout(this.resupplyPots, 50000)
+        if(!this.bot.items) {
+            return setTimeout( () => this.resupplyPots(), 5000)
+        }
+        if(this.bot.gold<100_000) {
+            return setTimeout(this.resupplyPots, 50000)
+        }
         let hpot = this.bot.items[this.bot.locateItem("hpot1")]?.q || 0// let hpot = this.getBot.items[this.bot.locateItem("hpot1")]?.q || 0
         let mpot = this.bot.items[this.bot.locateItem("mpot1")]?.q || 0
         if(this.bot.hasItem(["computer","supercomputer"])) {
@@ -106,8 +124,10 @@ export class ResuplyStrategy extends PartyStrategy {
         }
         else {
             if(mpot < 100 && !this.bot.smartMoving && !this.bot.moving) {
-                await this.bot.smartMove("main").catch(console.warn)
-                if( Tools.distance(this.bot, {x: -35, y: -162, map: "main"}) > Constants.NPC_INTERACTION_DISTANCE ) return setTimeout( this.resupplyPots, 5000 )
+                await this.bot.smartMove("main", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
+                if( Tools.distance(this.bot, {x: -35, y: -162, map: "main"}) > Constants.NPC_INTERACTION_DISTANCE ) {
+                    return setTimeout( this.resupplyPots, 5000 )
+                }
                 if(this.bot.canBuy("mpot1", {quantity: MIC.MPOTS_CAP - mpot}))await this.bot.buy("mpot1", MIC.MPOTS_CAP - mpot).catch(console.warn)
                 else await this.bot.buy("mpot1", Math.floor(this.bot.gold/Game.G.items.mpot1.g)).catch(console.warn)
 
@@ -119,8 +139,11 @@ export class ResuplyStrategy extends PartyStrategy {
     }
 
     protected async resuplyScrolls() {
+        if(this.deactivate) return
         if(this.bot.ctype != "merchant") return
-        if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, CF.UPGRADE_POSITION)> Constants.NPC_INTERACTION_DISTANCE) return setTimeout(this.resuplyScrolls, 1000)
+        if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, CF.UPGRADE_POSITION)> Constants.NPC_INTERACTION_DISTANCE) {
+            return setTimeout(this.resuplyScrolls, 1000)
+        }
         for(const [k, v] of MIC.SCROLLS_CAP) {
             if(v - this.bot.countItem(k) < 1) {
                 continue
@@ -135,10 +158,15 @@ export class ResuplyStrategy extends PartyStrategy {
     }
 
     private async scareLoop() {
+        if(this.deactivate) return
         // console.log("Scare loop")
-        if(!this.bot.canUse("scare")) return setTimeout(this.scareLoop, 1000)
-        if(this.bot.isOnCooldown("scare")) return setTimeout( () => this.scareLoop(), Math.max(1, this.bot.getCooldown("scare")))
-        if(this.bot.hp < this.bot.max_hp * 0.4) {
+        if(!this.bot.canUse("scare")) {
+            return setTimeout(this.scareLoop, 1000)
+        }
+        if(this.bot.isOnCooldown("scare")) {
+            return setTimeout( () => this.scareLoop(), Math.max(1, this.bot.getCooldown("scare")))
+        }
+        if(this.bot.hp < this.bot.max_hp * 0.33) {
             if(this.bot.slots.orb?.name != "jacko") {
                 let cur_orb = this.bot.slots.orb
                 let jacko_idx = this.bot.locateItem("jacko")
@@ -156,5 +184,31 @@ export class ResuplyStrategy extends PartyStrategy {
         }
         return setTimeout( () => this.scareLoop(), 1000)
     } 
+
+    private async saveXpOnDeath() {
+        if(this.deactivate) return
+        if(this.bot.rip) return setTimeout(this.saveXpOnDeath, 1000)
+        if( ((!this.bot.hasItem("jacko") && this.bot.slots?.orb?.name != "jacko") || this.bot.isOnCooldown("scare") )
+            && CF.calculate_monsters_dps(this.bot, this.bot, this.bot.getEntities({targetingMe: true}))>this.bot.hp ) {
+            try {
+                console.error(`${this.bot.name} SUICIDE BY LOW HP. HP: ${this.bot.hp}, DPS: ${CF.calculate_monsters_dps(this.bot, this.bot, this.bot.getEntities({targetingMe: true}))}`)
+                await this.bot.socket.emit("harakiri")
+                
+            }
+            catch(ex) {
+                console.error(ex)
+            }
+        }
+        if(this.bot.s.burned && this.bot.hp < Math.max(this.bot.max_hp*0.15, 2000)) {
+            try {
+                await this.bot.socket.emit("harakiri")
+                console.error(`SUICIDE BY BURNED HP ${this.bot.hp} burning ${JSON.stringify(this.bot.s.burned)}`)
+            }
+            catch(ex) {
+                console.error(ex)
+            }
+        }
+        return setTimeout(this.saveXpOnDeath, 1000)
+    }
 
 }

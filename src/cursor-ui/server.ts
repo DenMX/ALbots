@@ -1,4 +1,5 @@
 import { StateController } from "../controllers/state_controller";
+import { StateStrategy } from "../common_functions/state_strategy";
 import express from "express";
 import * as http from "http";
 import * as path from "path";
@@ -38,6 +39,9 @@ export type CursorUIBotData = {
     dps: number;
     physicalReduction: number;
     magicalReduction: number;
+    // Текущий state-режим и цель стратегии (для UI)
+    state_type?: string;
+    wantedMob?: string | string[];
     statusInfo: Record<string, unknown>;
     buffs: string[];
     debuffs: string[];
@@ -171,6 +175,8 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
                 dps: 0,
                 physicalReduction: 0,
                 magicalReduction: 0,
+                state_type: "",
+                wantedMob: undefined,
                 statusInfo: {},
                 buffs: [],
                 debuffs: [],
@@ -211,7 +217,24 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
             d.esize = bot.esize;
             d.gold = bot.gold;
             d.party = bot.party ?? "";
+            // status: человекочитаемое описание состояния (как раньше)
             d.status = b.getStateType?.() ?? "";
+
+            // state_type: "сырой" тип состояния из StateStrategy (farm|boss|event|quest)
+            if (b instanceof StateStrategy) {
+                const cs = b.currentState;
+                d.state_type = cs?.state_type ?? "";
+            } else {
+                d.state_type = "";
+            }
+
+            // wantedMob: целевой моб / список мобов из стратегии (через новый IState.getWantedMob)
+            const w = b.getWantedMob?.();
+            if (w !== undefined && w !== null) {
+                d.wantedMob = w as unknown as string | string[];
+            } else {
+                d.wantedMob = undefined;
+            }
             d.target = bot.getTargetEntity?.()?.name ?? "None";
             d.cc = bot.cc;
             d.attack = bot.attack;

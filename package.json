@@ -16,7 +16,7 @@
   "author": "DenMX",
   "license": "MIT",
   "dependencies": {
-    "alclient": "^0.23.2",
+    "alclient": "^0.24.1",
     "bot-web-interface": "^2.0.14",
     "dependencies": "^0.0.1",
     "express": "^5.2.1",
@@ -24,10 +24,10 @@
     "pretty-ms": "^9.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.3",
     "@types/express": "^4.17.0",
     "@types/node": "^25.0.10",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   },
   "keywords": []
 }

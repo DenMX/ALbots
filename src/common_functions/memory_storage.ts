@@ -11,7 +11,7 @@ export class MemoryStorage {
 
     private secretKey: string
 
-    private default_party_leader: string = "frostyRan"
+    private default_party_leader: string = "frostyHeal"
 
     private current_party_leader: string
 
@@ -83,6 +83,10 @@ export class MemoryStorage {
         return this.default_party_leader
     }
 
+    public get getDefaultTank() {
+        return this.default_tank
+    }
+
     public get getCurrentTank() {
         return this.current_tank
     }
@@ -123,7 +127,12 @@ export class MemoryStorage {
             body: JSON.stringify(bot.bank),
             };
             // if response.status == 200, it was successfully updated
-            fetch(url, settings).then((response) => console.log(`Sending bank status code: ${response.status}`));
+            try{
+                fetch(url, settings).then((response) => console.log(`Sending bank status code: ${response.status}`));
+            }
+            catch(ex) {
+                console.debug(`error while fetching bank in api:\n${ex}`)
+            }
         }
     }
 }

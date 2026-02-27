@@ -63,7 +63,7 @@
             <div class="k"><span class="v">{{ fmt(bot.gph || 0) }}</span><span class="l">G/h</span></div>
             <div class="k"><span class="v">{{ fmt(bot.xpPh || 0) }}</span><span class="l">XP/h</span></div>
             <div class="k"><span class="v">{{ bot.ttlu || '—' }}</span><span class="l">TTLU</span></div>
-            <div class="k full"><span class="l">Status</span><span class="v">{{ bot.status || '—' }}</span></div>
+            <div class="k full"><span class="l">Status</span><span class="v">{{ displayStatus }}</span></div>
             <div class="k full"><span class="l">Target</span><span class="v">{{ bot.target || 'None' }}</span></div>
             <div class="k full"><span class="l">Party</span><span class="v">{{ bot.party || 'Solo' }}</span></div>
           </div>
@@ -113,7 +113,7 @@
         <div class="k"><span class="v">{{ fmt(bot.gph || 0) }}</span><span class="l">G/h</span></div>
         <div class="k"><span class="v">{{ fmt(bot.xpPh || 0) }}</span><span class="l">XP/h</span></div>
         <div class="k"><span class="v">{{ bot.ttlu || '—' }}</span><span class="l">TTLU</span></div>
-        <div class="k full"><span class="l">Status</span><span class="v">{{ bot.status || '—' }}</span></div>
+        <div class="k full"><span class="l">Status</span><span class="v">{{ displayStatus }}</span></div>
         <div class="k full"><span class="l">Target</span><span class="v">{{ bot.target || 'None' }}</span></div>
         <div class="k full"><span class="l">Party</span><span class="v">{{ bot.party || 'Solo' }}</span></div>
       </div>
@@ -184,6 +184,25 @@ const openEffects = ref(props.defaultEffectsOpen)
 const totalEffects = computed(() =>
   (props.bot.buffs || []).length + (props.bot.debuffs || []).length + (props.bot.special || []).length
 )
+
+const displayStatus = computed(() => {
+  const t = props.bot.state_type
+  const wantedRaw = props.bot.wantedMob
+
+  if (t === 'farm' || t === 'boss' || t === 'event') {
+    let wantedText = ''
+    if (Array.isArray(wantedRaw)) {
+      wantedText = wantedRaw.join(', ')
+    } else if (typeof wantedRaw === 'string') {
+      wantedText = wantedRaw
+    }
+
+    if (wantedText) return `${t} · ${wantedText}`
+    return String(t)
+  }
+
+  return props.bot.status || '—'
+})
 
 function pct(a, b) {
   if (!b || b <= 0) return 0

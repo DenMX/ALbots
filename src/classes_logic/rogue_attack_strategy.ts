@@ -18,18 +18,31 @@ export class RogueAttackStrategy extends StateStrategy {
     }
 
     private async basicAttackLoop() {
-        if(!this.rogue.canUse("attack")) return setTimeout(this.basicAttackLoop, 500)
-        if(this.rogue.isOnCooldown("attack")) return setTimeout(this.basicAttackLoop, Math.max(1, this.rogue.getCooldown("attack")))
+        if(this.deactivate) return
+        if(!this.rogue.canUse("attack")) {
+            return setTimeout(this.basicAttackLoop, 500)
+        }
+        if(this.rogue.isOnCooldown("attack")) {
+            return setTimeout(this.basicAttackLoop, Math.max(1, this.rogue.getCooldown("attack")))
+        }
         let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
         let totalDps = 0
         mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
-        if( this.bot.c.town && this.bot.hp > totalDps*15 ) return setTimeout(this.basicAttackLoop, 5000)
+        if( this.bot.c.town && this.bot.hp > totalDps*15 ) {
+            return setTimeout(this.basicAttackLoop, 5000)
+        }
         
         let target = this.rogue.getTargetEntity()
-        if(!target) return setTimeout(this.basicAttackLoop, 500)
+        if(!target) {
+            return setTimeout(this.basicAttackLoop, 500)
+        }
 
-        if(this.rogue.isOnCooldown("scare") && !target.target) return setTimeout(this.basicAttackLoop, this.rogue.getCooldown("scare")) 
-        if(!target?.target && CF.calculate_monster_dps(this.rogue, target)/CF.calculate_hps(this.rogue) >=2) return setTimeout(this.basicAttackLoop, 500)
+        if(this.rogue.isOnCooldown("scare") && !target.target) {
+            return setTimeout(this.basicAttackLoop, this.rogue.getCooldown("scare"))
+        }
+        if(!target?.target && CF.calculate_monster_dps(this.rogue, target, true)/CF.calculate_hps(this.rogue) >=0.95) {
+            return setTimeout(this.basicAttackLoop, 500)
+        }
         
         if(Tools.distance(this.rogue, target) >  this.rogue.range*0.9) {
             let location = CF.getHalfWay(this.rogue, target)
@@ -42,15 +55,28 @@ export class RogueAttackStrategy extends StateStrategy {
     }
 
     private async stubLoop() {
-        if(!this.rogue.canUse("quickpunch")) return setTimeout(this.stubLoop, 500)
-        if(this.rogue.isOnCooldown("quickpunch")) return setTimeout(this.stubLoop, Math.max(1,this.rogue.getCooldown("quickpunch")))
+        if(this.deactivate) return
+        if(!this.rogue.canUse("quickpunch")) {
+            return setTimeout(this.stubLoop, 500)
+        }
+        if(this.rogue.isOnCooldown("quickpunch")) {
+            return setTimeout(this.stubLoop, Math.max(1,this.rogue.getCooldown("quickpunch")))
+        }
         
         let target = this.rogue.getTargetEntity()
-        if(!target) return setTimeout(this.stubLoop, 500)
+        if(!target) {
+            return setTimeout(this.stubLoop, 500)
+        }
         
-        if(!target.target && CF.calculate_monster_dps(this.rogue, target)/CF.calculate_hps(this.rogue) >=2) return setTimeout(this.stubLoop, 500)
-        if(this.rogue.isOnCooldown("scare") && !target.target) return setTimeout(this.stubLoop, this.rogue.getCooldown("scare"))
-        if(Tools.distance(this.rogue, target) > this.rogue.range) return setTimeout(this.stubLoop, 500)
+        if(!target.target && CF.calculate_monster_dps(this.rogue, target, true)/CF.calculate_hps(this.rogue) >=0.95) {
+            return setTimeout(this.stubLoop, 500)
+        }
+        if(this.rogue.isOnCooldown("scare") && !target.target) {
+            return setTimeout(this.stubLoop, this.rogue.getCooldown("scare"))
+        }
+        if(Tools.distance(this.rogue, target) > this.rogue.range) {
+            return setTimeout(this.stubLoop, 500)
+        }
         if(this.rogue.slots.mainhand){
             let weaponSkill
             if(Game.G.items[this.rogue.slots.mainhand.name].wtype == "fist" && this.rogue.mp - Game.G.skills.quickpunch.mp! > this.rogue.mp_cost * 2) {

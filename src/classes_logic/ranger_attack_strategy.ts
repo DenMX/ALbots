@@ -26,17 +26,30 @@ export class RangerAttackStrategy extends StateStrategy {
     }
 
     private async basicAttackLoop() {
-        if(this.ranger.isOnCooldown("attack")) return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("attack")))
-        if(!this.ranger.canUse("attack")) return setTimeout(this.basicAttackLoop, 300)
+        if(this.deactivate) return
+        if(this.ranger.isOnCooldown("attack")) {
+            return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("attack")))
+        }
+        if(!this.ranger.canUse("attack")) {
+            return setTimeout(this.basicAttackLoop, 300)
+        }
         let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
         let totalDps = 0
         mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
-        if( this.bot.c.town && this.bot.hp > totalDps*15 ) return setTimeout(this.basicAttackLoop, 5000)
+        if( this.bot.c.town && this.bot.hp > totalDps*15 ) {
+            return setTimeout(this.basicAttackLoop, 15000)
+        }
         let target = this.ranger.getTargetEntity()
-        if(!target) return setTimeout(this.basicAttackLoop, 500)
-        if(!target?.target && CF.calculate_monster_dps(this.ranger, this.ranger.getTargetEntity())/CF.calculate_hps(this.ranger) >=2) return setTimeout(this.basicAttackLoop, 500)
+        if(!target) {
+            return setTimeout(this.basicAttackLoop, 500)
+        }
+        if(!target?.target && CF.calculate_monster_dps(this.ranger, target, true)/CF.calculate_hps(this.ranger) >=0.95) {
+            return setTimeout(this.basicAttackLoop, 500)
+        }
         
-        if(this.ranger.getEntities({targetingMe: true, targetingPartyMember: true}).length < 1 && this.ranger.isOnCooldown("scare")) return setTimeout(this.basicAttackLoop, Math.max(1,this.ranger.getCooldown("scare")))
+        if(this.ranger.getEntities({targetingMe: true, targetingPartyMember: true}).length < 1 && this.ranger.isOnCooldown("scare")) {
+            return setTimeout(this.basicAttackLoop, Math.max(1,this.ranger.getCooldown("scare")))
+        }
         
         let targetsForFiveShot = this.getTargets("5shot")
         let targetsForThreeShot = this.getTargets("3shot")
@@ -49,7 +62,7 @@ export class RangerAttackStrategy extends StateStrategy {
             await this.ranger.threeShot(targetsForThreeShot[0]?.id,targetsForThreeShot[1]?.id,targetsForThreeShot[2]?.id).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("3shot")))
         }
-        if(Tools.distance(this.ranger, target)> this.ranger.range) {
+        if(Tools.distance(this.ranger, target)> this.ranger.range*0.8) {
             if( !this.ranger.smartMoving && !this.ranger.moving ) {
                 let location = CF.getHalfWay(this.ranger, target)
                 CF.moveHalfWay(this.ranger, location)
@@ -57,7 +70,9 @@ export class RangerAttackStrategy extends StateStrategy {
             }
         }
         if(Tools.distance(this.ranger,target) < this.ranger.range) {
-            if(CF.calculate_monster_dps(this.ranger,target)/CF.calculate_hps(this.ranger)>=2) return setTimeout(this.basicAttackLoop, 500)
+            if(CF.calculate_monster_dps(this.ranger,target)/CF.calculate_hps(this.ranger)>=2) {
+                return setTimeout(this.basicAttackLoop, 500)
+            }
             if(target.armor - this.ranger.apiercing < 250) await this.ranger.basicAttack(this.ranger.target).catch(CF.debugLog) 
             else await this.ranger.piercingShot(this.ranger.target).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, this.ranger.getCooldown("attack"))
@@ -68,9 +83,34 @@ export class RangerAttackStrategy extends StateStrategy {
     private getTargets(skill : SkillName) : Entity[] {
         if(!["5shot", "3shot"].includes(skill)) return this.ranger.getEntities({withinRange: this.ranger.range})
         let final_targets: Entity[] = []
+        let pcourage = 0
+        let mcourage = 0
+        let courage = 0
         for(const entity of this.ranger.getEntities()) {
             if(!entity.target && this.ranger.canKillInOneShot(entity, skill)) final_targets.push(entity)
             if(entity.isAttackingPartyMember(this.ranger) || entity.target == this.ranger.id) final_targets.push(entity)
+            if(!entity.target && !this.ranger.canKillInOneShot(entity, skill) && CF.calculate_monster_dps(this.ranger, entity)< this.bot.hp/5) {
+                switch(entity.damage_type) {
+                    case "physical":
+                        if(courage < this.ranger.courage) {
+                            final_targets.push(entity)
+                            courage++
+                        }
+                        break
+                    case "magical":
+                        if(mcourage < this.ranger.mcourage) {
+                            final_targets.push(entity)
+                            mcourage++
+                        }
+                        break
+                    case "pure":
+                        if(pcourage < this.ranger.pcourage) {
+                            final_targets.push(entity)
+                            pcourage++
+                        }
+                        break
+                }
+            }
         }
         return final_targets.sort( (curr, next) => {
             let curr_distance = Tools.distance(curr, this.ranger)
@@ -89,6 +129,7 @@ export class RangerAttackStrategy extends StateStrategy {
     }
 
     private async changeWeapon() {
+        if(this.deactivate) return
         if(!Items.WEAPON_CONFIGS[this.ranger.name]) return
         let needChangeMainhand = false
         let needChangeOffhand = false
@@ -118,11 +159,20 @@ export class RangerAttackStrategy extends StateStrategy {
     }
 
     private async useSupershotLoop() {
-        if(!this.ranger.canUse("supershot")) return setTimeout(this.useSupershotLoop, Math.max(2000, this.ranger.getCooldown("supershot")))
-        if(this.ranger.isOnCooldown("supershot")) return setTimeout(this.useSupershotLoop, Math.max(1, this.ranger.getCooldown("supershot")))
+        if(this.deactivate) return
+        if(!this.ranger.canUse("supershot")) {
+            return setTimeout(this.useSupershotLoop, Math.max(2000, this.ranger.getCooldown("supershot")))
+        }
+        if(this.ranger.isOnCooldown("supershot")) {
+            return setTimeout(this.useSupershotLoop, Math.max(1, this.ranger.getCooldown("supershot")))
+        }
         let target = this.ranger.getTargetEntity()
-        if(!target) return setTimeout(this.useSupershotLoop, 500)
-        if(!target.target && CF.calculate_monster_dps(this.ranger,target)/CF.calculate_hps(this.ranger)>=2) return setTimeout(this.useSupershotLoop, 500)
+        if(!target) {
+            return setTimeout(this.useSupershotLoop, 500)
+        }
+        if(!target.target && CF.calculate_monster_dps(this.ranger,target)/CF.calculate_hps(this.ranger)>=0.95) {
+            return setTimeout(this.useSupershotLoop, 500)
+        }
         if(this.ranger.mp > this.ranger.max_mp * 0.6) {
             await this.ranger.superShot(target.id).catch(console.warn)
             return setTimeout(this.useSupershotLoop, Math.max(1,this.ranger.getCooldown("supershot")))
@@ -132,12 +182,19 @@ export class RangerAttackStrategy extends StateStrategy {
     }
 
     private async useMarkLoop() {
-        if( !this.ranger.canUse("huntersmark") ) return setTimeout(this.useMarkLoop, 500)
-        if( this.ranger.isOnCooldown("huntersmark") ) return setTimeout(this.useMarkLoop, Math.max(1, this.ranger.getCooldown("huntersmark")))
+        if(this.deactivate) return
+        if( !this.ranger.canUse("huntersmark") ) {
+            return setTimeout(this.useMarkLoop, 500)
+        }
+        if( this.ranger.isOnCooldown("huntersmark") ) {
+            return setTimeout(this.useMarkLoop, Math.max(1, this.ranger.getCooldown("huntersmark")))
+        }
         
         let target = this.ranger.getTargetEntity()
         
-        if( !target || target?.hp< 15000 ) return setTimeout(this.useMarkLoop, 500)
+        if( !target || target?.hp< 15000 ) {
+            return setTimeout(this.useMarkLoop, 500)
+        }
         
         await this.ranger.huntersMark(target.id).catch(console.warn)
         return setTimeout(this.useMarkLoop, Math.max(1000, this.ranger.getCooldown("huntersmark")))

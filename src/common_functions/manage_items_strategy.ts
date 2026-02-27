@@ -59,15 +59,18 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected async startManageLogic() {
+        if(this.deactivate) return
         if( !this.bot.hasItem(["computer", "supercomputer"])) {
             
-            if( this.bot.esize>0 ) return setTimeout( this.startManageLogic, 30 * this.bot.esize * 1000 ) //setTimeout to 30sec for each empty slot
+            if( this.bot.esize>0 ) {
+                return setTimeout( this.startManageLogic, 30 * this.bot.esize * 1000 ) //setTimeout to 30sec for each empty slot
+            }
 
             if( !this.bot.smartMoving && !this.bot.map.startsWith("bank") && (!this.memoryStorage.getBank || this.locateEmptyBankSlots().length>0) ) {
-                await this.bot.smartMove("main").catch(console.warn)
+                await this.bot.smartMove("main", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
                 await this.sellTrash()
                 try {
-                    await this.bot.smartMove("bank")
+                    await this.bot.smartMove("bank", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
                 }
                 catch(error) {
                     console.warn(error)
@@ -94,9 +97,9 @@ export class ManageItems extends ResuplyStrategy {
         if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, CF.UPGRADE_POSITION)>Constants.NPC_INTERACTION_DISTANCE) return
 
         level: for(let lvl = 0; lvl < 9; lvl++){
-            let debugItemsInfo = this.bot.items.filter( e => ItemsConfig.MERCHANT_UPGRADE.has(e?.name) && e?.level == lvl && Game.G.items[e.name].upgrade)
-            // console.debug(`Upgrading to level ${lvl+1}, items should be upgraded: ${debugItemsInfo.length}`)
-            debugItemsInfo.forEach( e => console.debug(e.name))
+            // let debugItemsInfo = this.bot.items.filter( e => ItemsConfig.MERCHANT_UPGRADE.has(e?.name) && e?.level == lvl && Game.G.items[e.name].upgrade)
+            // // console.debug(`Upgrading to level ${lvl+1}, items should be upgraded: ${debugItemsInfo.length}`)
+            // debugItemsInfo.forEach( e => console.debug(e.name))
             for(const [slot,item] of this.bot.getItems()) {
                 if(!item) continue
                 if(!Game.G.items[item.name].upgrade || !ItemsConfig.MERCHANT_UPGRADE.has(item.name)) continue
@@ -143,9 +146,9 @@ export class ManageItems extends ResuplyStrategy {
         if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, CF.UPGRADE_POSITION)>Constants.NPC_INTERACTION_DISTANCE) return
 
         level: for(let lvl=0; lvl<5; lvl++){
-            let debugItemsInfo = this.bot.items.filter( e => ItemsConfig.MERCHANT_UPGRADE.has(e?.name) && e?.level == lvl && Game.G.items[e.name].compound)
-            // console.debug(`Compouding to level ${lvl+1}, items should be compound: ${debugItemsInfo.length}`)
-            debugItemsInfo.forEach( e => console.debug(e.name))
+            // let debugItemsInfo = this.bot.items.filter( e => ItemsConfig.MERCHANT_UPGRADE.has(e?.name) && e?.level == lvl && Game.G.items[e.name].compound)
+            // // console.debug(`Compouding to level ${lvl+1}, items should be compound: ${debugItemsInfo.length}`)
+            // debugItemsInfo.forEach( e => console.debug(e.name))
             for(const [, item] of this.bot.getItems()) {
                 if(!item) continue
                 if(!Game.G.items[item.name].compound || ! ItemsConfig.MERCHANT_UPGRADE.has(item.name)) continue
@@ -339,7 +342,7 @@ export class ManageItems extends ResuplyStrategy {
         items.upgrade.forEach( (e) => { itemsToUpgrade+=e.slots.length})
         let itemsToCompound = 0
         items.compound.forEach( (e) => {itemsToCompound+=Math.floor(e.slots.length/3)})
-        console.debug(`Items to upgrade: ${itemsToUpgrade}, items to compound: ${itemsToCompound}`)
+        // console.debug(`Items to upgrade: ${itemsToUpgrade}, items to compound: ${itemsToCompound}`)
         if(itemsToUpgrade<10 && itemsToCompound<5) {
             // items.upgrade.forEach(element => {
             //     console.debug(`Item for upgrade ${element.itemName} level: ${element.level ?? "none"} count: ${element.slots.length}`)
@@ -347,7 +350,7 @@ export class ManageItems extends ResuplyStrategy {
             // items.compound.forEach(element => {
             //     console.debug(`Item for upgrade ${element.itemName} level: ${element.level ?? "none"} count: ${element.slots.length}`)
             // });
-            return console.log("There not enough items to upgrade")
+            return //console.log("There not enough items to upgrade")
         }
         
         //get all offerings
@@ -355,7 +358,7 @@ export class ManageItems extends ResuplyStrategy {
             let offerings = this.locateItemsInBank(bot, "offeringp")
             if(offerings.length) {
                 for(const bankPack of offerings) {
-                    console.debug(`[upgradeFromBank] smartmove to bankPack`)
+                    // console.debug(`[upgradeFromBank] smartmove to bankPack`)
                     await bot.smartMove(bankPack[0], {getWithin: 9999}).catch(console.warn)
                     for(const pack of bankPack[1]) {
                         await bot.withdrawItem(bankPack[0], pack).catch(console.debug)
@@ -367,7 +370,7 @@ export class ManageItems extends ResuplyStrategy {
             let offerings = this.locateItemsInBank(bot, "offering")
             if(offerings.length) {
                 for(const bankPack of offerings) {
-                    console.debug(`[upgradeFromBank] smartmove to bankPack`)
+                    // console.debug(`[upgradeFromBank] smartmove to bankPack`)
                     await bot.smartMove(bankPack[0], {getWithin: 9999}).catch(console.warn)
                     for(const pack of bankPack[1]) {
                         await bot.withdrawItem(bankPack[0], pack).catch(console.debug)
@@ -380,7 +383,7 @@ export class ManageItems extends ResuplyStrategy {
         upouter: for(let i = 0; i < items.upgrade.length; i++) {
             for(const it of items.upgrade[i].slots) {
                 if(bot.esize<2) break upouter;
-                console.debug(`[upgradeFromBank] smartmove to bankPack`)
+                // console.debug(`[upgradeFromBank] smartmove to bankPack`)
                 await bot.smartMove(it[0], {getWithin: 9999}).catch(console.warn)
                 await bot.withdrawItem(it[0], it[1]).catch(console.debug)
             }
@@ -392,19 +395,19 @@ export class ManageItems extends ResuplyStrategy {
             for(let it = 0; it < slotsLength; it++) {
 
                 if((it == 0 || it%3 == 0) && bot.esize<3) {
-                    console.debug(`[upgradeFromBank] No more space in inventory`)
+                    // console.debug(`[upgradeFromBank] No more space in inventory`)
                     break comouter;
                 }
 
-                console.debug(`[upgradeFromBank] withdrowing ${configItem.itemName} level ${configItem.level}`)
+                // console.debug(`[upgradeFromBank] withdrowing ${configItem.itemName} level ${configItem.level}`)
                 await bot.smartMove(configItem.slots[it][0], {getWithin: 9999}).catch(console.warn)
                 await bot.withdrawItem(configItem.slots[it][0], configItem.slots[it][1]).catch(console.debug)
                 
             }
         }
-        console.debug(`[upgradeFromBank] smartmove to upgrade`)
-        await bot.smartMove(CF.UPGRADE_POSITION).catch(console.warn)
-        console.debug(`Calling compound function!`)
+        // console.debug(`[upgradeFromBank] smartmove to upgrade`)
+        await bot.smartMove(CF.UPGRADE_POSITION, {useBlink: bot.ctype == "mage"}).catch(console.warn)
+        // console.debug(`Calling compound function!`)
         this.compoundItems()
         await this.upgradeItems()
         
@@ -417,7 +420,7 @@ export class ManageItems extends ResuplyStrategy {
 
 
         let bank = (bot.map.startsWith("bank")) ? bot.bank : super.getMemoryStorage.getBank;
-        (bot.map.startsWith("bank")) ? console.debug('using bank info') : console.debug('using bank info from DB')
+        // (bot.map.startsWith("bank")) ? console.debug('using bank info') : console.debug('using bank info from DB')
         // console.debug(`bank in memory storage:\n${JSON.stringify(this.memoryStorage.getBank)}`)
 
         // console.debug(`Packs in bank: ${Object.keys(bank).filter( e => e != "gold").length}`)
@@ -442,18 +445,18 @@ export class ManageItems extends ResuplyStrategy {
                     let config = ItemsConfig.MERCHANT_UPGRADE.get(item.name)
                     let key = Game.G.items[item.name].upgrade ? "upgrade" : "compound"
                     if(item.level >= config.level) {
-                        console.debug(`Item upgraded ${item.name} level: ${item.level ?? "none"}`)
+                        // console.debug(`Item upgraded ${item.name} level: ${item.level ?? "none"}`)
                         continue
                     }
-                    if(config.shouldBeShiny && item.p != "shiny") {
-                        console.debug(`Item not shiny ${item.name} level: ${item.level ?? "none"}`)
+                    if(config.shouldBeShiny && item.p != "shiny" && item.level==0) {
+                        // console.debug(`Item not shiny ${item.name} level: ${item.level ?? "none"}`)
                         continue
                     }
 
                     // CHECK IF WE HAVE OFFERINGS FOR THIS ITEM
                     if(config.offeringAt && item.level>=config.offeringAt) {
                         if(offeringsCount<1 && bot.gold<500_000_000) {
-                            console.debug(`No big offering for item ${item.name} level: ${item.level ?? "none"}`)
+                            // console.debug(`No big offering for item ${item.name} level: ${item.level ?? "none"}`)
                             continue
                         }
                         
@@ -478,7 +481,7 @@ export class ManageItems extends ResuplyStrategy {
                     }
                     if(config.primlingAt && item.level >= config.primlingAt) {
                         if(primlingCount<1) {
-                            console.debug(`No offering for item ${item.name} level: ${item.level ?? "none"}`)
+                            // console.debug(`No offering for item ${item.name} level: ${item.level ?? "none"}`)
                             continue
                         }
 

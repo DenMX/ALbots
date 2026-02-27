@@ -1,7 +1,6 @@
 import pkg from "mongoose"
 const { model } = pkg
 
-import { MonsterName } from "alclient"
 import StateSchema from "./state.schema"
 import { IStateDocument } from "./state.types"
 

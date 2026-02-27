@@ -53,7 +53,12 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         solo_offhand: { name: "fireblade", level: 8 },
         mass_mainhand: { name: "glolipop", level: 6 },
         mass_offhand: { name: "glolipop", level: 6 },
-        stomp: { name: "basher", level: 0}
+        stomp: { name: "basher", level: 0},
+        cleave: { name: "bataxe", level: 4}
+    },
+    "frostyMerch": {
+        fast_mainhand: { name: "staff", level: 3},
+        fast_offhand: { name: "wbook0", level: 2}
     }
 }
 
@@ -62,6 +67,7 @@ export type SetConfig = {
     name: string,
     level?: number,
     slot?: SlotType
+    priority?: number
 }
 
 export type SetList = "tank" | "dd" | "heal" | "luck" | "gold"

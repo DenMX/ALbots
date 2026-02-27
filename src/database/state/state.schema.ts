@@ -9,7 +9,8 @@ const StateSchema = new Schema({
     botId: {required: true, type: String },
     wantedMob: {required: true, type: String || Array },
     state_type: {required: true, type: String },
-    location: {required: false, type: Object }
+    location: {required: false, type: Object },
+    server: {required: true, type: Object }
 })
 
 export default StateSchema

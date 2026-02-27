@@ -160,7 +160,7 @@ export const ITEMS_TO_SELL: ItemName[] = [
 ]
 
 export const DISMANTLE_ITEMS: ItemName[] = [
-	'firebow', 
+	// 'firebow', 
 	// 'lostearring',
     'goldenegg'
 ]
@@ -193,8 +193,9 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["xarmor", { level: 3, primlingAt: 0 }],
     ["xpants", { level: 3, primlingAt: 0 }],
 
-    ["firestaff", { level: 8, primlingAt: 7,  scrollUpAt: 5 }],
-    ["fireblade", { level: 8, primlingAt: 7, shouldBeShiny: true, scrollUpAt: 5 }],
+    ["firestaff", { level: 8, primlingAt: 7, scrollUpAt: 5 }],
+    ["fireblade", { level: 8, primlingAt: 7, scrollUpAt: 5 }],
+    ["firebow", { level: 8, primlingAt: 7, scrollUpAt: 5}],
 
     ["harbringer", { level: 7 }],
     ["oozingterror", { level: 6 }],
