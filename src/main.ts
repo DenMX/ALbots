@@ -37,10 +37,10 @@ async function run(){
     // PROD READY STEADY
     
     let stateController = new StateController([
-        await startBotWithStrategy("merchant", "frostyMerch", "US", "III", memoryStorage),
-        await startBotWithStrategy("rogue","frostyRogue2", "US", "III", memoryStorage),
+        // await startBotWithStrategy("merchant", "frostyMerch", "EU", "I", memoryStorage),
+        // await startBotWithStrategy("rogue","frostyRogue2", "EU", "II", memoryStorage),
         await startBotWithStrategy("mage","frostyMage", "US", "III", memoryStorage),
-        // await startBotWithStrategy("ranger","frostyRan", "US", "III", memoryStorage),
+        // await startBotWithStrategy("ranger","frostyRan", "ASIA", "I", memoryStorage),
         await startBotWithStrategy("priest","frostyHeal", "US", "III", memoryStorage)
     ], memoryStorage)
     memoryStorage.setStateController = stateController

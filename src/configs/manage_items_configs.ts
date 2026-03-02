@@ -133,7 +133,6 @@ export const ITEMS_TO_SELL: ItemName[] = [
 	'spear',
 	'swifty',
 	'phelmet',
-	'cupid',
 	"sword",
 	'sstinger',
 	'hammer',
@@ -207,13 +206,15 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["ololipop", { level: 8, primlingAt: 6, scrollUpAt: 3, shouldBeShiny: true }],
     ["glolipop", { level: 8, scrollUpAt: 3 }],
 
+    ["cupid", {level: 8, scrollUpAt: 4, primlingAt: 5, offeringAt: 7}],
+
     // Bunny stuff
     ["ecape", { level: 7, scrollUpAt: 5 }],
     ["pinkie", { level: 7 }],
     ["eslippers", { level: 7, scrollUpAt: 5 }],
 
     ["wingedboots", { level: 7, scrollUpAt: 5 }],
-    ["lmace", { level: 3, primlingAt: 0 }],
+    ["lmace", { level: 5, primlingAt: 0, offeringAt: 3 }],
     ["handofmidas", { level: 5 }],
     ["bataxe", { level: 8, scrollUpAt: 4, primlingAt: 4, offeringAt: 6, shouldBeShiny: true }],
 

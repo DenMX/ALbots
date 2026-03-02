@@ -296,7 +296,7 @@ export class StateStrategy extends ManageItems implements IState {
     public async startQuest() {
         if(this.deactivate) return
         
-        this.state_scheduler.push({wantedMob: this.bot.s.monsterhunt!.id, state_type: "quest", server: {region: this.bot.serverData.region, name: this.bot.serverData.name}})
+        this.state_scheduler.push({wantedMob: this.bot.s.monsterhunt?.id ?? "goo", state_type: "quest", server: {region: this.bot.serverData.region, name: this.bot.serverData.name}})
     }
 
     private switchState() {
@@ -402,16 +402,20 @@ export class StateStrategy extends ManageItems implements IState {
             //Quest completed need to take rewards
             if(this.bot.s.monsterhunt && this.bot.s.monsterhunt.c == 0) {
                 await this.bot.smartMove("monsterhunter", {useBlink: this.bot.ctype == "mage"}).catch(console.warn)
-                await this.bot.finishMonsterHuntQuest()
+                await this.bot.finishMonsterHuntQuest().catch(debugLog)
             }
             //Quest not completed
             else if(this.bot.s.monsterhunt && this.bot.s.monsterhunt.c > 0) {
-                if(this.bot.getEntities().filter( e => wanted_monster.includes(e.type)).length <1) {
-                    await this.bot.smartMove(wanted_monster[0], {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
+                if(this.bot.getEntities().filter( e => this.bot.s.monsterhunt?.id == e.type).length <1) {
+                    await this.bot.smartMove(this.bot.s.monsterhunt!.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
                 }
-                const questMonsters = this.bot.getEntities().filter( e => e.type == this.bot.s.monsterhunt?.id && calculate_monster_dps(this.bot,e)/calculate_hps(this.bot) < 1)
-                if(questMonsters.length<1) {
+                const questMonsters = this.bot.getEntities().filter( e => e.type == this.bot.s.monsterhunt?.id )
+                const questMonstersCanBeKilled = questMonsters.filter( e => calculate_monster_dps(this.bot,e)/calculate_hps(this.bot) < 1)
+                if(questMonsters?.length>1 && questMonstersCanBeKilled.length<1) {
                     this.switchState()
+                    setTimeout(() => {
+                        this.addStateToScheduler({state_type: "quest", wantedMob: "goo", server: {region: this.bot.serverData.region, name: this.bot.serverData.name}})
+                    }, Math.max(1, this.bot.s.monsterhunt?.ms ?? 0))
                 }
                 return setTimeout(this.checkState, 1000)
             }
@@ -419,9 +423,9 @@ export class StateStrategy extends ManageItems implements IState {
             if(!this.bot.s.monsterhunt) {
                 if(this.state_scheduler.length<1){
                     await this.bot.smartMove("monsterhunter", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
-                    await this.bot.getMonsterHuntQuest()
+                    await this.bot.getMonsterHuntQuest().catch(debugLog)
                     this.current_state = {state_type: "quest", wantedMob: this.bot.s.monsterhunt?.id, server: {region: this.bot.serverData.region, name: this.bot.serverData.name}}
-                    await this.bot.smartMove(this.bot.s.monsterhunt!.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
+                    if(this.bot.s.monsterhunt?.id) await this.bot.smartMove(this.bot.s.monsterhunt.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
                     return setTimeout(this.checkState, 1000)
                 }
                 else {

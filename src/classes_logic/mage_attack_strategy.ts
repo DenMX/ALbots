@@ -3,6 +3,7 @@ import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
 import * as CF from "../common_functions/common_functions"
 import { calculate_monster_dps, calculate_hps, debugLog } from "../common_functions/common_functions"
+import { WEAPON_CONFIGS } from "../configs/character_items_configs"
 
 export class MageAttackStrategy extends StateStrategy {
 
@@ -17,11 +18,13 @@ export class MageAttackStrategy extends StateStrategy {
         this.useReflectionShieldLoop = this.useReflectionShieldLoop.bind(this)
         this.useEnergizeLoop = this.useEnergizeLoop.bind(this)
         this.magiportCheckLoop = this.magiportCheckLoop.bind(this)
+        this.switchWeaponsLoop = this.switchWeaponsLoop.bind(this)
 
         this.attackLoop()
         this.useReflectionShieldLoop()
         this.useEnergizeLoop()
         this.magiportCheckLoop()
+        this.switchWeaponsLoop()
     }
 
     
@@ -122,7 +125,7 @@ export class MageAttackStrategy extends StateStrategy {
             if(this.mage.mp < Game.G.skills["magiport"].mp) break
             let bot = botState.getBot()
             // SUMMON WHEN WE HAVE SPECIALS NEAR AND OTHER DOESN'T
-            if(this.bot.getEntities().filter( e => Constants.SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => Constants.SPECIAL_MONSTERS.includes(e.type)).length<1) {
+            if(this.bot.getEntities().filter( e => Constants.SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => Constants.SPECIAL_MONSTERS.includes(e.type) && calculate_monster_dps(bot,e)/calculate_hps(bot) < 1).length<1) {
                 await this.mage.magiport(bot.id).catch(console.debug)
                 if(bot.smartMoving) bot.stopSmartMove()
                 bot.acceptMagiport(this.bot.id).catch(console.debug)
@@ -130,7 +133,7 @@ export class MageAttackStrategy extends StateStrategy {
                 continue
             }
             // SUMMON IF WE HAVE SAME FARM STATE MONSTERTYPE AND WE ARE ON SPOT
-            if(this.currentState.state_type == "farm" && this.currentState.wantedMob == (botState as StateStrategy).currentState.wantedMob) {
+            if(this.currentState.state_type == "farm" && (botState as StateStrategy).currentState.state_type == "farm" && this.currentState.wantedMob == (botState as StateStrategy).currentState.wantedMob) {
                 let wantedMonsters = (typeof this.currentState.wantedMob === "string") ? [this.currentState.wantedMob] : this.currentState.wantedMob
                 if(this.bot.getEntities().filter( e => wantedMonsters.includes(e.type)).length>0 && bot.getEntities().filter( e => wantedMonsters.includes(e.type)).length<1) {
                     await this.mage.magiport(bot.id).catch(console.debug)
@@ -142,6 +145,29 @@ export class MageAttackStrategy extends StateStrategy {
         }
         
         return setTimeout(this.magiportCheckLoop, 2000)
+    }
+
+    private async switchWeaponsLoop() {
+        if(this.deactivate) return
+        let wanted_mainhand
+        let wanted_offhand
+        if(CF.shouldUseMassWeapon(this.bot, this.memoryStorage.getCurrentTank) && WEAPON_CONFIGS[this.bot.id]?.mass_mainhand) {
+            wanted_mainhand = WEAPON_CONFIGS[this.bot.id].mass_mainhand
+        }
+        else if(this.bot.getTargetEntity()?.["1hp"] && WEAPON_CONFIGS[this.bot.id]?.fast_mainhand) {
+            wanted_mainhand = WEAPON_CONFIGS[this.bot.id].fast_mainhand
+            wanted_offhand = WEAPON_CONFIGS[this.bot.id].fast_offhand
+        }
+        else if(WEAPON_CONFIGS[this.bot.id]?.solo_mainhand) {
+            wanted_mainhand = WEAPON_CONFIGS[this.bot.id].solo_mainhand
+            wanted_offhand = WEAPON_CONFIGS[this.bot.id].solo_offhand
+        }
+
+        const mainhand_idx = this.mage.locateItem(wanted_mainhand.name, undefined, {level: wanted_mainhand.level})
+        const offhand_idx = this.mage.locateItem(wanted_offhand.name, undefined, {level: wanted_offhand.level})
+        if(mainhand_idx !== undefined) await this.mage.equip(mainhand_idx, "mainhand").catch(debugLog)
+        if(offhand_idx !== undefined) await this.mage.equip(offhand_idx, "offhand").catch(debugLog)
+        return setTimeout(this.switchWeaponsLoop, 1000)
     }
 
 }

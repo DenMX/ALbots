@@ -25,7 +25,12 @@ export type WarriorWeaponsConfig = DefaultWeaponsConfig & {
     stomp? : {name: ItemName, level: number},
 }
 
-export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeaponsConfig} = {
+export type RangerWeaponConfig = DefaultWeaponsConfig & {
+    heal_weapon?: {name: ItemName, level: number},
+    heal_offhand?: {name: ItemName, level: number}
+}
+
+export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeaponsConfig|RangerWeaponConfig} = {
     "Warious": {
         cleave: {name: "bataxe", level: 8 },
         stomp: {name: "basher", level: 8 },
@@ -46,7 +51,9 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         solo_mainhand: { name: "crossbow", level: 8},
         solo_offhand: { name: "t2quiver", level: 8 },
         mass_mainhand: { name: "pouchbow", level: 11},
-        mass_offhand: { name: "alloyquiver", level: 8}
+        mass_offhand: { name: "alloyquiver", level: 8},
+        heal_weapon: { name: "cupid", level: 8},
+        heal_offhand: {name: "t2quiver", level: 8}
     },
     "frostyWar": {
         solo_mainhand: { name: "candycanesword", level: 9 },
@@ -55,6 +62,10 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         mass_offhand: { name: "glolipop", level: 6 },
         stomp: { name: "basher", level: 0},
         cleave: { name: "bataxe", level: 4}
+    },
+    "MerchanDiser": {
+        solo_mainhand: {name: "broom", level: 8},
+        solo_offhand: {name: "wbookhs", level: 3}
     },
     "frostyMerch": {
         fast_mainhand: { name: "staff", level: 3},
@@ -70,7 +81,7 @@ export type SetConfig = {
     priority?: number
 }
 
-export type SetList = "tank" | "dd" | "heal" | "luck" | "gold"
+export type SetList = "tank" | "dd" | "heal" | "luck" | "gold" | "exp"
 
 export type SetListConfig = { [T in SetList]? : SetConfig[] }
 

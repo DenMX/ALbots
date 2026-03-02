@@ -6,6 +6,7 @@ import { MemoryStorage } from "../common_functions/memory_storage";
 import { IState } from "./state_interface";
 import { PartyStrategy } from "../common_functions/party_strategy";
 import { PriestsAttackStrategy } from "../classes_logic/priests_attack_strategy";
+import { debugLog } from "../common_functions/common_functions";
 
 export class StateController {
     private bots: IState[]
@@ -34,8 +35,8 @@ export class StateController {
             }
         }
 
-        this.serverObservers.push(new Observer(Game.servers.US.III, Game.G, Game.user.userAuth ))
-        this.serverObservers[0].connect(true, true)
+        this.serverObservers.push(new Observer(Game.servers.ASIA.I, Game.G, Game.user.userAuth ))
+        this.serverObservers[0].connect(true, true).catch(debugLog)
 
         // setTimeout(this.disconnectFirst, 30_000)
     }

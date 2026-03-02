@@ -3,6 +3,7 @@ import * as CF from "../../src/common_functions/common_functions"
 import * as Items from "../configs/character_items_configs"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
+import { RangerWeaponConfig, WEAPON_CONFIGS } from "../configs/character_items_configs"
 import { debugLog } from "../common_functions/common_functions"
 
 export class RangerAttackStrategy extends StateStrategy {
@@ -33,6 +34,12 @@ export class RangerAttackStrategy extends StateStrategy {
         if(!this.ranger.canUse("attack")) {
             return setTimeout(this.basicAttackLoop, 300)
         }
+        let healTarget = this.bot.getPlayers({isPartyMember: true, withinRange: "attack"}).filter( e => e.hp < e.max_hp * 0.45).sort( (a,b) => a.hp - b.hp)[0]
+        if(healTarget && (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_weapon) {
+            await this.switchWeapon("heal")
+            await this.bot.basicAttack(healTarget.id).catch(debugLog)
+            return setTimeout(this.basicAttackLoop, Math.max(1,this.ranger.getCooldown("attack")))
+        }
         let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
         let totalDps = 0
         mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
@@ -55,10 +62,12 @@ export class RangerAttackStrategy extends StateStrategy {
         let targetsForThreeShot = this.getTargets("3shot")
         
         if(this.ranger.canUse("5shot") && targetsForFiveShot.length>3) {
+            if(WEAPON_CONFIGS[this.bot.name]?.mass_mainhand) await this.switchWeapon("mass")
             await this.ranger.fiveShot(targetsForFiveShot[0]?.id,targetsForFiveShot[1]?.id,targetsForFiveShot[2]?.id,targetsForFiveShot[3]?.id,targetsForFiveShot[4]?.id).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("5shot")))
         }
         if(this.ranger.canUse("3shot") && targetsForThreeShot.length>1) {
+            if(WEAPON_CONFIGS[this.bot.name]?.mass_mainhand) await this.switchWeapon("mass")
             await this.ranger.threeShot(targetsForThreeShot[0]?.id,targetsForThreeShot[1]?.id,targetsForThreeShot[2]?.id).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("3shot")))
         }
@@ -73,11 +82,48 @@ export class RangerAttackStrategy extends StateStrategy {
             if(CF.calculate_monster_dps(this.ranger,target)/CF.calculate_hps(this.ranger)>=2) {
                 return setTimeout(this.basicAttackLoop, 500)
             }
+            if(WEAPON_CONFIGS[this.bot.name]?.solo_mainhand) await this.switchWeapon("solo")
             if(target.armor - this.ranger.apiercing < 250) await this.ranger.basicAttack(this.ranger.target).catch(CF.debugLog) 
             else await this.ranger.piercingShot(this.ranger.target).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, this.ranger.getCooldown("attack"))
         }
         return setTimeout(this.basicAttackLoop, this.ranger.frequency)
+    }
+
+    private async switchWeapon(weaponConfig: "heal" | "mass" | "solo") {
+        if(weaponConfig == "heal") {
+            if(this.bot.slots.mainhand?.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_weapon?.name
+               && this.bot.slots.offhand?.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_offhand?.name) return
+            let equipBatch : {num: number, slot: SlotType}[] = []
+            for( const [i, item] of this.bot.getItems() ) {
+                if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_weapon?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_weapon?.level) equipBatch.push({num: i, slot: "mainhand"})
+                if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_offhand?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_offhand?.level) equipBatch.push({num: i, slot: "offhand"})
+            }
+            await this.ranger.equipBatch(equipBatch).catch(console.warn)
+            return
+        }
+        else if(weaponConfig == "mass") {
+            if(this.bot.slots.mainhand?.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.mass_mainhand?.name
+               && this.bot.slots.offhand?.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.mass_offhand?.name) return
+            let equipBatch : {num: number, slot: SlotType}[] = []
+            for( const [i, item] of this.bot.getItems() ) {
+                if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.mass_mainhand?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.mass_mainhand?.level) equipBatch.push({num: i, slot: "mainhand"})
+                if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.mass_offhand?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.mass_offhand?.level) equipBatch.push({num: i, slot: "offhand"})
+            }
+            await this.ranger.equipBatch(equipBatch).catch(console.warn)
+            return
+        }
+        else if(weaponConfig == "solo") {
+            if(this.bot.slots.mainhand?.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_mainhand?.name
+               && this.bot.slots.offhand?.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_offhand?.name) return
+            let equipBatch : {num: number, slot: SlotType}[] = []
+            for( const [i, item] of this.bot.getItems() ) {
+                if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_mainhand?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_mainhand?.level) equipBatch.push({num: i, slot: "mainhand"})
+                if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_offhand?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_offhand?.level) equipBatch.push({num: i, slot: "offhand"})
+            }
+            await this.ranger.equipBatch(equipBatch).catch(console.warn)
+            return
+        }
     }
 
     private getTargets(skill : SkillName) : Entity[] {

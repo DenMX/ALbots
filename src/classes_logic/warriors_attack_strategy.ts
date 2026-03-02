@@ -230,6 +230,9 @@ export class WarriorsAttackStrategy extends StateStrategy {
             mainhand_item = botWC.mass_mainhand
             offhand_item = botWC.mass_offhand
         }
+        else if(this.bot.getTargetEntity()?.["1hp"] && botWC.fast_mainhand) {
+            mainhand_item = botWC.fast_mainhand
+        }
         else {
             // console.debug(`Warrior want solo weapon`)
             mainhand_item = botWC.solo_mainhand
