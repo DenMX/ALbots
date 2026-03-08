@@ -6,7 +6,8 @@ import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
 import { IState } from "../controllers/state_interface"
 import * as Items from "../configs/character_items_configs"
-import { BOSS_CHECK_ROUTE } from "../configs/events_and_spots"
+import { BOSS_CHECK_ROUTE, SPECIAL_ALWAYS_WANTED } from "../configs/events_and_spots"
+import { SPECIAL_MONSTERS } from "../configs/events_and_spots"
 
 
 export type State = {
@@ -38,6 +39,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.monitoringSpecialsLoop = this.monitoringSpecialsLoop.bind(this)
         this.shouldCheckBossesLoop = this.shouldCheckBossesLoop.bind(this)
         this.checkBosses = this.checkBosses.bind(this)
+        this.mluckLoop = this.mluckLoop.bind(this)
 
         this.checkInventory()
         this.job_scheduler.push(this.checkBankUpgrades)
@@ -45,6 +47,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.checkScheduler(true)
         this.monitoringSpecialsLoop()
         this.shouldCheckBossesLoop()
+        this.mluckLoop()
 
         if(this.bot.isOnCooldown("fishing")) setTimeout(() => {this.job_scheduler.push(this.fishing)}, Math.max(1,this.bot.getCooldown("fishing")))
         else this.job_scheduler.push(this.fishing)
@@ -277,7 +280,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.changeMerchState("Collecting trash")
 
         for(const itemName of MIC.ITEMS_TO_SELL) {
-            let idx = this.locateItemsInBank(this.bot, itemName)
+            let idx = this.locateItemsInBank(this.bot, itemName, {level: 0})
             if(idx) {
                 for(const pack of idx) {
                     await this.bot.smartMove(pack[0], {getWithin: 9999}).catch(console.warn)
@@ -302,8 +305,35 @@ export class MerchantStrategy extends ManageItems implements IState {
             return setTimeout(this.monitoringSpecialsLoop, 10_000)
         }
         const mage = mageState.getBot()
-        const specials = this.bot.getEntities().filter( e => Constants.SPECIAL_MONSTERS.includes(e.type))
+        const specials = this.bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type))
+        const wantedSpecials = this.bot.getEntities().filter( e => SPECIAL_ALWAYS_WANTED.includes(e.type))
+
+        if(wantedSpecials.length>0) {
+            wantedSpecials.forEach( e => {
+                this.getMemoryStorage?.getStateController?.getBots
+                .filter( botState => botState.getBot().serverData.region == this.bot.serverData.region && botState.getBot().serverData.name == this.bot.serverData.name && botState instanceof StateStrategy)
+                .forEach( botState => {
+                    if(!(botState as StateStrategy).stateScheduler.some( bState => bState.state_type == "boss" && bState.wantedMob.includes(e.type)) && !(botState as StateStrategy).currentState.wantedMob.includes(e.type)) {
+                        let state = botState as StateStrategy
+                        state.addStateToScheduler( {
+                            state_type: "boss",
+                            wantedMob: [e.type],
+                            location: {map: e.map, x: e.x, y: e.y},
+                            server: {region: this.bot.serverData.region, name: this.bot.serverData.name}
+                        } )
+                        console.debug(`${e.type} added to scheduler`)
+                    }
+                })
+            })
+            
+        }
+
         if(specials.length<1) return setTimeout(this.monitoringSpecialsLoop, 1000)
+
+        const stateBots = this.getMemoryStorage?.getStateController?.getBots.filter( botState => botState.getBot().serverData.region == this.bot.serverData.region && botState.getBot().serverData.name == this.bot.serverData.name && botState instanceof StateStrategy)
+        if(stateBots && stateBots.length>0 && stateBots.some( e => e.getStateType() == "quest")) {
+            return setTimeout(this.monitoringSpecialsLoop, 1000)
+        }
         
         for( const special of specials) {
             if(mage.getEntities().filter( e => e.id == special.id).length>0) {
@@ -314,12 +344,13 @@ export class MerchantStrategy extends ManageItems implements IState {
                 console.debug(`${special.type} is already in scheduler`)
                 continue
             }
-            const priest = this.getMemoryStorage.getStateController?.getBots.filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "priest")[0].getBot()
+            const priest = this.getMemoryStorage.getStateController?.getBots.filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "priest")[0] as StateStrategy
             
-            if(!priest || CF.calculate_monster_dps(priest, special) > CF.calculate_hps(priest)) {
+            if(!priest || CF.calculate_monster_dps(priest, special) > CF.calculate_hps(priest.getBot())) {
                 console.debug(`${special.type} is too OP for priest`)
                 continue
             }
+
             
             (mageState as StateStrategy).addStateToScheduler( {
                 state_type: "boss",
@@ -344,6 +375,12 @@ export class MerchantStrategy extends ManageItems implements IState {
         {
             console.debug("No mage on the server while loop is running")
             return setTimeout(this.shouldCheckBossesLoop, 10_000)
+        }
+        if(!this.getMemoryStorage?.getStateController?.getBots) return setTimeout(this.shouldCheckBossesLoop, 10_000)
+        for(const botState of this.getMemoryStorage?.getStateController?.getBots) {
+            const bot = botState.getBot()
+            if(bot.serverData.region != this.bot.serverData.region || bot.serverData.name != this.bot.serverData.name || bot.id == this.bot.id) continue
+            if((botState as StateStrategy).getStateType() == "quest") return setTimeout(this.shouldCheckBossesLoop, 60_000)
         }
         console.debug("Should check bosses loop is running")
         this.job_scheduler.push(this.checkBosses)        
@@ -438,6 +475,15 @@ export class MerchantStrategy extends ManageItems implements IState {
         setTimeout(()=>{this.job_scheduler.push(this.checkPartyInventory)}, 60 * 1000)
     }
 
-    
-    
+    private async mluckLoop() {
+        if(this.deactivate) return
+        if(this.bot.isOnCooldown("mluck")) return setTimeout(this.mluckLoop, Math.max(1,this.bot.getCooldown("mluck")))
+        if(!this.bot.canUse("mluck")) return setTimeout(this.mluckLoop, 1000)
+        const players = this.bot.getPlayers().filter( e => (!e.s?.mluck || !e.s?.mluck?.strong || (e.s?.mluck?.f == this.bot.id && e.s?.mluck?.ms < 900_000)) && Tools.distance(this.bot, e) < Game.G.skills.mluck.range)
+        if (players.length>0) {
+            await (this.bot as Merchant).mluck(players[0].id).catch(CF.debugLog)
+            return setTimeout(this.mluckLoop, Math.max(1,this.bot.getCooldown("mluck")))
+        }
+        setTimeout(this.mluckLoop, 1000)
+    }
 }

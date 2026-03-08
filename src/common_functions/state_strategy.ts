@@ -5,6 +5,7 @@ import { calculate_hps, calculate_monster_dps, debugLog } from "./common_functio
 import fs from "fs"
 import { DEFAULT_SERVER_NAME, DEFAULT_SERVER_REGION, MemoryStorage } from "./memory_storage"
 import { ManageItems } from "./manage_items_strategy"
+import { SPECIAL_MONSTERS } from "../configs/events_and_spots"
 
 export type MobsSortFilter = {
     sortSpawns? : boolean,
@@ -28,7 +29,7 @@ export class StateStrategy extends ManageItems implements IState {
     private state_scheduler: State[] = []
 
     private default_state: State = {
-        wantedMob: "spider",
+        wantedMob: "dryad",
         state_type: "farm",
         server: {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME}
     }
@@ -75,9 +76,12 @@ export class StateStrategy extends ManageItems implements IState {
     }
 
     public set currentState(state: State) {
-        if(this.current_state.state_type == "farm") {
+        if(this.current_state.state_type == "farm" || this.current_state.state_type == "quest") {
             this.last_state = this.current_state
             this.current_state = state
+        }
+        else if(!this.state_scheduler.some( e => e.state_type == state.state_type && e.wantedMob == state.wantedMob)) {
+            this.state_scheduler.push(state)
         }
     }
 
@@ -218,8 +222,8 @@ export class StateStrategy extends ManageItems implements IState {
     private async loadState() {
 
         return this.current_state = {
-            wantedMob: "spider",
-            state_type: "quest",
+            wantedMob: "dryad",
+            state_type: "farm",
             server: {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME}
         }
         // load saved in DB
@@ -309,7 +313,7 @@ export class StateStrategy extends ManageItems implements IState {
         // WE ARE SMARTMOVING => EXIT
         if( this.bot.smartMoving || this.bot.rip) return setTimeout(this.checkState, 1000)
 
-        if(this.bot.getEntities().filter( e=> Constants.SPECIAL_MONSTERS.includes(e.type) && (calculate_monster_dps(this.bot,e)/calculate_hps(this.bot) < 0.95 || e.target)).length>0) return setTimeout(this.checkState, 1000)
+        if(this.bot.getEntities().filter( e=> SPECIAL_MONSTERS.includes(e.type) && (calculate_monster_dps(this,e)/calculate_hps(this.bot) < 0.95 || e.target)).length>0) return setTimeout(this.checkState, 1000)
 
         // CHECK EVENT BUFF IF IT EXPIRED
         await this.checkEventBuff()
@@ -343,22 +347,26 @@ export class StateStrategy extends ManageItems implements IState {
             //WE HAVE NO OTHER TASKS AND HAVE NO WANTED MOBS NEAR => SMART MOVING
             else if(this.bot.getEntities().filter( e => wanted_monster.includes(e.type)).length < 1) {
                 console.log("there is no monsters, going search some")
-                if(this.current_state.location) await this.bot.smartMove(this.current_state.location, {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
-                else await this.bot.smartMove(wanted_monster[0], {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
+                if(this.current_state.location) await this.bot.smartMove(this.current_state.location, {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.warn)
+                else await this.bot.smartMove(wanted_monster[0], {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.warn)
                 return setTimeout(this.checkState, 1000)
             }
         }
         // CURRENT STATE BOSS || EVENT
         else if(this.current_state.state_type == "boss" || this.current_state.state_type == "event"){
             // we still fighting
-            if(this.bot.getEntities().filter( e=> Constants.SPECIAL_MONSTERS.includes(e.type)).length>0) {
+            if(this.bot.getEntities().filter( e=> SPECIAL_MONSTERS.includes(e.type)).length>0) {
                 return setTimeout(this.checkState, 1000)
             }                
             // wanted mobs not found
-            else if(this.bot.getEntities().filter( e=> Constants.SPECIAL_MONSTERS.includes(e.type)).length<1) {
+            else if(this.bot.getEntities().filter( e=> SPECIAL_MONSTERS.includes(e.type)).length<1) {
                 if(this.current_state.state_type == "event") {
                     if( this.bot.S[this.current_state?.eventName] && this.bot.S[this.current_state.eventName]?.live != false) {
-                        await this.bot.smartMove(this.bot.S[this.current_state.eventName], {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.error)
+                        let join
+                        if(this.current_state?.eventName in Game.G.maps || Game.G.monsters) {
+                            join = (this.current_state?.eventName in Game.G.maps) ? this.current_state.eventName as MapName : this.current_state.eventName as MonsterName;
+                        }
+                        await this.bot.smartMove(join ?? this.bot.S[this.current_state.eventName], {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.error)
                         return setTimeout(this.checkState, 1000)
                     }
                     else {
@@ -372,11 +380,11 @@ export class StateStrategy extends ManageItems implements IState {
                     if(Tools.distance(this.current_state.location, this.bot) > 400) {
                         console.debug(`${this.bot.name} too far from ${this.current_state.location.toString()}`)
                         // for bosses we should have location
-                        await this.bot.smartMove(this.current_state.location, {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
+                        await this.bot.smartMove(this.current_state.location, {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.warn)
                     }
                     const currentBoss = this.bot.getEntities().filter( e=> e.type == this.current_state.wantedMob)[0]
                     console.debug(`${this.bot.name} current boss: ${currentBoss?.type}\n
-                        target: ${currentBoss?.target} dps: ${calculate_monster_dps(this.bot,currentBoss,true)} hps: ${calculate_hps(this.bot)} ratio: ${calculate_monster_dps(this.bot,currentBoss,true)/calculate_hps(this.bot)}`)
+                        target: ${currentBoss?.target} dps: ${calculate_monster_dps(this,currentBoss,true)} hps: ${calculate_hps(this.bot)} ratio: ${calculate_monster_dps(this,currentBoss,true)/calculate_hps(this.bot)}`)
                     // if we smartmoved and still not found or boss is OP
                     if( !currentBoss ) {
                         console.debug(`${this.bot.name} not found ${this.current_state.wantedMob}`)
@@ -384,7 +392,7 @@ export class StateStrategy extends ManageItems implements IState {
                         return setTimeout(this.checkState, 1000)
                 
                     }
-                    else if (currentBoss && !currentBoss.target && calculate_monster_dps(this.bot,currentBoss,true)/calculate_hps(this.bot) > 1) {
+                    else if (currentBoss && !currentBoss.target && calculate_monster_dps(this,currentBoss,true)/calculate_hps(this.bot) > 1) {
                         console.debug(`${this.bot.name} found ${this.current_state.wantedMob} but it is OP`)
                         this.switchState()
                         return setTimeout(this.checkState, 1000)
@@ -401,16 +409,17 @@ export class StateStrategy extends ManageItems implements IState {
             }
             //Quest completed need to take rewards
             if(this.bot.s.monsterhunt && this.bot.s.monsterhunt.c == 0) {
-                await this.bot.smartMove("monsterhunter", {useBlink: this.bot.ctype == "mage"}).catch(console.warn)
+                await this.bot.smartMove("monsterhunter", {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.warn)
                 await this.bot.finishMonsterHuntQuest().catch(debugLog)
+                if(this.state_scheduler.length<1) await this.bot.getMonsterHuntQuest().catch(debugLog)
             }
             //Quest not completed
             else if(this.bot.s.monsterhunt && this.bot.s.monsterhunt.c > 0) {
                 if(this.bot.getEntities().filter( e => this.bot.s.monsterhunt?.id == e.type).length <1) {
-                    await this.bot.smartMove(this.bot.s.monsterhunt!.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
+                    await this.bot.smartMove(this.bot.s.monsterhunt!.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.warn)
                 }
                 const questMonsters = this.bot.getEntities().filter( e => e.type == this.bot.s.monsterhunt?.id )
-                const questMonstersCanBeKilled = questMonsters.filter( e => calculate_monster_dps(this.bot,e)/calculate_hps(this.bot) < 1)
+                const questMonstersCanBeKilled = questMonsters.filter( e => this.bot.max_hp/calculate_monster_dps(this,e) > 10)
                 if(questMonsters?.length>1 && questMonstersCanBeKilled.length<1) {
                     this.switchState()
                     setTimeout(() => {
@@ -422,10 +431,10 @@ export class StateStrategy extends ManageItems implements IState {
             //Quest not started
             if(!this.bot.s.monsterhunt) {
                 if(this.state_scheduler.length<1){
-                    await this.bot.smartMove("monsterhunter", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
+                    await this.bot.smartMove("monsterhunter", {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.warn)
                     await this.bot.getMonsterHuntQuest().catch(debugLog)
                     this.current_state = {state_type: "quest", wantedMob: this.bot.s.monsterhunt?.id, server: {region: this.bot.serverData.region, name: this.bot.serverData.name}}
-                    if(this.bot.s.monsterhunt?.id) await this.bot.smartMove(this.bot.s.monsterhunt.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
+                    if(this.bot.s.monsterhunt?.id) await this.bot.smartMove(this.bot.s.monsterhunt.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.warn)
                     return setTimeout(this.checkState, 1000)
                 }
                 else {
@@ -467,12 +476,12 @@ export class StateStrategy extends ManageItems implements IState {
         //we don't want to targeting mob with dps more than 2x hps
         // console.log(`Target loop, ${this.bot.target}`)
         let target = this.bot.getTargetEntity()
-        let entities = this.bot.getEntities().filter( e => e.xp > 0 && (calculate_monster_dps(this.bot,e)/calculate_hps(this.bot) < 1 || e.target))
+        let entities = this.bot.getEntities().filter( e => e.xp > 0 && (calculate_monster_dps(this,e)/calculate_hps(this.bot) < 1 || e.target))
         if(entities.length<1) {
             return setTimeout(this.getTargetLoop, 500)
         }
         try {
-            if(!target || (target && target.willBurnToDeath()) || target.map != this.bot.map) {
+            if(!target || (target && target.willBurnToDeath()) || target.map != this.bot.map || Tools.distance(this.bot, target) > this.bot.range * 1.5) {
                 // console.log("Searching target")
                 entities = this.sortEntities(entities)
                 this.bot.target = entities[0].id
@@ -482,9 +491,9 @@ export class StateStrategy extends ManageItems implements IState {
                 entities = this.sortEntities(entities, {sortSpawns: true})
                 if(entities[0].id != target.id) this.bot.target = entities[0].id
             }
-            else if (target && !Constants.SPECIAL_MONSTERS.includes(target.type)) {
+            else if (target && !SPECIAL_MONSTERS.includes(target.type)) {
                 entities = this.sortEntities(entities)
-                if(!Constants.SPECIAL_MONSTERS.includes(target.type) && Constants.SPECIAL_MONSTERS.includes(entities[0].type)) {
+                if(!SPECIAL_MONSTERS.includes(target.type) && SPECIAL_MONSTERS.includes(entities[0].type)) {
                     this.bot.target = entities[0].id
                     if(this.bot.smartMoving) this.bot.stopSmartMove().catch(debugLog)
                 }
@@ -514,29 +523,28 @@ export class StateStrategy extends ManageItems implements IState {
                 let wantedMob
                 if(this.current_state?.wantedMob && typeof this.current_state.wantedMob === "string") wantedMob = [this.current_state.wantedMob]
                 else if(this.current_state?.wantedMob ) wantedMob = this.current_state.wantedMob
+                let targetingCurrent = this.bot.getPlayers({isPartyMember: true}).filter( e => e.target == curr.id).length
+                let targetingNext = this.bot.getPlayers({isPartyMember: true}).filter( e => e.target == next.id).length
+                // SPAWNS FIRST
                 if(filter?.sortSpawns && target.spawns) {
                     if(target.spawns.some(spawn => spawn[1] == curr.type)!= target.spawns.some(spawn => spawn[1] == next.type)) {
                         return (target.spawns.some(spawn => spawn[1] == curr.type) && target.spawns.some(spawn => spawn[1] != next.type)) ? -1 : 1;
                     }
                 }
-                if(Constants.SPECIAL_MONSTERS.includes(curr.type)!=Constants.SPECIAL_MONSTERS.includes(next.type)) {
-                    return (Constants.SPECIAL_MONSTERS.includes(curr.type) && !Constants.SPECIAL_MONSTERS.includes(next.type)) ? -1 : 1;
+                // SPECIAL MONSTERS FIRST
+                if(SPECIAL_MONSTERS.includes(curr.type)!=SPECIAL_MONSTERS.includes(next.type)) {
+                    return (SPECIAL_MONSTERS.includes(curr.type) && !SPECIAL_MONSTERS.includes(next.type)) ? -1 : 1;
                 }
-                
-                if(curr.isAttackingUs(this.bot)!=next.isAttackingUs(this.bot)) {
-                    return (curr.isAttackingUs(this.bot) && !next.isAttackingUs(this.bot)) ? -1 : 1;
-                }
-                if(curr.isAttackingPartyMember(this.bot)!=next.isAttackingPartyMember(this.bot)) {
-                    return (curr.isAttackingPartyMember(this.bot) && !next.isAttackingPartyMember(this.bot)) ? -1 : 1;
-                }
+                // WANTED MOB FIRST
                 if(wantedMob && curr.type!=next.type && (wantedMob.includes(curr.type) || wantedMob.includes(next.type))) {
                     return (wantedMob.includes(curr.type)) ? -1 : 1;
                 }
-                if(curr.s.cursed!=next.s.cursed) {
-                    return (curr.s.cursed && !next.s.cursed) ? -1 : 1;
-                }
-                if(curr.s.marked!=next.s.marked) {
-                    return (curr.s.marked && !next.s.marked) ? -1 : 1;
+                // CURSED AND MARKED FIRST
+                if(curr.s.cursed!=next.s.cursed) return (curr.s.cursed && !next.s.cursed) ? -1 : 1;
+                if(curr.s.marked!=next.s.marked) return (curr.s.marked && !next.s.marked) ? -1 : 1;
+                // WICH ONE ATTAKING MOST PARTY MEMBERS FIRST
+                if(targetingCurrent!=targetingNext) {
+                    return (targetingCurrent && !targetingNext) ? -1 : 1;
                 }
                 if(dist_current != dist_next) return (dist_current < dist_next) ? -1 : 1;
                 if(curr.hp != next.hp) {

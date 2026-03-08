@@ -26,7 +26,10 @@ export class PartyStrategy {
         datetime: undefined
     }
 
-    
+    private last_loot: number = 0
+
+    private loot_interval: number = 30_000
+
     constructor(bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
         this.bot = bot as PingCompensatedCharacter
         this.memoryStorage = memoryStorage
@@ -38,7 +41,7 @@ export class PartyStrategy {
         this.checkParty()
         this.loot()
         this.enablePartyEvents()
-        this.checkEquippedSetLoop()
+        
 
         let logLimitDCReport = (data: LimitDCReportData) => {
             console.debug(`=== START LIMITDCREPORT (${bot.id}) ===`)
@@ -59,45 +62,30 @@ export class PartyStrategy {
         this.deactivate = true
     }
 
-    private calculateMaxDef() {
-        if(!SET_CONFIGS[this.bot.id]?.tank) {
-            this.maxDef = {
-                armor: this.bot.armor,
-                resistance: this.bot.resistance,
-                firesistance: this.bot.firesistance,
-                reflection: this.bot.reflection,
-                evasion: this.bot.evasion
+    private async calculateMaxDef() {
+        
+        if(SET_CONFIGS[this.bot.id]?.tank)  {
+            const set = SET_CONFIGS[this.bot.id]?.tank
+            let equipBatchList: {num: number, slot: SlotType}[] = []
+            for(const [idx, item] of this.bot.getItems()) {
+                const setItem = set.find(e => e.name == item.name && e?.level == item?.level)
+                if(!setItem) continue
+                equipBatchList.push({num: idx, slot: setItem.slot ?? this.getSlotType(item.name as ItemName)})
+                console.debug(`${this.bot.id} Equipping ${item.name} - ${setItem.slot ?? this.getSlotType(item.name as ItemName)}`)
             }
+            await this.bot.equipBatch(equipBatchList).catch(console.warn)
         }
-        else {
-            const tankSet = SET_CONFIGS[this.bot.id]?.tank
-            let strMultiplier = 1
-            let intMultiplier = 1
-            switch(this.bot.ctype) {
-                case "warrior":
-                    strMultiplier = 0.25
-                    break;
-                case "mage":
-                case "priest":
-                    intMultiplier = 0.25
-                    break;
-            }
-            for (const [, item] of this.bot.getItems()) {
-                if(tankSet.some(e => e.name == item.name && e.level == item.level)) {
-                    const slotType = this.getSlotType(item.name)
-                    const currentItem = new Item({name: this.bot.slots[slotType]?.name, level: this.bot.slots[slotType]?.level}, Game.G)
-                    const currStr = currentItem.str ?? 0 + currentItem.stat_type == "str" ? currentItem.stat ?? 0 : 0
-                    const currInt = currentItem.int ?? 0 + currentItem.stat_type == "int" ? currentItem.stat ?? 0 : 0
-                    const itemStr = item.str ?? 0 + item.stat_type == "str" ? item.stat ?? 0 : 0
-                    const itemInt = item.int ?? 0 + item.stat_type == "int" ? item.stat ?? 0 : 0
-                    this.maxDef.armor = this.bot.armor + (item.armor - (currentItem.armor ?? 0)) + ((itemStr - currStr) * strMultiplier)
-                    this.maxDef.resistance = this.bot.resistance + (item.resistance - (currentItem.resistance ?? 0)) + ((itemInt - currInt) * intMultiplier)
-                    this.maxDef.firesistance = this.bot.firesistance + (currentItem.firesistance ?? 0 - (item.firesistance ?? 0))
-                    this.maxDef.reflection = this.bot.reflection + (item.reflection ?? 0 - (currentItem.reflection ?? 0))
-                    this.maxDef.evasion = this.bot.evasion + (item.evasion ?? 0- (currentItem.evasion ?? 0))
-                }
-            }
+
+        this.maxDef = {
+            armor: this.bot.armor,
+            resistance: this.bot.resistance,
+            firesistance: this.bot.firesistance,
+            reflection: this.bot.reflection,
+            evasion: this.bot.evasion
         }
+
+        this.checkEquippedSetLoop()
+        console.debug(`${this.bot.id} MAX DEF: ${JSON.stringify(this.maxDef)}`)
     }
 
 
@@ -144,11 +132,7 @@ export class PartyStrategy {
     private getActiveBooster(): number {
         let idx: number
         for(const [id, item] of this.bot.getItems()) {
-            if(item.name.includes('booster')){
-                if(!idx) idx = id
-                else if(item.expires && !this.bot.items[idx].expires ) idx = id
-                else if(item.expires < this.bot.items[idx].expires) idx = id
-            }
+            if(item.name.includes('booster') && item.expires) return id
         }
         return idx
     }
@@ -157,13 +141,16 @@ export class PartyStrategy {
         if(this.deactivate) return
         if(!this.bot.chests) return setTimeout( this.loot, 500)
         if(this.canLoot()) {
-            if(this.bot.chests.size>3 || (this.bot.chests.size>0 && this.bot.smartMoving)) {
+            if( (this.bot.chests.size>0 && this.last_loot < Date.now() - this.loot_interval) 
+                || (this.bot.chests.size>0 && this.bot.smartMoving)
+            ) {
                 let active_booster = this.getActiveBooster()
                 if(active_booster && this.bot.items[active_booster].name !== "goldbooster") await this.bot.shiftBooster(active_booster, "goldbooster").catch(debugLog)
                 if(SET_CONFIGS[this.bot.id]?.gold) await this.equipSet("gold", SET_CONFIGS[this.bot.id]?.gold)
                 this.bot.chests.forEach( (e) => this.bot.openChest(e.id).catch(console.warn))
-                if(this.memoryStorage.getCurrentLooter != this.bot.name || this.memoryStorage.getDefaultLooter != this.bot.name) this.bot.shiftBooster(active_booster, "xpbooster").catch(debugLog)
+                if(this.memoryStorage.getCurrentLooter != this.bot.id || this.memoryStorage.getDefaultLooter != this.bot.id) this.bot.shiftBooster(active_booster, "xpbooster").catch(debugLog)
                 else await this.bot.shiftBooster(active_booster, "luckbooster").catch(debugLog)
+                this.last_loot = Date.now()
             }
         }
         setTimeout(this.loot, 1000)
@@ -191,7 +178,7 @@ export class PartyStrategy {
 
     private async checkEquippedSetLoop() {
         if(this.deactivate) return
-        if(Date.now() - Math.max(1,this.LastEquippedSet.datetime) < 300 ) return setTimeout(this.checkEquippedSetLoop, Math.max(1, this.LastEquippedSet.datetime - Date.now() + 300))
+        if(Date.now() - Math.max(1,this.LastEquippedSet.datetime) < 500 ) return setTimeout(this.checkEquippedSetLoop, Math.max(1, this.LastEquippedSet.datetime - Date.now() + 500))
         if(this.bot.hp < this.bot.max_hp * 0.55 && this.bot.getEntities({targetingMe: true}).length > 0 && SET_CONFIGS[this.bot.id]?.tank) {
             await this.equipSet("tank", SET_CONFIGS[this.bot.id]?.tank)
             return setTimeout(this.checkEquippedSetLoop, 500)
@@ -215,15 +202,17 @@ export class PartyStrategy {
         return setTimeout(this.checkEquippedSetLoop, 500)
     }
 
-    private async equipSet(name: string,set: SetConfig[]) {
-        if(!set) return
-        if(Date.now() - Math.max(1,this.LastEquippedSet.datetime) < 300 ) return
-        if(Object.keys(set).length == this.LastEquippedSet.itemsCount && this.LastEquippedSet.name == name) return
+    private async equipSet(name: string, set: SetConfig[]) {
+        // console.debug(`${this.bot.id} Equipping ${name} set`)
+        if(!set) return console.debug(`${this.bot.id} No set ${name} found`)
+        // if(Date.now() - Math.max(1,this.LastEquippedSet.datetime) < 300 ) return console.debug(`${this.bot.id} Already equipped ${name} set in last 300ms`)
+        if(Object.keys(set).length == this.LastEquippedSet.itemsCount && this.LastEquippedSet.name == name) return console.debug(`${this.bot.id} Already equipped ${name} set`)
         let equipBatchList: {num: number, slot: SlotType}[] = []
-        for(const setItem of set) {
-            let item = this.bot.locateItem(setItem.name as ItemName, this.bot.items, {returnHighestLevel: true})
-            if(!item) continue
-            equipBatchList.push({num: item, slot: setItem.slot ?? this.getSlotType(setItem.name as ItemName)})
+        for(const [idx, item] of this.bot.getItems()) {
+            const setItem = set.find(e => e.name == item.name && e?.level == item?.level)
+            if(!setItem) continue
+            equipBatchList.push({num: idx, slot: setItem.slot ?? this.getSlotType(item.name as ItemName)})
+            console.debug(`${this.bot.id} Equipping ${item.name} - ${setItem.slot ?? this.getSlotType(item.name as ItemName)}`)
         }
 
         equipBatchList.sort((curr, next) => {
@@ -237,7 +226,7 @@ export class PartyStrategy {
         const timeToNextAttack = ( msToNextAttack === 0 ) ? 1000 / this.bot.frequency : msToNextAttack
         const maxItemsCanEquip = Math.max(1, Math.floor(timeToNextAttack - (this.bot.s.penalty_cd?.ms ?? 0) / 120))
         equipBatchList.splice(maxItemsCanEquip)
-        await this.bot.equipBatch(equipBatchList)
+        await this.bot.equipBatch(equipBatchList).catch(console.warn)
         this.LastEquippedSet.itemsCount = (this.LastEquippedSet.name == name) ? this.LastEquippedSet.itemsCount+equipBatchList.length : equipBatchList.length
         this.LastEquippedSet.datetime = Date.now()
         this.LastEquippedSet.name = name
@@ -277,7 +266,7 @@ export class PartyStrategy {
     }
 
 
-    protected get getMemoryStorage() {
+    public get getMemoryStorage() {
         return this.memoryStorage
     }
 

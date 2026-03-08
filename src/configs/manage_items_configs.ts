@@ -155,7 +155,9 @@ export const ITEMS_TO_SELL: ItemName[] = [
 	'hpants',
 	
 	'hboots',
-	'hgloves'
+	'hgloves',
+    "mcape",
+    
 ]
 
 export const DISMANTLE_ITEMS: ItemName[] = [
@@ -175,10 +177,11 @@ export type UpgradeConfig = {
 export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, UpgradeConfig>([
     // --- UPGRADE SECTION --- \\
     ["staff", { level: 8 }],
-    ["angelwings", { level: 6 }],
-    ["cape", { level: 7 }],
+    ["angelwings", { level: 8, scrollUpAt: 4, offeringAt: 6}],
+    
     ["sshield", { level: 8 }],
-    ["mshield", { level: 6 }],
+    ["mshield", { level: 9, primlingAt: 7, offeringAt: 8 }],
+    ["rapier", { level: 8, scrollUpAt: 4, primlingAt: 7}],
 
     //wanderer set
     ["wbreeches", { level: 9, scrollUpAt: 8 }],
@@ -192,21 +195,26 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["xarmor", { level: 3, primlingAt: 0 }],
     ["xpants", { level: 3, primlingAt: 0 }],
 
+    // Weapons
     ["firestaff", { level: 8, primlingAt: 7, scrollUpAt: 5 }],
     ["fireblade", { level: 8, primlingAt: 7, scrollUpAt: 5 }],
     ["firebow", { level: 8, primlingAt: 7, scrollUpAt: 5}],
-
+    ["crossbow", { level: 8, primlingAt: 4, scrollUpAt: 4, offeringAt: 5 }],
     ["harbringer", { level: 7 }],
     ["oozingterror", { level: 6 }],
+    ["basher", {level: 7, primlingAt: 7}],
+    ["cclaw", {level: 9, scrollUpAt: 5, offeringAt: 8}],
+    ["cupid", {level: 8, scrollUpAt: 4, primlingAt: 5, offeringAt: 7}],
+    
 
-    ["basher", {level: 7}],
-
-    ["cclaw", {level: 8, scrollUpAt: 7}],
     // Halloween
     ["ololipop", { level: 8, primlingAt: 6, scrollUpAt: 3, shouldBeShiny: true }],
     ["glolipop", { level: 8, scrollUpAt: 3 }],
 
-    ["cupid", {level: 8, scrollUpAt: 4, primlingAt: 5, offeringAt: 7}],
+
+    // Capes
+    ["cape", { level: 7 }],
+    ["horsecapeg", {level: 7, primlingAt: 5}],
 
     // Bunny stuff
     ["ecape", { level: 7, scrollUpAt: 5 }],
@@ -214,15 +222,16 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["eslippers", { level: 7, scrollUpAt: 5 }],
 
     ["wingedboots", { level: 7, scrollUpAt: 5 }],
-    ["lmace", { level: 5, primlingAt: 0, offeringAt: 3 }],
-    ["handofmidas", { level: 5 }],
+    ["lmace", { level: 8, primlingAt: 0, offeringAt: 3 }],
+    ["handofmidas", { level: 5, primlingAt: 3 }],
     ["bataxe", { level: 8, scrollUpAt: 4, primlingAt: 4, offeringAt: 6, shouldBeShiny: true }],
 
     // Winter holidays
     ["gcape", { level: 7 }],
-    ["mittens", { level: 8, scrollUpAt: 6 }],
-    ["ornamentstaff", { level: 8, scrollUpAt: 6 }],
-    ["supermittens", { level: 3, primlingAt: 0 }],
+    ["mittens", { level: 9, scrollUpAt: 6, offeringAt: 8 }],
+    ["ornamentstaff", { level: 9, scrollUpAt: 6, offeringAt: 8 }],
+    ["supermittens", { level: 7, primlingAt: 0, offeringAt: 3 }],
+    ["xmaspants", { level: 9, scrollUpAt: 6, primlingAt: 8 }],
 
     // --- COMPOUND SECTION --- \\
     // Offhands
@@ -254,7 +263,7 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["strbelt", { level: 4, offeringAt: 3 }],
     ["dexbelt", { level: 4, offeringAt: 3 }],
 
-    ["crossbow", { level: 5, primlingAt: 3, scrollUpAt: 4 }],
+    
 
     // Orbs
     ["orbg", { level: 3 }],

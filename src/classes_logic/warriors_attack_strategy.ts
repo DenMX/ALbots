@@ -63,7 +63,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
         }
         let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
         let totalDps = 0
-        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
+        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this, e))
         if( this.bot.c.town && this.bot.hp > totalDps*15 ) {
             return setTimeout(this.attackLoop, 15000)
         }
@@ -75,8 +75,8 @@ export class WarriorsAttackStrategy extends StateStrategy {
         if( this.warrior.hasItem("jacko") && this.warrior.isOnCooldown("scare") && this.warrior.getEntities({targetingMe: true, targetingPartyMember:true}).length<1) {
             return setTimeout( this.attackLoop, this.warrior.getCooldown("scare"))
         }
-        if(!target.target && CF.calculate_monster_dps(this.warrior, target, true)/CF.calculate_hps(this.warrior) >=0.95) {
-            console.log(`Monster DPS: ${CF.calculate_monster_dps(this.warrior, target, true)}, ${this.warrior.name} HPS: ${CF.calculate_hps(this.warrior)}`)
+        if(!target.target && this.bot.max_hp/CF.calculate_monster_dps(this, target, true) < 10) {
+            console.log(`Monster DPS: ${CF.calculate_monster_dps(this, target, true)}, ${this.warrior.name} HPS: ${CF.calculate_hps(this.warrior)}`)
             return setTimeout(this.attackLoop, 500)
         }
         try {            
@@ -174,7 +174,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
             
             let offhand_item
             
-            if(CF.shouldUseMassWeapon(this.warrior, this.memoryStorage.getCurrentTank)) {
+            if(CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank)) {
                 // console.debug(`Warrior want mass weapon`)
                 mainhand_item = botWC.mass_mainhand
                 offhand_item = botWC.mass_offhand
@@ -218,14 +218,14 @@ export class WarriorsAttackStrategy extends StateStrategy {
         if(this.deactivate) return
         let botWC = Items.WEAPON_CONFIGS[this.bot.name] as Items.WarriorWeaponsConfig
         if(!botWC) return
-        if(Date.now() - this.lastWeaponSwitch < 1000) return setTimeout(this.switchWeaponsLoop, 500)
+        if(Date.now() - this.lastWeaponSwitch < 500) return setTimeout(this.switchWeaponsLoop, 500)
         if( this.warrior.canUse("cleave") || this.warrior.canUse("stomp") ) return setTimeout(this.switchWeaponsLoop, 500)
 
         let mainhand_item
             
         let offhand_item
         
-        if(CF.shouldUseMassWeapon(this.warrior, this.memoryStorage.getCurrentTank)) {
+        if(CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank)) {
             // console.debug(`Warrior want mass weapon`)
             mainhand_item = botWC.mass_mainhand
             offhand_item = botWC.mass_offhand
@@ -242,7 +242,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
             // console.debug('using weapon as we want')
             return setTimeout(this.switchWeaponsLoop,1000)
         }
-        if(mainhand_item.name == offhand_item.name && mainhand_item.level == offhand_item.level) {
+        if(mainhand_item?.name == offhand_item?.name && mainhand_item?.level == offhand_item?.level) {
             let items = this.bot.locateItems(mainhand_item.name, undefined, {level: mainhand_item.level})
             if(!items) {
                 return setTimeout(this.switchWeapons, 1000)
@@ -257,7 +257,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
         let mainhand_idx = this.warrior.locateItem(mainhand_item.name, undefined, {level: mainhand_item?.level})
         // console.debug(`Mainhand ${mainhand_item.name} in ${mainhand_idx} slot.`)
         if( mainhand_idx !== undefined ) await this.warrior.equip(mainhand_idx,"mainhand").catch(debugLog)
-        let offhand_idx = this.warrior.locateItem(offhand_item.name, undefined, {level: offhand_item?.level})
+        let offhand_idx = this.warrior.locateItem(offhand_item?.name, undefined, {level: offhand_item?.level})
         // console.debug(`Offhand ${offhand_item.name} in ${offhand_idx} slot.`)        
         if( offhand_idx !== undefined ) await this.warrior.equip(offhand_idx, "offhand").catch(debugLog)
         
@@ -268,7 +268,8 @@ export class WarriorsAttackStrategy extends StateStrategy {
         // console.log("Cealve loop")
         if(this.warrior.isOnCooldown("cleave")) return 
         if(!this.warrior.canUse("cleave", {ignoreEquipped: true})) return 
-        if(!CF.shouldUseMassSkill(this.warrior, this.getMemoryStorage.getCurrentTank, "cleave") || this.warrior.getEntities({withinRange:"cleave"}).length<3) return //console.log("Don't want to use cleave")
+        if( this.warrior.c.town) return
+        if(!CF.shouldUseMassSkill(this, this.getMemoryStorage.getCurrentTank, "cleave") || this.warrior.getEntities({withinRange:"cleave"}).length<3) return //console.log("Don't want to use cleave")
         await this.switchWeapons({cleave: true})
         if(Game.G.skills.cleave.wtype.includes(Game.G.items[this.warrior.slots.mainhand?.name].wtype)) {
             await this.warrior.cleave().catch(debugLog)
@@ -305,13 +306,14 @@ export class WarriorsAttackStrategy extends StateStrategy {
 
     private async useMassAggroLoop() {
         if(this.deactivate) return
+        if(this.warrior.c.town) return
         if(this.warrior.isOnCooldown("scare")) {
             return setTimeout(this.useMassAggroLoop, this.warrior.getCooldown("scare"))
         }
         if(this.warrior.smartMoving || !this.warrior.canUse("agitate")) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
-        if(!CF.shouldUseMassSkill(this.warrior, this.memoryStorage.getCurrentTank, "agitate")) {
+        if(!CF.shouldUseMassSkill(this, this.memoryStorage.getCurrentTank, "agitate")) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
         if(this.warrior.getEntities({hasTarget: false, withinRange: "agitate"}).length<2) {
@@ -325,13 +327,14 @@ export class WarriorsAttackStrategy extends StateStrategy {
 
     public async useMassAggro() {
         if(this.deactivate) return
+        if(this.warrior.c.town) return
         if(this.warrior.isOnCooldown("scare")) {
             return setTimeout(this.useMassAggroLoop, this.warrior.getCooldown("scare"))
         }
         if(this.warrior.smartMoving) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
-        if(!CF.shouldUseMassWeapon(this.warrior, this.memoryStorage.getCurrentTank)) {
+        if(!CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank)) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
         if(this.warrior.getEntities({hasTarget: false}).length<2) {

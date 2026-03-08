@@ -1,21 +1,26 @@
 import { BankInfo, BankModel, Database, PingCompensatedCharacter, ServerIdentifier, ServerRegion } from "alclient";
 import fs from "fs"
 import { StateController } from "../controllers/state_controller";
+import { debugLog } from "./common_functions";
 
-export const DEFAULT_SERVER_REGION: ServerRegion = "EU"
-export const DEFAULT_SERVER_NAME: ServerIdentifier = "II"
+export const DEFAULT_SERVER_REGION: ServerRegion = "ASIA"
+export const DEFAULT_SERVER_NAME: ServerIdentifier = "I"
 
 export class MemoryStorage {
     
     private bank: BankInfo
 
+    private lastDepositGold: number
+
+    private readonly DEPOSIT_GOLD_THRESHOLD: number = 3_600_000; // 1 hour
+
     private secretKey: string
 
-    private default_party_leader: string = "frostyHeal"
+    private default_party_leader: string = "Archealer"
 
     private current_party_leader: string
 
-    private default_tank: string = "frostyHeal"
+    private default_tank: string = "Archealer"
 
     private current_tank: string
 
@@ -34,6 +39,7 @@ export class MemoryStorage {
 
         this.current_party_leader = this.default_party_leader
         this.current_tank = this.default_tank
+        this.current_looter = this.default_looter
 
         this.loadBankFromMongo().catch(console.warn)
     }
@@ -133,6 +139,10 @@ export class MemoryStorage {
             catch(ex) {
                 console.debug(`error while fetching bank in api:\n${ex}`)
             }
+        }
+        if(bot.gold > 1000000000 && (!this.lastDepositGold || Date.now() - this.lastDepositGold > this.DEPOSIT_GOLD_THRESHOLD)) {
+            bot.depositGold(bot.gold*0.05).catch(debugLog)
+            this.lastDepositGold = Date.now()
         }
     }
 }

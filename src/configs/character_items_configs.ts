@@ -1,7 +1,7 @@
 import { CharacterType, ItemName, SlotType } from "alclient";
 
-export const KEEP_GOLD: number = 1_500_000;
-export const KEEP_GOLD_WITH_PC: number = 10_000_000;
+export const KEEP_GOLD: number = 10_500_000;
+export const KEEP_GOLD_WITH_PC: number = 100_000_000;
 
 export const DEFAULT_ELIXIRS: Map<CharacterType, ItemName[]> = new Map([
     ["mage", ["pumpkinspice","elixirluck"]],
@@ -64,8 +64,8 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         cleave: { name: "bataxe", level: 4}
     },
     "MerchanDiser": {
-        solo_mainhand: {name: "broom", level: 8},
-        solo_offhand: {name: "wbookhs", level: 3}
+        fast_mainhand: {name: "broom", level: 8},
+        fast_offhand: {name: "wbookhs", level: 3}
     },
     "frostyMerch": {
         fast_mainhand: { name: "staff", level: 3},
@@ -98,7 +98,7 @@ export const SET_CONFIGS: {
                 {name: 'mittens', level: 9},
                 {name: 'spookyamulet', level: 1},
                 {name: 'mshield', level: 9, slot: "offhand"},
-                {name: 'lmace', level: 7},
+                {name: 'lmace', level: 8},
                 {name: 'rabbitsfoot', level: 1},
                 {name: 'mearring', level: 0, slot: "earring1"},
                 {name: 'ecape', level: 6}
@@ -110,7 +110,8 @@ export const SET_CONFIGS: {
                 {name: 'wshoes', level: 9},
                 {name: 'handofmidas', level: 4},
                 {name: 'spookyamulet', level: 1},
-                {name: 'mearring', level: 0, slot: "earring1"}
+                {name: 'mearring', level: 0, slot: "earring1"},
+                {name: 'horsecapeg', level: 7}
             ],
             "tank": [
                 {name: 'xhelmet', level: 7},

@@ -4,6 +4,7 @@ import { StateStrategy } from "../common_functions/state_strategy"
 import * as CF from "../common_functions/common_functions"
 import { calculate_monster_dps, calculate_hps, debugLog } from "../common_functions/common_functions"
 import { WEAPON_CONFIGS } from "../configs/character_items_configs"
+import { SPECIAL_MONSTERS } from "../configs/events_and_spots"
 
 export class MageAttackStrategy extends StateStrategy {
 
@@ -51,7 +52,7 @@ export class MageAttackStrategy extends StateStrategy {
         if( !target.target && this.mage.isOnCooldown("scare") ) {
             return setTimeout(this.attackLoop, this.mage.getCooldown("scare"))
         }
-        if( !target.target && calculate_monster_dps(this.mage, target, true) / calculate_hps(this.mage) >= 2 ) {
+        if( !target.target && this.bot.max_hp/calculate_monster_dps(this.mage, target, true) < 10 ) {
             return setTimeout(this.attackLoop, 500)
         }
         
@@ -124,8 +125,9 @@ export class MageAttackStrategy extends StateStrategy {
         for(const botState of stateBots) {
             if(this.mage.mp < Game.G.skills["magiport"].mp) break
             let bot = botState.getBot()
+            if(Tools.distance(this.bot, bot) < 400) continue
             // SUMMON WHEN WE HAVE SPECIALS NEAR AND OTHER DOESN'T
-            if(this.bot.getEntities().filter( e => Constants.SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => Constants.SPECIAL_MONSTERS.includes(e.type) && calculate_monster_dps(bot,e)/calculate_hps(bot) < 1).length<1) {
+            if(this.bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type) && calculate_monster_dps(bot,e)/calculate_hps(bot) < 1).length<1) {
                 await this.mage.magiport(bot.id).catch(console.debug)
                 if(bot.smartMoving) bot.stopSmartMove()
                 bot.acceptMagiport(this.bot.id).catch(console.debug)
@@ -163,8 +165,8 @@ export class MageAttackStrategy extends StateStrategy {
             wanted_offhand = WEAPON_CONFIGS[this.bot.id].solo_offhand
         }
 
-        const mainhand_idx = this.mage.locateItem(wanted_mainhand.name, undefined, {level: wanted_mainhand.level})
-        const offhand_idx = this.mage.locateItem(wanted_offhand.name, undefined, {level: wanted_offhand.level})
+        const mainhand_idx = (wanted_mainhand) ? this.mage.locateItem(wanted_mainhand?.name, undefined, {level: wanted_mainhand?.level}) : undefined
+        const offhand_idx = (wanted_offhand) ? this.mage.locateItem(wanted_offhand?.name, undefined, {level: wanted_offhand?.level}) : undefined
         if(mainhand_idx !== undefined) await this.mage.equip(mainhand_idx, "mainhand").catch(debugLog)
         if(offhand_idx !== undefined) await this.mage.equip(offhand_idx, "offhand").catch(debugLog)
         return setTimeout(this.switchWeaponsLoop, 1000)

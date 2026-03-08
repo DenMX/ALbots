@@ -9,6 +9,8 @@ import { RogueAttackStrategy } from "../classes_logic/rogue_attack_strategy"
 import { MerchantStrategy } from "../classes_logic/merchant_strategy"
 import { MemoryStorage, DEFAULT_SERVER_NAME, DEFAULT_SERVER_REGION } from "./memory_storage"
 import { IState } from "../controllers/state_interface"
+import { PartyStrategy } from "./party_strategy"
+import { StateStrategy } from "./state_strategy"
 
 export const UPGRADE_POSITION: IPosition = {
     x: -208,
@@ -40,33 +42,16 @@ export async function startBotWithStrategy(ctype: CharacterType, name: string, s
 }
 
 
-
-/*
-Formula for calculationg burning
-
-const burnPadding = highestBurningMob
-    ? dps_multiplier(
-        highestBurningMob.damage_type === "physical"
-          ? characterEntity.armor -
-              (G.monsters[highestBurningMob.mtype].apiercing ?? 0) * 2
-          : highestBurningMob.damage_type === "magical"
-          ? characterEntity.resistance -
-            (G.monsters[highestBurningMob.mtype].rpiercing ?? 0) * 2
-          : 1,
-      ) *
-      ((100 - fireResist) / 100) *
-      (highestBurningMob.abilities.burn.unlimited ? 3 : 1.5) *
-      highestBurningMob.attack
-    : 0;
-*/
-export function calculate_monsters_dps (bot: PingCompensatedCharacter, tank: PingCompensatedCharacter|Player, entities?: Entity[], applyDistance: boolean = false) {
+export function calculate_monsters_dps (bot: PartyStrategy, tank: PartyStrategy|Player, entities?: Entity[], applyDistance: boolean = false) {
     
-    if(!entities) entities = bot.getEntities()
+    if(!entities) entities = bot.getBot().getEntities()
 
     let dps = 0
 
+    let tankBot = tank instanceof PartyStrategy ? tank.getBot() : tank
+
     entities.forEach( e => {
-        if(applyDistance && Tools.distance(e, tank) > e.range) return
+        if(applyDistance && Tools.distance(e, tankBot) > e.range) return
         dps +=calculate_monster_dps(tank, e) 
     })
 
@@ -84,17 +69,19 @@ export function calculate_monsters_dps (bot: PingCompensatedCharacter, tank: Pin
     return dps
 }
 
-export function calculate_burning_dps(bot: PingCompensatedCharacter|Player, mob: Entity) {
+export function calculate_burning_dps(bot: PartyStrategy|Player, mob: Entity) {
     if(!bot || !mob) return 0
 
     let damage_multiplier = 1 
 
     switch (mob.damage_type) {
         case "physical":
-            damage_multiplier = Tools.damage_multiplier(bot.armor - mob.apiercing * 2)
+            let armor = bot instanceof PartyStrategy ? bot.getMaxDef.armor : bot.armor
+            damage_multiplier = Tools.damage_multiplier(armor - mob.apiercing * 2)
             break;
         case "magical":
-            damage_multiplier = Tools.damage_multiplier(bot.resistance - mob.rpiercing * 2)
+            let resistance = bot instanceof PartyStrategy ? bot.getMaxDef.resistance : bot.resistance
+            damage_multiplier = Tools.damage_multiplier(resistance - mob.rpiercing * 2)
             break;
     }
     let fireres = (bot instanceof PingCompensatedCharacter) ? bot.firesistance : 0
@@ -102,24 +89,27 @@ export function calculate_burning_dps(bot: PingCompensatedCharacter|Player, mob:
 
 }
 
-export function calculate_monster_dps(bot: PingCompensatedCharacter|Player, mob: Entity, calculateBurn: boolean = false): number {
+export function calculate_monster_dps(bot: PartyStrategy|Player, mob: Entity, calculateBurn: boolean = false): number {
     if(!mob || !bot) return 0
     let dps = 0
     let bonusArmor = 0
-    Object.keys(bot.s).forEach( e => bonusArmor += (Game.G.conditions[e]?.armor) ? Game.G.conditions[e].armor : 0)
+    const botBot = bot instanceof PartyStrategy ? bot.getBot() : bot
+    // console.debug(`${botBot.id} instanceof PartyStrategy: ${bot instanceof PartyStrategy}`)
+    Object.keys(botBot.s).forEach( e => bonusArmor += (Game.G.conditions[e]?.armor) ? Game.G.conditions[e].armor : 0)
     let bonusResistance = 0
-    Object.keys(bot.s).forEach( e => bonusResistance += (Game.G.conditions[e]?.resistance) ? Game.G.conditions[e].resistance : 0)
-    if(mob.damage_type == "physical") {
-        // console.log(`${mob.type} DPS counter ${bot.name}: ${(mob.attack * Tools.damage_multiplier(bot.armor - mob.apiercing)) * mob.frequency}`)
-        dps = (mob.attack * Tools.damage_multiplier(bot.armor - bonusArmor - mob.apiercing * 2)) * mob.frequency
-    }
-    else if(mob.damage_type == "magical"){
-        // console.log(`${mob.type} DPS counter ${bot.name}: ${(mob.attack * Tools.damage_multiplier(bot.resistance - mob.rpiercing)) * (mob.frequency/100)}`)
-        dps = (mob.attack * Tools.damage_multiplier(bot.resistance - bonusResistance - mob.rpiercing * 2)) * mob.frequency
-    }
-    else if(mob.damage_type == "pure"){
-        // console.log(`${mob.type} DPS counter ${bot.name}: ${mob.attack * (mob.frequency/100)}`)
-        dps = mob.attack * mob.frequency
+    Object.keys(botBot.s).forEach( e => bonusResistance += (Game.G.conditions[e]?.resistance) ? Game.G.conditions[e].resistance : 0)
+    switch(mob.damage_type) {
+        case "physical":
+            let armor = bot instanceof PartyStrategy ? bot.getMaxDef.armor : bot.armor
+            dps = (mob.attack * Tools.damage_multiplier(armor - bonusArmor - mob.apiercing * 2)) * mob.frequency
+            break;
+        case "magical":
+            let resistance = bot instanceof PartyStrategy ? bot.getMaxDef.resistance : bot.resistance
+            dps = (mob.attack * Tools.damage_multiplier(resistance - bonusResistance - mob.rpiercing * 2)) * mob.frequency
+            break;
+        case "pure":
+            dps = mob.attack * mob.frequency
+            break;
     }
     
     return calculateBurn ? dps + calculate_burning_dps(bot, mob) : dps
@@ -185,35 +175,43 @@ export function calculate_my_dps(bot: PingCompensatedCharacter) {
 /**
  * Decide could we or should we use weapon with explosion and blast effects
  */
-export function shouldUseMassWeapon(bot: PingCompensatedCharacter, tank: string) {
-    if(bot.getEntities().filter( e => e.target == bot.id || bot.partyData?.list.includes(e.target)).length>1) return true
-    let target = bot.getTargetEntity()
+export function shouldUseMassWeapon(bot: PartyStrategy, tank: string) {
+    if(bot.getBot().getEntities().filter( e => e.target == bot.getBot().id || bot.getBot().partyData?.list.includes(e.target)).length>1) return true
+    let target = bot.getBot().getTargetEntity()
     if(!target) return false
+    if(bot.getBot().getEntities().filter( e => Tools.distance(e, target)<= 40 && e.abilities.stone && !e.target).length>0) return false
     let willTank 
-    if(bot.name == tank ) willTank = bot
+    if(bot.getBot().name == tank ) willTank = bot.getBot()
     else {
-        willTank = bot.getPlayers().filter( e => e.name == tank && Tools.distance(e,bot)<200)[0] || bot
+        willTank = bot.getBot().getPlayers().filter( e => e.name == tank && Tools.distance(e,bot.getBot())<200)[0] || bot.getBot()
     }
-    let entitiesTargetingUs = bot.getEntities().filter( e => Tools.distance(e, target)<= 40 && (bot.partyData?.list.includes(e.target) || e.target == willTank.name))
+    let entitiesTargetingUs = bot.getBot().getEntities().filter( e => Tools.distance(e, target)<= 40 && (bot.getBot().partyData?.list.includes(e.target) || e.target == willTank.name))
     
     if(entitiesTargetingUs.length>1) return true
 
-    let entitiesInRadiusWT = bot.getEntities().filter( e => Tools.distance(e, target) <= 40 && !e.target )
+    let entitiesInRadiusWT = bot.getBot().getEntities().filter( e => Tools.distance(e, target) <= 40 && !e.target )
 
 
     
-    return ( entitiesInRadiusWT.length>0 && calculate_monsters_dps(bot, willTank, [...entitiesInRadiusWT, ...entitiesTargetingUs]) / calculate_hps(bot) <= 0.95)
+    return ( entitiesInRadiusWT.length>0 && calculate_monsters_dps(bot, willTank, [...entitiesInRadiusWT, ...entitiesTargetingUs]) / calculate_hps(bot.getBot()) <= 0.95)
 }
 
-export function shouldUseMassSkill(bot: PingCompensatedCharacter, tank: string, skill: SkillName) {
-    if(bot.getEntities({withinRange: skill, hasTarget: false}).length<1) return true
+export function shouldUseMassSkill(bot: PartyStrategy, tank: string, skill: SkillName) {
+    if(bot.getBot().getEntities({withinRange: skill, hasTarget: false}).length<1) return true
+
+    if(bot.getBot().getEntities({hasTarget: false}).filter( e => e.abilities.stone).length>0) return false
     
-    let willTank = (bot.name == tank ) ? bot : bot.getPlayer({isDead: false, id: tank}) ?? bot
+    let willTank =  bot.getMemoryStorage?.getStateController?.getBots.find( e => e.getBot().id == tank && e.getBot().serverData.region == bot.getBot().serverData.region && e.getBot().serverData.name == bot.getBot().serverData.name && Tools.distance(e.getBot(), bot.getBot()) < 200) as StateStrategy
+                    || bot.getBot().getPlayer({id: tank}) || bot
 
-    let entitiesInRange = bot.getEntities({withinRange: skill, hasTarget: false})
-    let targetingUs = bot.getEntities().filter( e => e.target == bot.name || bot.partyData?.list.includes(e.target))
 
-    return (Math.floor(calculate_monsters_dps(bot, willTank, [...entitiesInRange, ...targetingUs])) < Math.floor(calculate_hps(bot) * 0.70) && willTank.hp > willTank.max_hp *0.55)
+    let entitiesInRange = bot.getBot().getEntities({withinRange: skill, hasTarget: false})
+    let targetingUs = bot.getBot().getEntities().filter( e => e.target == bot.getBot().name || bot.getBot().partyData?.list.includes(e.target))
+
+    let  tankHp = willTank instanceof StateStrategy ? willTank.getBot().hp : willTank instanceof Player ? willTank.hp : 0
+    let  tankMaxHp = willTank instanceof StateStrategy ? willTank.getBot().max_hp : willTank instanceof Player ? willTank.max_hp : 0
+
+    return (Math.floor(calculate_monsters_dps(bot, willTank, [...entitiesInRange, ...targetingUs])) < Math.floor(calculate_hps(bot.getBot()) * 0.70) && tankHp > tankMaxHp *0.55)
 }
 
 export function isInRange(entity: Entity, bot: PingCompensatedCharacter, skill?: SkillName) {

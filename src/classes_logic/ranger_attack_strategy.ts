@@ -40,19 +40,14 @@ export class RangerAttackStrategy extends StateStrategy {
             await this.bot.basicAttack(healTarget.id).catch(debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1,this.ranger.getCooldown("attack")))
         }
+        
         let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
         let totalDps = 0
-        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
+        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this, e))
         if( this.bot.c.town && this.bot.hp > totalDps*15 ) {
             return setTimeout(this.basicAttackLoop, 15000)
         }
-        let target = this.ranger.getTargetEntity()
-        if(!target) {
-            return setTimeout(this.basicAttackLoop, 500)
-        }
-        if(!target?.target && CF.calculate_monster_dps(this.ranger, target, true)/CF.calculate_hps(this.ranger) >=0.95) {
-            return setTimeout(this.basicAttackLoop, 500)
-        }
+        
         
         if(this.ranger.getEntities({targetingMe: true, targetingPartyMember: true}).length < 1 && this.ranger.isOnCooldown("scare")) {
             return setTimeout(this.basicAttackLoop, Math.max(1,this.ranger.getCooldown("scare")))
@@ -71,6 +66,13 @@ export class RangerAttackStrategy extends StateStrategy {
             await this.ranger.threeShot(targetsForThreeShot[0]?.id,targetsForThreeShot[1]?.id,targetsForThreeShot[2]?.id).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("3shot")))
         }
+        let target = this.ranger.getTargetEntity()
+        if(!target) {
+            return setTimeout(this.basicAttackLoop, 500)
+        }
+        if(!target?.target && CF.calculate_monster_dps(this, target, true)/CF.calculate_hps(this.ranger) >=0.95) {
+            return setTimeout(this.basicAttackLoop, 500)
+        }
         if(Tools.distance(this.ranger, target)> this.ranger.range*0.8) {
             if( !this.ranger.smartMoving && !this.ranger.moving ) {
                 let location = CF.getHalfWay(this.ranger, target)
@@ -79,7 +81,7 @@ export class RangerAttackStrategy extends StateStrategy {
             }
         }
         if(Tools.distance(this.ranger,target) < this.ranger.range) {
-            if(CF.calculate_monster_dps(this.ranger,target)/CF.calculate_hps(this.ranger)>=2) {
+            if(CF.calculate_monster_dps(this,target)/CF.calculate_hps(this.ranger)>=2) {
                 return setTimeout(this.basicAttackLoop, 500)
             }
             if(WEAPON_CONFIGS[this.bot.name]?.solo_mainhand) await this.switchWeapon("solo")
@@ -129,30 +131,30 @@ export class RangerAttackStrategy extends StateStrategy {
     private getTargets(skill : SkillName) : Entity[] {
         if(!["5shot", "3shot"].includes(skill)) return this.ranger.getEntities({withinRange: this.ranger.range})
         let final_targets: Entity[] = []
-        let pcourage = 0
-        let mcourage = 0
-        let courage = 0
+        let pcourage = this.bot.getEntities({targetingMe: true}).filter( e => e.damage_type == "pure").length
+        let mcourage = this.bot.getEntities({targetingMe: true}).filter( e => e.damage_type == "magical").length
+        let courage = this.bot.getEntities({targetingMe: true}).filter( e => e.damage_type == "physical").length
         for(const entity of this.ranger.getEntities()) {
             if(!entity.target && this.ranger.canKillInOneShot(entity, skill)) final_targets.push(entity)
             if(entity.isAttackingPartyMember(this.ranger) || entity.target == this.ranger.id) final_targets.push(entity)
-            if(!entity.target && !this.ranger.canKillInOneShot(entity, skill) && CF.calculate_monster_dps(this.ranger, entity)< this.bot.hp/5) {
+            if(!entity.target && !this.ranger.canKillInOneShot(entity, skill) && CF.calculate_monster_dps(this, entity)< this.bot.hp/5) {
                 switch(entity.damage_type) {
                     case "physical":
-                        if(courage < this.ranger.courage) {
+                        if(courage < this.ranger.courage || entity.target) {
                             final_targets.push(entity)
-                            courage++
+                            if(!entity.target) courage++
                         }
                         break
                     case "magical":
-                        if(mcourage < this.ranger.mcourage) {
+                        if(mcourage < this.ranger.mcourage || entity.target) {
                             final_targets.push(entity)
-                            mcourage++
+                            if(!entity.target) mcourage++
                         }
                         break
                     case "pure":
-                        if(pcourage < this.ranger.pcourage) {
+                        if(pcourage < this.ranger.pcourage || entity.target) {
                             final_targets.push(entity)
-                            pcourage++
+                            if(!entity.target) pcourage++
                         }
                         break
                 }
@@ -216,7 +218,7 @@ export class RangerAttackStrategy extends StateStrategy {
         if(!target) {
             return setTimeout(this.useSupershotLoop, 500)
         }
-        if(!target.target && CF.calculate_monster_dps(this.ranger,target)/CF.calculate_hps(this.ranger)>=0.95) {
+        if(!target.target && CF.calculate_monster_dps(this,target)/CF.calculate_hps(this.ranger)>=0.95) {
             return setTimeout(this.useSupershotLoop, 500)
         }
         if(this.ranger.mp > this.ranger.max_mp * 0.6) {

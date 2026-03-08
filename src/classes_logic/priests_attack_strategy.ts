@@ -39,7 +39,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         }
         let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
         let totalDps = 0
-        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
+        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this, e))
         if( this.bot.c.town && this.bot.hp > totalDps*15 ) {
             return setTimeout(this.attackOrHealLoop, 15000)
         }
@@ -71,7 +71,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(!target) {
             return setTimeout(this.attackOrHealLoop, 300)
         }
-        if(!target.target && CF.calculate_monster_dps(this.priest, target, true)/CF.calculate_hps(this.priest) >=0.95) {
+        if(!target.target && CF.calculate_monster_dps(this, target, true)/CF.calculate_hps(this.priest) >=0.95) {
             return setTimeout(this.attackOrHealLoop, 500)
         }
         if(!this.priest.smartMoving && !this.priest.moving && Tools.distance(target, this.priest)> this.priest.range) {
@@ -115,6 +115,7 @@ export class PriestsAttackStrategy extends StateStrategy {
 
     private async useCurseLoop() {
         if(this.deactivate) return
+        if(this.priest.c.town) return setTimeout(this.useCurseLoop, 2000)
         if(!this.priest.getTargetEntity() || this.priest.smartMoving) {
             return setTimeout(this.useCurseLoop, 2000)
         }
@@ -124,7 +125,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(this.priest.getTargetEntity().hp<5000) {
             return setTimeout(this.useCurseLoop, 1000)
         }
-        if(!this.priest.getTargetEntity().target && CF.calculate_monster_dps(this.priest, this.priest.getTargetEntity())/CF.calculate_hps(this.priest) >=0.95) {
+        if(!this.priest.getTargetEntity().target && CF.calculate_monster_dps(this, this.priest.getTargetEntity())/CF.calculate_hps(this.priest) >=0.95) {
             return setTimeout(this.useCurseLoop, 500)
         }
         if(Tools.distance(this.priest, this.priest.getTargetEntity()) <= Game.G.skills.curse.range) await this.priest.curse(this.priest.target).catch(console.warn)
@@ -137,6 +138,8 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(this.priest.isOnCooldown("absorb")) return setTimeout(this.pullMobsFromParty, Math.max(1, this.priest.getCooldown("absorb")))
         if(!this.priest.canUse("absorb")) return setTimeout(this.pullMobsFromParty, 1000)
         if(this.priest.mp < this.priest.max_mp * 0.3) return setTimeout(this.pullMobsFromParty, 1000)
+        if(this.priest.c.town) return setTimeout(this.pullMobsFromParty, 2000)
+        if(this.priest.hp < this.priest.max_hp*0.45) return setTimeout(this.pullMobsFromParty, 1000)
         let mobs_targeting_party = this.priest.getEntities({targetingPartyMember: true})
         // console.debug(`Mobs targeting party: ${mobs_targeting_party.length}`)
         
@@ -174,12 +177,12 @@ export class PriestsAttackStrategy extends StateStrategy {
         this.priest.partyData?.list?.forEach(pm => { if(pm!=this.priest.id) players.set( pm, mobs_targeting_party.filter( e=> e.target == pm).length ) })
         
         let player_with_more_mobs = [...players.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
-        let current_dps = CF.calculate_monsters_dps(this.priest, this.priest, this.priest.getEntities({targetingMe: true}))
-        let add_dps = CF.calculate_monsters_dps(this.priest, this.priest, mobs_targeting_party.filter(e => e.target == player_with_more_mobs))
-        if(current_dps+add_dps/CF.calculate_hps(this.priest) > 0.95) {
-            // console.debug(`Current dps + add dps is more than 1.2x hps`)
-            return setTimeout(this.pullMobsFromParty, 1000)
-        }
+        // let current_dps = CF.calculate_monsters_dps(this, this, this.priest.getEntities({targetingMe: true}), true)
+        // let add_dps = CF.calculate_monsters_dps(this, this, mobs_targeting_party.filter(e => e.target == player_with_more_mobs), true)
+        // if(current_dps+add_dps/CF.calculate_hps(this.priest) > 1.2) {
+        //     // console.debug(`Current dps + add dps is more than 1.2x hps, player ${player_with_more_mobs} has ${mobs_targeting_party.filter(e => e.target == player_with_more_mobs).length} mobs targeting him`)
+        //     return setTimeout(this.pullMobsFromParty, 1000)
+        // }
 
         await this.priest.absorbSins(player_with_more_mobs).catch(debugLog)
         
@@ -225,6 +228,7 @@ export class PriestsAttackStrategy extends StateStrategy {
 
     private async useDarkBlessingLoop() {
         if(this.deactivate) return
+        if(this.priest.c.town) return setTimeout(this.useDarkBlessingLoop, 2000)
         if(this.priest.isOnCooldown("darkblessing")) {
             return setTimeout(this.useDarkBlessingLoop, this.priest.getCooldown("darkblessing"))
         }
@@ -243,16 +247,19 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(this.deactivate) return
         if(this.priest.isOnCooldown("zapperzap")) return setTimeout(this.useZap, Math.max(1, this.priest.getCooldown("zapperzap")))
         if(!this.priest.canUse("zapperzap")) return setTimeout(this.useZap, 1000)
+        if(this.priest.c.town) return setTimeout(this.useZap, 2000)
+        if(this.priest.smartMoving) return setTimeout(this.useZap, 1000)
         if(this.priest.mp < this.priest.max_mp * 0.3) return setTimeout(this.useZap, 1000)
+        if(this.bot.ctype == "priest" && this.bot.getPlayers({isPartyMember: true, isDead: false}).filter( e => e.hp > e.max_hp*0.3 && Tools.distance(this.priest, e) < this.priest.range*1.5).length<1) return setTimeout(this.useZap, 1000)
         
-        let dps = CF.calculate_monsters_dps(this.priest, this.priest, this.priest.getEntities({targetingMe: true, targetingPartyMember: true}))
+        let dps = CF.calculate_monsters_dps(this, this, this.priest.getEntities({targetingMe: true, targetingPartyMember: true}))
         let hps = CF.calculate_hps(this.priest)
         
         let MobsWithoutTargetingParty = this.priest.getEntities({hasTarget: false})
         
         if(MobsWithoutTargetingParty.length>0 && dps<hps) {
             for( let mob of MobsWithoutTargetingParty) {
-                if(hps > dps + CF.calculate_monster_dps(this.priest, mob)) {
+                if(hps > dps + CF.calculate_monster_dps(this, mob) && (!mob.abilities.stone || mob.target)) {
                     await this.priest.zapperZap(mob.id).catch(er => console.warn(er))
                     return setTimeout(this.useZap, Math.max(1, this.priest.getCooldown("zapperzap")))
                 }

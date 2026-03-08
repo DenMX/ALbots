@@ -68,7 +68,7 @@ export class RogueAttackStrategy extends StateStrategy {
             return setTimeout(this.stubLoop, 500)
         }
         
-        if(!target.target && CF.calculate_monster_dps(this.rogue, target, true)/CF.calculate_hps(this.rogue) >=0.95) {
+        if(!target.target && this.bot.max_hp/CF.calculate_monster_dps(this.rogue, target, true) < 10) {
             return setTimeout(this.stubLoop, 500)
         }
         if(this.rogue.isOnCooldown("scare") && !target.target) {

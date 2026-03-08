@@ -31,3 +31,64 @@ export const BOSS_CHECK_ROUTE: BossSpot[] = [
 	{name: "stompy", location: {map: "winterland", x: 400, y: -2600}},
 	{name: "skeletor", location: {map: "arena", x: 247, y: -558}}
 ]
+export const SPECIAL_MONSTERS: MonsterName[] = [
+	// Noraml monsters
+	"crabxx",
+	"cutebee",
+	"dragold",
+	"fvampire",
+	"franky",
+	"gbluepro",
+	"ggreenpro",
+	"goldenbat",
+	"goldenbot",
+	"gredpro",
+	"gpurplepro",
+	"greenjr",
+	"grinch",
+	"harpy",
+	"icegolem",
+	"jr",
+	"mrgreen",
+	"mrpumpkin",
+	"mvampire",
+	"phoenix",
+	"pinkgoo",
+	"rharpy",
+	"rudolph",
+	"skeletor",
+	"slenderman",
+	"snowman",
+	"spiderbl",
+	"spiderbr",
+	"spiderr",
+	"stompy",
+	"tiger",
+	// "tinyp",
+	"wabbit",
+	// Goo Brawl
+	"rgoo",
+	// Crypt monsters
+	"a1",
+	"a2",
+	"a3",
+	"a4",
+	"a5",
+	"a6",
+	"a7",
+	"a8",
+	"vbat",
+	"xmagefi",
+	"xmagefz",
+	"xmagen",
+	"xmagex",
+]
+
+export const SPECIAL_ALWAYS_WANTED: MonsterName[] = [
+	// Noraml monsters
+	"cutebee",
+	"goldenbat",
+	"goldenbot",
+	"rharpy",
+	"tiger"
+]

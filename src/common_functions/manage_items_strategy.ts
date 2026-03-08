@@ -4,6 +4,7 @@ import { ResuplyStrategy } from "./resupply_strategy"
 import { MemoryStorage } from "./memory_storage"
 import * as CharacterItems from "../configs/character_items_configs"
 import * as CF from "./common_functions"
+import { debugLog } from "./common_functions"
 
 
 export type PackItems = [BankPackName, number[]]
@@ -87,7 +88,6 @@ export class ManageItems extends ResuplyStrategy {
                 this.sellTrash()
                 await this.upgradeItems()
                 await this.compoundItems()
-                await this.exchangeItems()
             }
         }
         return setTimeout(this.startManageLogic, 30 * this.bot.esize * 1000)
@@ -95,6 +95,7 @@ export class ManageItems extends ResuplyStrategy {
 
     protected async upgradeItems() {
         if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, CF.UPGRADE_POSITION)>Constants.NPC_INTERACTION_DISTANCE) return
+        if(this.bot.map.startsWith("bank")) return
 
         level: for(let lvl = 0; lvl < 9; lvl++){
             // let debugItemsInfo = this.bot.items.filter( e => ItemsConfig.MERCHANT_UPGRADE.has(e?.name) && e?.level == lvl && Game.G.items[e.name].upgrade)
@@ -111,7 +112,7 @@ export class ManageItems extends ResuplyStrategy {
                 if( itemConfig.offeringAt && itemConfig.offeringAt <= item.level ) offering = "offering"
                 else if ( itemConfig.primlingAt && itemConfig.primlingAt <= item.level ) offering = "offeringp"
                 if( offering && !this.bot.locateItem(offering) ) {
-                    if( offering == "offering" && this.bot.gold > 500000000 && this.bot.esize>0 ) await this.bot.buy("offering")
+                    if( offering == "offering" && this.bot.gold > 500000000 && this.bot.esize>0 ) await this.bot.buy("offering").catch(debugLog)
                     else continue
                 }
 
@@ -132,8 +133,14 @@ export class ManageItems extends ResuplyStrategy {
 
                 let scroll_idx = this.bot.locateItem(scroll_name)
                 if(this.bot instanceof Merchant) {
-                    if(this.bot.canUse("massproduction")) await this.bot.massProduction().catch(console.debug)
-                    if(this.bot.canUse("massproductionpp")) await this.bot.massProductionPP().catch(console.debug)
+                    try{
+                        if(this.bot.canUse("massproduction")) await this.bot.massProduction()
+                        if(this.bot.canUse("massproductionpp")) await this.bot.massProductionPP()
+                    }
+                    catch(error) {
+                        debugLog()
+                    }
+                    
                 }
                 console.debug(`Upgrading ${item.name} to ${item.level+1}`)
                 await this.bot.upgrade(slot, scroll_idx, primling).catch(console.warn)
@@ -142,7 +149,7 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected async compoundItems() {
-        console.debug(`COMPOUND STARTED`)
+        // console.debug(`${this.bot.id} COMPOUND STARTED`)
         if(!this.bot.hasItem(["computer", "supercomputer"]) && Tools.distance(this.bot, CF.UPGRADE_POSITION)>Constants.NPC_INTERACTION_DISTANCE) return
 
         level: for(let lvl=0; lvl<5; lvl++){
@@ -161,7 +168,7 @@ export class ManageItems extends ResuplyStrategy {
                 if( itemConfig.offeringAt && itemConfig.offeringAt <= item.level ) offering = "offering"
                 else if ( itemConfig.primlingAt && itemConfig.primlingAt <= item.level ) offering = "offeringp"
                 if( offering && !this.bot.locateItem(offering) ) {
-                    if( offering == "offering" && this.bot.gold > 500000000 && this.bot.esize>0 ) await this.bot.buy("offering")
+                    if( offering == "offering" && this.bot.gold > 500000000 && this.bot.esize>0 ) await this.bot.buy("offering").catch(debugLog)
                     else continue
                 }
 
@@ -203,14 +210,16 @@ export class ManageItems extends ResuplyStrategy {
             if(!item || ItemsConfig.DO_NOT_EXCHANGE.includes(item.name)) continue
             if(!item.e || item.q < item.e) continue
             for(let q = 0; q< Math.floor(item.e/item.q); q++) {
-                if(this.bot.esize < 1 ) break items;
+                if(this.bot.esize < 1 ) continue items;
                 if(this.bot instanceof Merchant) {
                     if(this.bot.canUse("massexchange")) await this.bot.massExchange().catch(console.debug)
-                    if(this.bot.canUse("massexchange")) await this.bot.massExchange().catch(console.debug)
+                    if(this.bot.canUse("massexchangepp")) await this.bot.massExchangePP().catch(console.debug)
                 }
                 await this.bot.exchange(idx).catch(console.warn)
             }
         }
+
+        setTimeout(this.exchangeItems, 1000)
     }
 
     protected async shinyItems() {
@@ -337,6 +346,7 @@ export class ManageItems extends ResuplyStrategy {
     protected async upgradeItemsFromBank() {
         let bot = this.bot
         if (!bot.bank && !super.getMemoryStorage.getBank) return console.debug("We don't have bank information")
+        if ( bot.gold < 500_000_000) return //console.debug("Not enough gold to upgrade items")
         const items = this.getUpgradeListFromBank()
         let itemsToUpgrade = 0
         items.upgrade.forEach( (e) => { itemsToUpgrade+=e.slots.length})
@@ -406,7 +416,8 @@ export class ManageItems extends ResuplyStrategy {
             }
         }
         // console.debug(`[upgradeFromBank] smartmove to upgrade`)
-        await bot.smartMove(CF.UPGRADE_POSITION, {useBlink: bot.ctype == "mage"}).catch(console.warn)
+        if(!this.bot.hasItem(["computer", "supercomputer"])) await bot.smartMove(CF.UPGRADE_POSITION).catch(console.warn)
+        else await bot.smartMove("main").catch(console.warn)
         // console.debug(`Calling compound function!`)
         this.compoundItems()
         await this.upgradeItems()
@@ -469,9 +480,11 @@ export class ManageItems extends ResuplyStrategy {
                             }
                         }
 
-                        let itemUpgrade : UpgradeItem
-                        itemUpgrade.itemName == item.name
-                        itemUpgrade.level == item.level
+                        let itemUpgrade : UpgradeItem = {
+                            itemName: item.name,
+                            level: item.level,
+                            slots: []
+                        }
                         itemUpgrade.slots.push([bankPackName, i])
                         upgradeItems[key].push(itemUpgrade)
                         if(key == "upgrade") offeringsCount -= 1

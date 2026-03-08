@@ -25,7 +25,7 @@ export class ResuplyStrategy extends PartyStrategy {
         this.resupplyPots()
         this.usePotionsLoop()
         this.scareLoop()
-        // this.useElixirsLoop()
+        this.useElixirsLoop()
         this.resuplyScrolls()
         this.stayAlive()
         this.saveXpOnDeath()
@@ -66,11 +66,11 @@ export class ResuplyStrategy extends PartyStrategy {
 
 
     private async useElixirsLoop() {
-        if(this.deactivate) return
+        if(this.deactivate || this.bot.ctype == "merchant") return
         if(this.bot.slots.elixir?.expires) {
             return setTimeout( () => this.useElixirsLoop(), Date.parse(this.bot.slots.elixir.expires) - Date.now())
         }
-        if(!this.bot.slots || (this.bot.slots.elixir?.expires &&  Date.parse(this.bot.slots.elixir.expires) - Date.now() < 60000 )) {
+        if( (this.bot.slots?.elixir?.expires &&  Date.parse(this.bot.slots.elixir.expires) - Date.now() < 60000) || !this.bot.slots.elixir ) {
             let elixir_idx = this.bot.locateItem(CI.DEFAULT_ELIXIRS.get(this.bot.ctype)) 
             if(elixir_idx) await this.bot.equip(elixir_idx).catch(console.warn)
         }
@@ -86,6 +86,8 @@ export class ResuplyStrategy extends PartyStrategy {
         if(this.bot.isOnCooldown("use_hp")) {
             return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
         }
+
+        if(Object.keys(this.bot.c).length > 0) return setTimeout(this.usePotionsLoop, 2000)
         if(this.bot.hp < this.bot.max_hp * 0.5) {
             let hpot = this.bot.locateItem("hpot1")
             hpot>=0 ? await this.bot.usePotion(hpot).catch(console.warn) : await this.bot.regenHP().catch(console.warn)
@@ -189,9 +191,9 @@ export class ResuplyStrategy extends PartyStrategy {
         if(this.deactivate) return
         if(this.bot.rip) return setTimeout(this.saveXpOnDeath, 1000)
         if( ((!this.bot.hasItem("jacko") && this.bot.slots?.orb?.name != "jacko") || this.bot.isOnCooldown("scare") )
-            && CF.calculate_monsters_dps(this.bot, this.bot, this.bot.getEntities({targetingMe: true}))>this.bot.hp ) {
+            && CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))>this.bot.hp ) {
             try {
-                console.error(`${this.bot.name} SUICIDE BY LOW HP. HP: ${this.bot.hp}, DPS: ${CF.calculate_monsters_dps(this.bot, this.bot, this.bot.getEntities({targetingMe: true}))}`)
+                console.error(`${this.bot.name} SUICIDE BY LOW HP. HP: ${this.bot.hp}, DPS: ${CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))}`)
                 await this.bot.socket.emit("harakiri")
                 
             }

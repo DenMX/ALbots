@@ -85,9 +85,9 @@ export class StateController {
                     console.warn(`${Date.now()} Bot started. ${i} in bots list, ready: ${new_bot.getBot().ready}. Length of bots ${this.bots.length}.`)
                     this.memoryStorage.addEventListners(new_bot.getBot())
                     new_bot.getBot().socket.on("disconnect", (data) => this.reconnect(data, new_bot.getBot()))
-                    if(new_bot instanceof StateStrategy) {
-                        new_bot.startQuest()
-                    }
+                    // if(new_bot instanceof StateStrategy) {
+                    //     new_bot.startQuest()
+                    // }
                     break
                 }
             }
