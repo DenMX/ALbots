@@ -162,13 +162,13 @@ export class ResuplyStrategy extends PartyStrategy {
     private async scareLoop() {
         if(this.deactivate) return
         // console.log("Scare loop")
-        if(!this.bot.canUse("scare")) {
+        if(!this.bot.canUse("scare", {ignoreEquipped: true})) {
             return setTimeout(this.scareLoop, 1000)
         }
         if(this.bot.isOnCooldown("scare")) {
             return setTimeout( () => this.scareLoop(), Math.max(1, this.bot.getCooldown("scare")))
         }
-        if(this.bot.hp < this.bot.max_hp * 0.33) {
+        if(this.bot.hp < this.bot.max_hp * 0.33 || this.bot.getEntities({targetingMe: true}).filter( e => e.abilities.stone).length>0) {
             if(this.bot.slots.orb?.name != "jacko") {
                 let cur_orb = this.bot.slots.orb
                 let jacko_idx = this.bot.locateItem("jacko")

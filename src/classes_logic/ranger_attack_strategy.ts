@@ -133,10 +133,14 @@ export class RangerAttackStrategy extends StateStrategy {
         let pcourage = this.bot.getEntities({targetingMe: true}).filter( e => e.damage_type == "pure").length
         let mcourage = this.bot.getEntities({targetingMe: true}).filter( e => e.damage_type == "magical").length
         let courage = this.bot.getEntities({targetingMe: true}).filter( e => e.damage_type == "physical").length
+        let dps = CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))
+        if (dps> this.bot.max_hp*0.2) return final_targets
         for(const entity of this.ranger.getEntities()) {
+            if(entity.abilities.stone && !entity.target) continue
+            if(this.bot.getEntities().filter(e => e.abilities.stone && !e.target && Tools.distance(e, entity)<40).length>0) continue
             if(!entity.target && this.ranger.canKillInOneShot(entity, skill)) final_targets.push(entity)
             if(entity.isAttackingPartyMember(this.ranger) || entity.target == this.ranger.id) final_targets.push(entity)
-            if(!entity.target && !this.ranger.canKillInOneShot(entity, skill) && CF.calculate_monster_dps(this, entity)< this.bot.hp/5) {
+            if(!entity.target && !this.ranger.canKillInOneShot(entity, skill) && dps+CF.calculate_monster_dps(this, entity)< this.bot.hp/5) {
                 switch(entity.damage_type) {
                     case "physical":
                         if(courage < this.ranger.courage || entity.target) {

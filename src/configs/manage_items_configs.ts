@@ -240,6 +240,8 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["supermittens", { level: 7, primlingAt: 0, offeringAt: 3 }],
     ["xmaspants", { level: 9, scrollUpAt: 6, primlingAt: 8 }],
 
+    ["frankypants", { level: 9, primlingAt: 7, offeringAt: 8 }],
+
     // --- COMPOUND SECTION --- \\
     // Offhands
     ["wbookhs", { level: 3, primlingAt: 1 }],

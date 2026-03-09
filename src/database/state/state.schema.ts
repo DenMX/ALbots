@@ -7,7 +7,9 @@ const StateSchema = new Schema({
         type: Number,
     },
     botId: {required: true, type: String },
-    wantedMob: {required: true, type: String || Array },
+    // `String || Array` always resolves to `String` in JS, which causes CastError when saving arrays.
+    // We allow both `string` and `string[]` here (see `IState.wantedMob`).
+    wantedMob: {required: true, type: Schema.Types.Mixed },
     state_type: {required: true, type: String },
     location: {required: false, type: Object },
     server: {required: true, type: Object }
