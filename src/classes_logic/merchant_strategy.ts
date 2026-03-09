@@ -40,6 +40,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.shouldCheckBossesLoop = this.shouldCheckBossesLoop.bind(this)
         this.checkBosses = this.checkBosses.bind(this)
         this.mluckLoop = this.mluckLoop.bind(this)
+        this.fastRunLoop = this.fastRunLoop.bind(this)
 
         this.checkInventory()
         this.job_scheduler.push(this.checkBankUpgrades)
@@ -48,6 +49,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.monitoringSpecialsLoop()
         this.shouldCheckBossesLoop()
         this.mluckLoop()
+        this.fastRunLoop()
 
         if(this.bot.isOnCooldown("fishing")) setTimeout(() => {this.job_scheduler.push(this.fishing)}, Math.max(1,this.bot.getCooldown("fishing")))
         else this.job_scheduler.push(this.fishing)
@@ -484,5 +486,13 @@ export class MerchantStrategy extends ManageItems implements IState {
             return setTimeout(this.mluckLoop, Math.max(1,this.bot.getCooldown("mluck")))
         }
         setTimeout(this.mluckLoop, 1000)
+    }
+
+    private async fastRunLoop() {
+        if(this.deactivate) return
+        if(this.bot.isOnCooldown("mcourage")) return setTimeout(this.fastRunLoop, Math.max(1, this.bot.getCooldown("mcourage")))
+        if(!this.bot.smartMoving || !this.bot.canUse("mcourage")) return setTimeout(this.fastRunLoop, 1000)
+        if(this.bot.smartMoving) await (this.bot as Merchant).merchantCourage().catch(CF.debugLog)
+        return setTimeout(this.fastRunLoop, Math.max(100, this.bot.getCooldown("mcourage")))
     }
 }

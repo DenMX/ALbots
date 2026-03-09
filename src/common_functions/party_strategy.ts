@@ -37,10 +37,12 @@ export class PartyStrategy {
         this.enablePartyEvents = this.enablePartyEvents.bind(this)
         this.loot = this.loot.bind(this)
         this.checkEquippedSetLoop = this.checkEquippedSetLoop.bind(this)
+        this.reduceSpotCDLoop = this.reduceSpotCDLoop.bind(this)
 
         this.checkParty()
         this.loot()
         this.enablePartyEvents()
+        this.reduceSpotCDLoop()
         
 
         let logLimitDCReport = (data: LimitDCReportData) => {
@@ -267,6 +269,23 @@ export class PartyStrategy {
         }
 
         setTimeout(this.checkParty, 5000)
+    }
+
+    private async reduceSpotCDLoop() {
+        if(this.deactivate || !this.bot.hasItem("orboftemporal")) return
+        if(this.bot.smartMoving) return setTimeout(this.reduceSpotCDLoop, 1000)
+        if(this.bot.isOnCooldown("temporalsurge")) return setTimeout(this.reduceSpotCDLoop, Math.max(1, this.bot.getCooldown("temporalsurge")))
+        if(!this.bot.canUse("temporalsurge", {ignoreEquipped: true})) return setTimeout(this.reduceSpotCDLoop, 500)
+        if(this.bot.ctype == 'merchant' && this.bot.getPlayers({isPartyMember: true}).filter( e => Tools.distance(this.bot, e)< 200).length<1) return setTimeout(this.reduceSpotCDLoop, 1000)
+        
+        let currentOrb = this.bot.slots.orb
+        if(this.bot.slots?.orb?.name != "orboftemporal") await this.bot.equip(this.bot.locateItem("orboftemporal")).catch(debugLog)
+        
+        if(this.bot.slots?.orb?.name == "orboftemporal") await this.bot.temporalSurge().catch(debugLog)
+
+        if(currentOrb && currentOrb.name != this.bot.slots?.orb?.name) this.bot.equip(this.bot.locateItem(currentOrb?.name, undefined, {level: currentOrb?.level}))
+
+        setTimeout(this.reduceSpotCDLoop, Math.max(100, this.bot.getCooldown("temporalsurge")))
     }
 
 

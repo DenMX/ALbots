@@ -176,7 +176,9 @@ export function calculate_my_dps(bot: PingCompensatedCharacter) {
  * Decide could we or should we use weapon with explosion and blast effects
  */
 export function shouldUseMassWeapon(bot: PartyStrategy, tank: string) {
-    if(bot.getBot().getEntities().filter( e => e.target == bot.getBot().id || bot.getBot().partyData?.list.includes(e.target)).length>1) return true
+
+
+    if(bot.getBot().getEntities().filter( e => e.target == bot.getBot().id || bot.getBot().partyData?.list.includes(e.target) && bot.getBot().getEntities().filter( addentity => addentity.abilities.stone && Tools.distance(e, addentity)<40).length<1).length>1) return true
     let target = bot.getBot().getTargetEntity()
     if(!target) return false
     if(bot.getBot().getEntities().filter( e => Tools.distance(e, target)<= 40 && e.abilities.stone && !e.target).length>0) return false
