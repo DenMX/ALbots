@@ -157,6 +157,9 @@ export const ITEMS_TO_SELL: ItemName[] = [
 	'hboots',
 	'hgloves',
     "mcape",
+
+    //trash weapon
+    "t2bow"
     
 ]
 
@@ -179,8 +182,11 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["staff", { level: 8 }],
     ["angelwings", { level: 8, scrollUpAt: 4, offeringAt: 6}],
     
+    // Shields
     ["sshield", { level: 8 }],
     ["mshield", { level: 9, primlingAt: 7, offeringAt: 8 }],
+    ["shield", {level: 9, scrollUpAt: 6}],
+    
     ["rapier", { level: 8, scrollUpAt: 4, primlingAt: 7}],
 
     //wanderer set
@@ -205,6 +211,7 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["basher", {level: 7, primlingAt: 7}],
     ["cclaw", {level: 9, scrollUpAt: 5, offeringAt: 8}],
     ["cupid", {level: 8, scrollUpAt: 4, primlingAt: 5, offeringAt: 7}],
+    ["pmace", {level: 9, scrollUpAt: 4, primlingAt: 6, offeringAt: 8}],
     
 
     // Halloween

@@ -255,12 +255,12 @@ export class PriestsAttackStrategy extends StateStrategy {
         let dps = CF.calculate_monsters_dps(this, this, this.priest.getEntities({targetingMe: true, targetingPartyMember: true}))
         let hps = CF.calculate_hps(this.priest)
         
-        let MobsWithoutTargetingParty = this.priest.getEntities({hasTarget: false})
+        let MobsWithoutTargetingParty = this.priest.getEntities({hasTarget: false, withinRange: "zapperzap"})
         
         if(MobsWithoutTargetingParty.length>0 && dps<hps) {
             for( let mob of MobsWithoutTargetingParty) {
                 if(hps > dps + CF.calculate_monster_dps(this, mob) && (!mob.abilities.stone || mob.target)) {
-                    await this.priest.zapperZap(mob.id).catch(er => console.warn(er))
+                    await this.priest.zapperZap(mob.id).catch(debugLog)
                     return setTimeout(this.useZap, Math.max(1, this.priest.getCooldown("zapperzap")))
                 }
             }

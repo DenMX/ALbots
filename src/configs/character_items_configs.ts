@@ -38,7 +38,7 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         solo_offhand: { name: 'candycanesword', level: 9 },
         mass_mainhand: {name: 'ololipop', level: 9},
         mass_offhand: {name: 'ololipop', level: 9},
-        fast_mainhand: {name: "rapier", level: 8}
+        fast_mainhand: {name: "rapier", level: 7}
     },
     "arMAGEdon": {
         solo_mainhand: { name: "firestaff", level: 9 },

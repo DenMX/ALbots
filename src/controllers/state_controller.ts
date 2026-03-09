@@ -139,7 +139,7 @@ export class StateController {
                 
             }
         }
-        setTimeout(this.checkEvents, 60 * 1000)
+        setTimeout(this.checkEvents, 10 * 1000)
     }
 
     private checkSendItems() {

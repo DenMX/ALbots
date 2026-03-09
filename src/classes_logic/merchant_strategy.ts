@@ -238,7 +238,6 @@ export class MerchantStrategy extends ManageItems implements IState {
             await this.resuplyScrolls()
             await this.upgradeItems()
             await this.compoundItems()
-            await this.exchangeItems()
         }
         setTimeout(this.checkInventory, 1000)//10sec
                 
@@ -301,7 +300,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         if(this.deactivate) return console.debug("Monitoring specials loop is deactivated")
         const mageState = this.getMemoryStorage.getStateController?.getBots.filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "mage")[0]
         if( !mageState ) {
-            console.debug("No mage on the server while monitoring specials loop is running")
+            // console.debug("No mage on the server while monitoring specials loop is running")
             return setTimeout(this.monitoringSpecialsLoop, 10_000)
         }
         const mage = mageState.getBot()
@@ -373,7 +372,7 @@ export class MerchantStrategy extends ManageItems implements IState {
             .length < 1
         ) 
         {
-            console.debug("No mage on the server while loop is running")
+            // console.debug("No mage on the server while loop is running")
             return setTimeout(this.shouldCheckBossesLoop, 10_000)
         }
         if(!this.getMemoryStorage?.getStateController?.getBots) return setTimeout(this.shouldCheckBossesLoop, 10_000)
@@ -392,7 +391,7 @@ export class MerchantStrategy extends ManageItems implements IState {
             .filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "mage")
             .length < 1
         ) {
-            console.debug("No mage on the server")
+            // console.debug("No mage on the server")
             return setTimeout(this.shouldCheckBossesLoop, 10_000)
         }
         this.changeMerchState("Checking bosses")

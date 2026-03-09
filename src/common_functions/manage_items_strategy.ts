@@ -57,6 +57,7 @@ export class ManageItems extends ResuplyStrategy {
         this.startManageLogic = this.startManageLogic.bind(this)
 
         if(bot.ctype != 'merchant') this.startManageLogic()
+        else this.exchangeItems()
     }
 
     protected async startManageLogic() {
@@ -205,21 +206,30 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected async exchangeItems() {
-        if(this.bot.esize<1) return
+        if(this.bot.esize<1) return setTimeout(this.exchangeItems, 1000)
+        if(this.bot.rip) return setTimeout(this.exchangeItems, 1000)
+        if(["bank", "bank_u","bank_b", "cyberland"].includes(this.bot.map) ) return setTimeout(this.exchangeItems, 1000)
         items: for(const [idx, item] of this.bot.getItems()) {
-            if(!item || ItemsConfig.DO_NOT_EXCHANGE.includes(item.name)) continue
-            if(!item.e || item.q < item.e) continue
-            for(let q = 0; q< Math.floor(item.e/item.q); q++) {
-                if(this.bot.esize < 1 ) continue items;
+            if( !item.e || ItemsConfig.DO_NOT_EXCHANGE.includes(item.name) || item.q < item.e ) {
+                continue
+            }
+            // console.debug(`${item.name} item excahngeble ${item.e} item in blacklist: ${ItemsConfig.DO_NOT_EXCHANGE.includes(item.name)} item q ${item.q} not enough ${item.q < item.e} `)
+            for(let q = 0; q< Math.floor(item.q/item.e); q++) {
+                if(this.bot.esize < 1 ) {
+                    console.debug(`${this.bot.id} not enough space ${this.bot.esize}`)
+                    break items;
+                }
                 if(this.bot instanceof Merchant) {
+                    // console.debug(`Using massexchanges`)
                     if(this.bot.canUse("massexchange")) await this.bot.massExchange().catch(console.debug)
                     if(this.bot.canUse("massexchangepp")) await this.bot.massExchangePP().catch(console.debug)
                 }
+                // console.debug(`exchanging ${item.name}`)
                 await this.bot.exchange(idx).catch(console.warn)
             }
         }
 
-        setTimeout(this.exchangeItems, 1000)
+        if(this.bot.hasItem(["computer", "supercomputer"])) setTimeout(this.exchangeItems, 1000)
     }
 
     protected async shinyItems() {

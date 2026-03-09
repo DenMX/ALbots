@@ -145,8 +145,10 @@ export class PartyStrategy {
                 || (this.bot.chests.size>0 && this.bot.smartMoving)
             ) {
                 let active_booster = this.getActiveBooster()
+                let burstDamage = 0
+                this.bot.getEntities({targetingMe: true}).forEach( e => burstDamage+= e.attack)
                 if(active_booster && this.bot.items[active_booster].name !== "goldbooster") await this.bot.shiftBooster(active_booster, "goldbooster").catch(debugLog)
-                if(SET_CONFIGS[this.bot.id]?.gold) await this.equipSet("gold", SET_CONFIGS[this.bot.id]?.gold)
+                if(SET_CONFIGS[this.bot.id]?.gold && burstDamage<this.bot.max_hp*0.5) await this.equipSet("gold", SET_CONFIGS[this.bot.id]?.gold)
                 this.bot.chests.forEach( (e) => this.bot.openChest(e.id).catch(console.warn))
                 if(this.memoryStorage.getCurrentLooter != this.bot.id || this.memoryStorage.getDefaultLooter != this.bot.id) this.bot.shiftBooster(active_booster, "xpbooster").catch(debugLog)
                 else await this.bot.shiftBooster(active_booster, "luckbooster").catch(debugLog)
@@ -179,15 +181,17 @@ export class PartyStrategy {
     private async checkEquippedSetLoop() {
         if(this.deactivate) return
         if(Date.now() - Math.max(1,this.LastEquippedSet.datetime) < 500 ) return setTimeout(this.checkEquippedSetLoop, Math.max(1, this.LastEquippedSet.datetime - Date.now() + 500))
+        let burstDamage = 0
+        this.bot.getEntities({targetingMe: true}).forEach( e => burstDamage+= e.attack)
         if(this.bot.hp < this.bot.max_hp * 0.55 && this.bot.getEntities({targetingMe: true}).length > 0 && SET_CONFIGS[this.bot.id]?.tank) {
             await this.equipSet("tank", SET_CONFIGS[this.bot.id]?.tank)
             return setTimeout(this.checkEquippedSetLoop, 500)
         }
-        if(this.bot.hp > this.bot.max_hp * 0.55 && SET_CONFIGS[this.bot.id]?.luck && this.bot.getEntities({targetingMe: true}).length > 0) {
+        if(this.bot.hp > this.bot.max_hp * 0.55 && SET_CONFIGS[this.bot.id]?.luck && this.bot.getEntities({targetingMe: true}).length > 0 && burstDamage<this.bot.max_hp*0.5) {
             await this.equipSet("luck", SET_CONFIGS[this.bot.id]?.luck)
             return setTimeout(this.checkEquippedSetLoop, 500)
         }
-        if(this.bot.hp > this.bot.max_hp * 0.55 && SET_CONFIGS[this.bot.id]?.exp && this.bot.getEntities({targetingMe: true}).length > 0) {
+        if(this.bot.hp > this.bot.max_hp * 0.55 && SET_CONFIGS[this.bot.id]?.exp && this.bot.getEntities({targetingMe: true}).length > 0 && burstDamage<this.bot.max_hp*0.5) {
             await this.equipSet("exp", SET_CONFIGS[this.bot.id]?.exp)
             return setTimeout(this.checkEquippedSetLoop, 500)
         }

@@ -34,7 +34,7 @@ export class RangerAttackStrategy extends StateStrategy {
         if(!this.ranger.canUse("attack")) {
             return setTimeout(this.basicAttackLoop, 300)
         }
-        let healTarget = this.bot.getPlayers({isPartyMember: true, withinRange: "attack"}).filter( e => e.hp < e.max_hp * 0.45).sort( (a,b) => a.hp - b.hp)[0]
+        let healTarget = this.bot.getPlayers({isPartyMember: true, withinRange: "attack", isDead: false}).filter( e => e.hp < e.max_hp * 0.45).sort( (a,b) => a.hp - b.hp)[0]
         if(healTarget && (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_weapon) {
             await this.switchWeapon("heal")
             await this.bot.basicAttack(healTarget.id).catch(debugLog)
@@ -42,9 +42,8 @@ export class RangerAttackStrategy extends StateStrategy {
         }
         
         let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
-        let totalDps = 0
-        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this, e))
-        if( this.bot.c.town && this.bot.hp > totalDps*15 ) {
+        
+        if( this.bot.c.town ) {
             return setTimeout(this.basicAttackLoop, 15000)
         }
         

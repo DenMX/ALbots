@@ -257,10 +257,11 @@ export class WarriorsAttackStrategy extends StateStrategy {
         let mainhand_idx = this.warrior.locateItem(mainhand_item.name, undefined, {level: mainhand_item?.level})
         // console.debug(`Mainhand ${mainhand_item.name} in ${mainhand_idx} slot.`)
         if( mainhand_idx !== undefined ) await this.warrior.equip(mainhand_idx,"mainhand").catch(debugLog)
-        let offhand_idx = this.warrior.locateItem(offhand_item?.name, undefined, {level: offhand_item?.level})
-        // console.debug(`Offhand ${offhand_item.name} in ${offhand_idx} slot.`)        
-        if( offhand_idx !== undefined ) await this.warrior.equip(offhand_idx, "offhand").catch(debugLog)
-        
+        if(offhand_item){
+            let offhand_idx = this.warrior.locateItem(offhand_item.name, undefined, {level: offhand_item?.level})
+            // console.debug(`Offhand ${offhand_item.name} in ${offhand_idx} slot.`)        
+            if( offhand_idx !== undefined ) await this.warrior.equip(offhand_idx, "offhand").catch(debugLog)
+        }
         setTimeout(this.switchWeaponsLoop,5000)
     }
 

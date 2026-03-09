@@ -363,7 +363,7 @@ export class StateStrategy extends ManageItems implements IState {
                 if(this.current_state.state_type == "event") {
                     if( this.bot.S[this.current_state?.eventName] && this.bot.S[this.current_state.eventName]?.live != false) {
                         let join
-                        if(this.current_state?.eventName in Game.G.maps || Game.G.monsters) {
+                        if(this.current_state?.eventName in Game.G.maps || Game.G.monsters && this.current_state.eventName != "snowman") {
                             join = (this.current_state?.eventName in Game.G.maps) ? this.current_state.eventName as MapName : this.current_state.eventName as MonsterName;
                         }
                         await this.bot.smartMove(join ?? this.bot.S[this.current_state.eventName], {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.error)
