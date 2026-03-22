@@ -1,4 +1,4 @@
-import { PingCompensatedCharacter, Game, Merchant, Tools, Database, EntityModel, Constants, MonsterName } from "alclient"
+import { PingCompensatedCharacter, Game, Merchant, Tools, Database, EntityModel, Constants, MonsterName, Item, Pathfinder } from "alclient"
 import * as MIC from "../configs/manage_items_configs"
 import * as CF from "../common_functions/common_functions"
 import { ManageItems } from "../common_functions/manage_items_strategy"
@@ -21,6 +21,10 @@ export class MerchantStrategy extends ManageItems implements IState {
 
     private merch_state : State = {state_type: this.DEFAULT_STATE}
 
+    private CYBERLAND_COOLDOWN: number = 1000 * 60 * 30
+
+    private lastCyberLandCheck: number = 0
+
     public getStateType(): string {
         return this.merch_state.state_type
     }
@@ -41,6 +45,10 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.checkBosses = this.checkBosses.bind(this)
         this.mluckLoop = this.mluckLoop.bind(this)
         this.fastRunLoop = this.fastRunLoop.bind(this)
+        this.checkPontyLoop = this.checkPontyLoop.bind(this)
+        this.checkCyberLandLoop = this.checkCyberLandLoop.bind(this)
+        this.checkCyberLand = this.checkCyberLand.bind(this)
+        this.switchTradeStandLoop = this.switchTradeStandLoop.bind(this)
 
         this.checkInventory()
         this.job_scheduler.push(this.checkBankUpgrades)
@@ -50,6 +58,9 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.shouldCheckBossesLoop()
         this.mluckLoop()
         this.fastRunLoop()
+        this.checkPontyLoop()
+        this.checkCyberLandLoop()
+        this.switchTradeStandLoop()
 
         if(this.bot.isOnCooldown("fishing")) setTimeout(() => {this.job_scheduler.push(this.fishing)}, Math.max(1,this.bot.getCooldown("fishing")))
         else this.job_scheduler.push(this.fishing)
@@ -165,8 +176,8 @@ export class MerchantStrategy extends ManageItems implements IState {
         if(this.deactivate) return
         if(this.bot.slots.mainhand?.name == "rod" && this.merch_state.state_type == "Fishing") return setTimeout(this.checkWeapon, 1000)
         if(this.bot.slots.mainhand?.name == "pickaxe" && this.merch_state.state_type == "Mining") return setTimeout(this.checkWeapon, 1000)
-        if(this.bot.slots.mainhand?.name != Items.WEAPON_CONFIGS[this.bot.id].fast_mainhand?.name) await this.bot.equip(this.bot.locateItem(Items.WEAPON_CONFIGS[this.bot.id].fast_mainhand?.name), "mainhand").catch(CF.debugLog)
-        if(this.bot.slots.offhand?.name != Items.WEAPON_CONFIGS[this.bot.id].fast_offhand?.name) await this.bot.equip(this.bot.locateItem(Items.WEAPON_CONFIGS[this.bot.id].fast_offhand?.name), "offhand").catch(CF.debugLog)
+        if(this.bot.slots.mainhand?.name != Items.WEAPON_CONFIGS[this.bot.id].fast_mainhand?.name) await this.bot.equip(this.bot.locateItem(Items.WEAPON_CONFIGS[this.bot.id].fast_mainhand?.name, undefined, {level: Items.WEAPON_CONFIGS[this.bot.id].fast_mainhand?.level}), "mainhand").catch(CF.debugLog)
+        if(this.bot.slots.offhand?.name != Items.WEAPON_CONFIGS[this.bot.id].fast_offhand?.name) await this.bot.equip(this.bot.locateItem(Items.WEAPON_CONFIGS[this.bot.id].fast_offhand?.name, undefined, {level: Items.WEAPON_CONFIGS[this.bot.id].fast_offhand?.level}), "offhand").catch(CF.debugLog)
         setTimeout(this.checkWeapon, 1000)
     }
 
@@ -182,6 +193,11 @@ export class MerchantStrategy extends ManageItems implements IState {
             let fn = this.job_scheduler.shift()
             await fn()
         }
+        else if ( this.DEFAULT_STATE == this.merch_state.state_type 
+            && !this.bot.smartMoving && this.bot.partyData?.list.length>0
+            && this.bot.getPlayers({isPartyMember: true, withinRange: 300}).length<1) {
+                await this.bot.smartMove(this.bot.partyData.party[Object.keys(this.bot.partyData.party).find( e => e != this.bot.id)]).catch(CF.debugLog)
+            }
 
         if(setNextTimeout == true) {
             setTimeout(this.checkScheduler, 1000)
@@ -480,7 +496,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         if(this.deactivate) return
         if(this.bot.isOnCooldown("mluck")) return setTimeout(this.mluckLoop, Math.max(1,this.bot.getCooldown("mluck")))
         if(!this.bot.canUse("mluck")) return setTimeout(this.mluckLoop, 1000)
-        const players = this.bot.getPlayers().filter( e => (!e.s?.mluck || !e.s?.mluck?.strong || (e.s?.mluck?.f == this.bot.id && e.s?.mluck?.ms < 900_000)) && Tools.distance(this.bot, e) < Game.G.skills.mluck.range)
+        const players = this.bot.getPlayers({withinRange: "mluck"}).filter( e => (!e.s?.mluck || (!e.s?.mluck?.strong && e.s?.mluck?.ms < 600_000) || (e.s?.mluck?.f == this.bot.id && e.s?.mluck?.ms < 900_000)) )
         if (players.length>0) {
             await (this.bot as Merchant).mluck(players[0].id).catch(CF.debugLog)
             return setTimeout(this.mluckLoop, Math.max(1,this.bot.getCooldown("mluck")))
@@ -494,5 +510,48 @@ export class MerchantStrategy extends ManageItems implements IState {
         if(!this.bot.smartMoving || !this.bot.canUse("mcourage")) return setTimeout(this.fastRunLoop, 1000)
         if(this.bot.smartMoving) await (this.bot as Merchant).merchantCourage().catch(CF.debugLog)
         return setTimeout(this.fastRunLoop, Math.max(100, this.bot.getCooldown("mcourage")))
+    }
+
+    private async checkPontyLoop() {
+        if(this.deactivate) return
+        if(Pathfinder.locateNPC("secondhands").every((loc) => { return Tools.squaredDistance(this.bot, loc) > Constants.NPC_INTERACTION_DISTANCE_SQUARED })) return setTimeout(this.checkPontyLoop, 1000)
+        const pontyItems = await this.bot.getPontyItems().catch(CF.debugLog)
+        // console.debug(`Ponty items ${pontyItems}`)
+        if(!pontyItems || pontyItems.length<1) return setTimeout(this.checkPontyLoop, 1000)
+        // console.debug(`Ponty 1st item:\n ${JSON.stringify(pontyItems[0])}`)
+        for(const item of pontyItems) {
+            if(!MIC.BUY_FROM_PONTY.get(item.name)) continue
+            const itemPrice = new Item(item, Game.G).calculateValue()*Game.G.multipliers.secondhands_mult
+           if(MIC.BUY_FROM_PONTY.get(item.name) && this.bot.gold*0.2 >= itemPrice && itemPrice >= MIC.BUY_FROM_PONTY.get(item.name)) {
+            console.debug(`Buying ${item.name} from ponty for ${itemPrice}`)
+            await this.bot.buyFromPonty(item).catch(CF.debugLog)
+           }
+        }
+        setTimeout(this.checkPontyLoop, 1000)
+    }
+
+    private checkCyberLandLoop() {
+        if(this.deactivate) return
+        if(Date.now() - this.lastCyberLandCheck < this.CYBERLAND_COOLDOWN) return setTimeout(this.checkCyberLandLoop, this.CYBERLAND_COOLDOWN - (Date.now() - this.lastCyberLandCheck))
+        this.job_scheduler.push(this.checkCyberLand)
+    }
+
+    private async checkCyberLand() {
+        if(this.deactivate) return
+        this.changeMerchState("Checking CyberLand")
+        await this.bot.smartMove("cyberland").catch(CF.debugLog)
+        await this.bot.socket.emit("eval", {command: "give spares"});
+        await CF.sleep(500)
+        this.bot.chests.forEach( e => this.bot.openChest(e.id).catch(CF.debugLog))
+        this.changeMerchState(this.DEFAULT_STATE)
+        this.lastCyberLandCheck = Date.now()
+        setTimeout(this.checkCyberLandLoop, this.CYBERLAND_COOLDOWN)
+    }
+
+    private async switchTradeStandLoop() {
+        if(this.deactivate) return
+        if(this.bot.stand && (this.bot.moving || this.bot.smartMoving) ) this.bot.closeMerchantStand().catch(CF.debugLog)
+        else if(!this.bot.stand && !this.bot.moving && !this.bot.smartMoving) this.bot.openMerchantStand().catch(CF.debugLog)
+        setTimeout(this.switchTradeStandLoop, 500)
     }
 }

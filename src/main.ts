@@ -1,10 +1,4 @@
 import {Game, CharacterType, PingCompensatedCharacter, Pathfinder, Observer} from "alclient"
-import { WarriorsAttackStrategy } from "./classes_logic/warriors_attack_strategy"
-import { PriestsAttackStrategy } from "./classes_logic/priests_attack_strategy"
-import { RangerAttackStrategy } from "./classes_logic/ranger_attack_strategy"
-import { MageAttackStrategy } from "./classes_logic/mage_attack_strategy"
-import { RogueAttackStrategy } from "./classes_logic/rogue_attack_strategy"
-import { MerchantStrategy } from "./classes_logic/merchant_strategy"
 import { MemoryStorage } from "./common_functions/memory_storage"
 import { startBotWithStrategy } from "./common_functions/common_functions"
 import { StateController } from "./controllers/state_controller"
@@ -13,17 +7,7 @@ import { startCursorUI } from "./cursor-ui/server"
 
 var active_players: PingCompensatedCharacter[] = []
 
-export const my_characters: Map<string, CharacterType> = new Map([
-    ["Warious", "warrior"],
-    ["arMAGEdon", "mage"],
-    ["Archealer", "priest"],
-    ["DonWar", "warrior"],
-    ["Merchandiser", "merchant"],
-    ["aRanDonDon", "ranger"],
-    ["RangerOver", "ranger"],
-    ["aRogDonDon", "rogue"],
-    ["RogerThat", "rogue"]
-])
+
 
 let bwiReporter
 const CURSOR_UI_PORT = Number(process.env.CURSOR_UI_PORT) || 3001

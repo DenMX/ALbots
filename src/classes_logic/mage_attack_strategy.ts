@@ -40,11 +40,11 @@ export class MageAttackStrategy extends StateStrategy {
         }
         let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
         let totalDps = 0
-        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
+        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this, e))
         if( this.bot.c.town && this.bot.hp > totalDps*15 ) {
             return setTimeout(this.attackLoop, 5000)
         }
-        let target = this.mage.getTargetEntity()
+        let target = this.getTarget()
         if( !target ) {
             return setTimeout(this.attackLoop, 1000)
         }
@@ -52,7 +52,7 @@ export class MageAttackStrategy extends StateStrategy {
         if( !target.target && this.mage.isOnCooldown("scare") ) {
             return setTimeout(this.attackLoop, this.mage.getCooldown("scare"))
         }
-        if( !target.target && this.bot.max_hp/calculate_monster_dps(this.mage, target, true) < 10 ) {
+        if( !target.target && this.bot.max_hp/calculate_monster_dps(this, target, true) < 10 ) {
             return setTimeout(this.attackLoop, 500)
         }
         
@@ -79,12 +79,12 @@ export class MageAttackStrategy extends StateStrategy {
         if(mobsTargetingParty.length>0) {
             let mob = mobsTargetingParty[0]
             if (mob.damage_type == "magical" ) {
-                await this.mage.applyReflection(mob.target).catch(console.warn)
+                await this.mage.applyReflection(mob.target).catch(debugLog)
                 return setTimeout(this.useReflectionShieldLoop, Math.max(1,this.mage.getCooldown("reflection")))
             }
         }
         else if(this.mage.getEntities({targetingMe: true}).length>0) {
-            await this.mage.applyReflection(this.mage.name).catch(console.warn)
+            await this.mage.applyReflection(this.mage.name).catch(debugLog)
             return setTimeout(this.useReflectionShieldLoop, Math.max(1,this.mage.getCooldown("reflection")))
         }
         return setTimeout(this.useReflectionShieldLoop, 2000)
@@ -102,7 +102,7 @@ export class MageAttackStrategy extends StateStrategy {
         for( let k of Object.keys(this.mage.partyData.party)) {
             let member = this.mage.partyData.party[k]
             if(Tools.distance(member, this.mage)<Game.G.skills["energize"].range && (member.type == "warrior" || member.type == "ranger")) {
-                await this.mage.energize(k, 1).catch(console.warn)
+                await this.mage.energize(k, 1).catch(debugLog)
                 return setTimeout(this.useEnergizeLoop, Math.max(1, this.mage.getCooldown("energize")))
             }
         }
@@ -127,10 +127,10 @@ export class MageAttackStrategy extends StateStrategy {
             let bot = botState.getBot()
             if(Tools.distance(this.bot, bot) < 400) continue
             // SUMMON WHEN WE HAVE SPECIALS NEAR AND OTHER DOESN'T
-            if(this.bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type) && calculate_monster_dps(bot,e)/calculate_hps(bot) < 1).length<1) {
-                await this.mage.magiport(bot.id).catch(console.debug)
+            if(this.bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type) && calculate_monster_dps(this,e)/calculate_hps(bot) < 1).length<1) {
+                await this.mage.magiport(bot.id).catch(debugLog)
                 if(bot.smartMoving) bot.stopSmartMove()
-                bot.acceptMagiport(this.bot.id).catch(console.debug)
+                bot.acceptMagiport(this.bot.id).catch(debugLog)
                 if(this.currentState.state_type == "boss" || this.currentState.state_type == "event") (botState as StateStrategy).currentState = this.currentState
                 continue
             }
@@ -138,9 +138,9 @@ export class MageAttackStrategy extends StateStrategy {
             if(this.currentState.state_type == "farm" && (botState as StateStrategy).currentState.state_type == "farm" && this.currentState.wantedMob == (botState as StateStrategy).currentState.wantedMob) {
                 let wantedMonsters = (typeof this.currentState.wantedMob === "string") ? [this.currentState.wantedMob] : this.currentState.wantedMob
                 if(this.bot.getEntities().filter( e => wantedMonsters.includes(e.type)).length>0 && bot.getEntities().filter( e => wantedMonsters.includes(e.type)).length<1) {
-                    await this.mage.magiport(bot.id).catch(console.debug)
+                    await this.mage.magiport(bot.id).catch(debugLog)
                     if(bot.smartMoving) bot.stopSmartMove()
-                    bot.acceptMagiport(this.bot.id).catch(console.debug)
+                    bot.acceptMagiport(this.bot.id).catch(debugLog)
                     continue
                 }
             }
@@ -153,7 +153,7 @@ export class MageAttackStrategy extends StateStrategy {
         if(this.deactivate) return
         let wanted_mainhand
         let wanted_offhand
-        if(CF.shouldUseMassWeapon(this.bot, this.memoryStorage.getCurrentTank) && WEAPON_CONFIGS[this.bot.id]?.mass_mainhand) {
+        if(CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank) && WEAPON_CONFIGS[this.bot.id]?.mass_mainhand) {
             wanted_mainhand = WEAPON_CONFIGS[this.bot.id].mass_mainhand
         }
         else if(this.bot.getTargetEntity()?.["1hp"] && WEAPON_CONFIGS[this.bot.id]?.fast_mainhand) {

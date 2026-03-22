@@ -73,6 +73,22 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
     }
 }
 
+export type PriestOffhandConfig = {
+    luck?: {name: ItemName, level: number},
+    armor?: {name: ItemName, level: number},
+    resistance?: {name: ItemName, level: number},
+    resistEvasion?: {name: ItemName, level: number}
+}
+
+export const PRIEST_OFFHAND_CONFIGS: { [T in string]: PriestOffhandConfig} = {
+    "Archealer": {
+        luck: {name: "mshield", level: 9},
+        armor: {name: "exoarm", level: 2},
+        resistance: {name: "wbookhs", level: 3},
+        resistEvasion: {name: "lantern", level: 3}
+    }
+}
+
 
 export type SetConfig = {
     name: string,
@@ -97,10 +113,11 @@ export const SET_CONFIGS: {
                 {name: 'eslippers', level: 8},
                 {name: 'mittens', level: 9},
                 {name: 'spookyamulet', level: 1},
-                {name: 'mshield', level: 9, slot: "offhand"},
+                {name: 'mshield', level: 9},
                 {name: 'lmace', level: 8},
                 {name: 'rabbitsfoot', level: 1},
                 {name: 'mearring', level: 0, slot: "earring1"},
+                {name: 'mearring', level: 1, slot: "earring2"},
                 {name: 'ecape', level: 6}
             ],
             "gold": [
@@ -110,7 +127,6 @@ export const SET_CONFIGS: {
                 {name: 'wshoes', level: 9},
                 {name: 'handofmidas', level: 4},
                 {name: 'spookyamulet', level: 1},
-                {name: 'mearring', level: 0, slot: "earring1"},
                 {name: 'horsecapeg', level: 7}
             ],
             "tank": [

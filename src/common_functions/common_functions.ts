@@ -1,4 +1,4 @@
-import {Entity, PingCompensatedCharacter, Tools, SkillName, IPosition, Pathfinder, ItemData, Player, Game, CharacterType, ServerRegion, ServerIdentifier} from "alclient"
+import {Entity, PingCompensatedCharacter, Tools, SkillName, IPosition, Pathfinder, ItemData, Player, Game, CharacterType, ServerRegion, ServerIdentifier, GMonsterAbilities} from "alclient"
 import * as CharacterItems from "../configs/character_items_configs"
 import * as MIC from "../configs/manage_items_configs"
 import { WarriorsAttackStrategy } from "../classes_logic/warriors_attack_strategy"
@@ -17,6 +17,31 @@ export const UPGRADE_POSITION: IPosition = {
     y: -137,
     map: "main"
 }
+
+export const BLACKLISTED_ATTRIBUTES_BY_CLASS = {
+    "warrior": { dreturn: 30 },
+    "mage": { reflection: 30}
+    }
+
+export const BLACKLISTED_ABILITIES: GMonsterAbilities[] = ["stone"]
+
+export type CharacterSettings = {
+    ctype: CharacterType,
+    server: {region: ServerRegion, name: ServerIdentifier},
+    isMainSetup?: boolean
+}
+
+export const MY_CHARACTERS: Map<string, CharacterSettings> = new Map([
+    ["Warious", {ctype: "warrior", server: {region: "ASIA", name: "I"}, isMainSetup: true}],
+    ["aRanDonDon", {ctype: "ranger", server: {region: "ASIA", name: "I", isMainSetup: true}}],
+    ["Archealer", {ctype: "priest", server: {region: "ASIA", name: "I", isMainSetup: true}}],
+    ["DonWar", {ctype:"warrior", server: {region: "EU", name: "I"}}],
+    ["MerchanDiser", {ctype: "merchant", server: {region: "ASIA", name: "I"}}],
+    ["arMAGEdon", {ctype:"mage", server: {region: "US", name: "III"}}],
+    ["RangerOver", {ctype: "ranger", server: {region: "US", name: "II"}}],
+    ["aRogDonDon", {ctype: "rogue", server: {region: "US", name: "I"}}],
+    ["RogerThat", {ctype: "rogue", server: {region: "EU", name: "II"}}]
+])
 
 export async function startBotWithStrategy(ctype: CharacterType, name: string, sRegion: ServerRegion = DEFAULT_SERVER_REGION, sID: ServerIdentifier = DEFAULT_SERVER_NAME, memory_storage: MemoryStorage): Promise<IState> {
     
@@ -39,6 +64,18 @@ export async function startBotWithStrategy(ctype: CharacterType, name: string, s
             console.error(`Unknown ctype ${ctype}`)
     }
     return undefined
+}
+
+// ?????????
+export function checkScareAttack(bot: PingCompensatedCharacter): boolean {
+    if(!bot) return false
+    if(!bot.isOnCooldown("scare")) return true
+    else {
+        let target = bot.getTargetEntity()
+        if(!target) return false
+        if(target.target && !Object.keys(target?.abilities).some(e => BLACKLISTED_ABILITIES.includes(e as GMonsterAbilities))) return true
+    }
+    return true
 }
 
 
@@ -146,7 +183,7 @@ export function getHalfWay(bot: PingCompensatedCharacter, mob: Entity) : IPositi
 
 export function moveHalfWay(bot: PingCompensatedCharacter, to: IPosition) {
     if(to && Pathfinder.canStand(to)) {
-        Pathfinder.canWalkPath(bot, to) ? bot.move(to.x, to.y).catch(debugLog) : bot.smartMove(to).catch(debugLog)
+        Pathfinder.canWalkPath(bot, to) ? bot.move(to.x, to.y).catch(debugLog) : bot.smartMove(to, {avoidTownWarps: true}).catch(debugLog)
     }
 }
 
@@ -177,10 +214,11 @@ export function calculate_my_dps(bot: PingCompensatedCharacter) {
  */
 export function shouldUseMassWeapon(bot: PartyStrategy, tank: string) {
 
-
-    if(bot.getBot().getEntities().filter( e => e.target == bot.getBot().id || bot.getBot().partyData?.list.includes(e.target) && bot.getBot().getEntities().filter( addentity => addentity.abilities.stone && Tools.distance(e, addentity)<40).length<1).length>1) return true
-    let target = bot.getBot().getTargetEntity()
+    const target = bot.getBot().getTargetEntity()
     if(!target) return false
+    if((target.dreturn >= 30 || bot.getBot().getEntities().filter(e => Tools.distance(e, target) <=40 && e.dreturn >= 30).length>0) && bot.getBot().ctype == "warrior") return false
+    if(bot.getBot().getEntities().filter( e => e.target == bot.getBot().id || bot.getBot().partyData?.list.includes(e.target) && bot.getBot().getEntities().filter( addentity => addentity.abilities.stone && Tools.distance(e, addentity)<40).length<1).length>1) return true
+    
     if(bot.getBot().getEntities().filter( e => Tools.distance(e, target)<= 40 && e.abilities.stone && !e.target).length>0) return false
     let willTank 
     if(bot.getBot().name == tank ) willTank = bot.getBot()
@@ -273,4 +311,9 @@ export function warnLog(): void {
 
 export function errorLog(): void {
     return console.debug()
+}
+
+export function sleep(ms)
+{
+    return new Promise(resolve => setTimeout(resolve, ms))
 }

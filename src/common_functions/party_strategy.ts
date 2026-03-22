@@ -1,8 +1,8 @@
 import { Item, Game, Constants, InviteData, PingCompensatedCharacter, Tools, HitData, LimitDCReportData, ItemName, SlotType } from "alclient";
 import { MemoryStorage } from "./memory_storage";
-import { my_characters } from "../main";
-import { debugLog } from "./common_functions";
-import { SET_CONFIGS, SetConfig } from "../configs/character_items_configs";
+import { debugLog,  } from "./common_functions";
+import * as CF from "./common_functions"
+import { SET_CONFIGS, SetConfig, PRIEST_OFFHAND_CONFIGS } from "../configs/character_items_configs";
 
 export class PartyStrategy {
 
@@ -38,6 +38,9 @@ export class PartyStrategy {
         this.loot = this.loot.bind(this)
         this.checkEquippedSetLoop = this.checkEquippedSetLoop.bind(this)
         this.reduceSpotCDLoop = this.reduceSpotCDLoop.bind(this)
+        this.becomeHandsomeLoop = this.becomeHandsomeLoop.bind(this)
+
+        this.becomeHandsomeLoop()
 
         this.checkParty()
         this.loot()
@@ -86,6 +89,20 @@ export class PartyStrategy {
             evasion: this.bot.evasion
         }
 
+        if(PRIEST_OFFHAND_CONFIGS[this.bot.id]) {
+            if(PRIEST_OFFHAND_CONFIGS[this.bot.id]?.armor) {
+                const armorOffhandConfig = PRIEST_OFFHAND_CONFIGS[this.bot.id]?.armor
+                await this.bot.equip(this.bot.locateItem(armorOffhandConfig?.name, undefined, {level: armorOffhandConfig?.level})).catch(debugLog)
+                this.maxDef.armor = this.bot.armor
+            }
+            if(PRIEST_OFFHAND_CONFIGS[this.bot.id]?.resistance) {
+                const resistanceOffhandConfig = PRIEST_OFFHAND_CONFIGS[this.bot.id]?.resistance
+                await this.bot.equip(this.bot.locateItem(resistanceOffhandConfig?.name, undefined, {level: resistanceOffhandConfig?.level})).catch(debugLog)
+                this.maxDef.resistance = this.bot.resistance
+            }
+
+        }
+
         this.checkEquippedSetLoop()
         console.debug(`${this.bot.id} MAX DEF: ${JSON.stringify(this.maxDef)}`)
     }
@@ -113,9 +130,9 @@ export class PartyStrategy {
 
     private async onPartyRequest(data: InviteData) {
         if(this.bot.name != this.memoryStorage.getCurrentPartyLeader) return
-        if(my_characters.has(data.name) || !this.bot.partyData) this.bot.acceptPartyRequest(data.name)
+        if(CF.MY_CHARACTERS.has(data.name) || !this.bot.partyData) this.bot.acceptPartyRequest(data.name)
         let myCharsInParty = 0
-        this.bot.partyData?.list.forEach((e) => { if(my_characters.has(e)) myCharsInParty++})
+        this.bot.partyData?.list.forEach((e) => { if(CF.MY_CHARACTERS.has(e)) myCharsInParty++})
         if(
             //All my characters in party. we can have additional chars
             myCharsInParty==4 || 
@@ -150,7 +167,7 @@ export class PartyStrategy {
                 let burstDamage = 0
                 this.bot.getEntities({targetingMe: true}).forEach( e => burstDamage+= e.attack)
                 if(active_booster && this.bot.items[active_booster].name !== "goldbooster") await this.bot.shiftBooster(active_booster, "goldbooster").catch(debugLog)
-                if(SET_CONFIGS[this.bot.id]?.gold && burstDamage<this.bot.max_hp*0.5) await this.equipSet("gold", SET_CONFIGS[this.bot.id]?.gold)
+                if(SET_CONFIGS[this.bot.id]?.gold && burstDamage<this.bot.max_hp*0.5 && !this.bot.smartMoving) await this.equipSet("gold", SET_CONFIGS[this.bot.id]?.gold)
                 this.bot.chests.forEach( (e) => this.bot.openChest(e.id).catch(console.warn))
                 if(this.memoryStorage.getCurrentLooter != this.bot.id || this.memoryStorage.getDefaultLooter != this.bot.id) this.bot.shiftBooster(active_booster, "xpbooster").catch(debugLog)
                 else await this.bot.shiftBooster(active_booster, "luckbooster").catch(debugLog)
@@ -211,14 +228,14 @@ export class PartyStrategy {
     private async equipSet(name: string, set: SetConfig[]) {
         // console.debug(`${this.bot.id} Equipping ${name} set`)
         if(!set) return console.debug(`${this.bot.id} No set ${name} found`)
-        // if(Date.now() - Math.max(1,this.LastEquippedSet.datetime) < 300 ) return console.debug(`${this.bot.id} Already equipped ${name} set in last 300ms`)
-        if(Object.keys(set).length == this.LastEquippedSet.itemsCount && this.LastEquippedSet.name == name) return console.debug(`${this.bot.id} Already equipped ${name} set`)
+        if(Date.now() - Math.max(1,this.LastEquippedSet.datetime) < 300 ) return //console.debug(`${this.bot.id} Already equipped ${name} set in last 300ms`)
+        if(Object.keys(set).length == this.LastEquippedSet.itemsCount && this.LastEquippedSet.name == name) return //console.debug(`${this.bot.id} Already equipped ${name} set`)
         let equipBatchList: {num: number, slot: SlotType}[] = []
         for(const [idx, item] of this.bot.getItems()) {
             const setItem = set.find(e => e.name == item.name && e?.level == item?.level)
             if(!setItem) continue
             equipBatchList.push({num: idx, slot: setItem.slot ?? this.getSlotType(item.name as ItemName)})
-            console.debug(`${this.bot.id} Equipping ${item.name} - ${setItem.slot ?? this.getSlotType(item.name as ItemName)}`)
+            // console.debug(`${this.bot.id} Equipping ${item.name} - ${setItem.slot ?? this.getSlotType(item.name as ItemName)}`)
         }
 
         equipBatchList.sort((curr, next) => {
@@ -271,6 +288,38 @@ export class PartyStrategy {
         setTimeout(this.checkParty, 5000)
     }
 
+    private async becomeHandsomeLoop() {
+        if(!["priest", "mage"].includes(this.bot.ctype)) return
+        if(!this.bot.hasItem("angelwings", undefined, {levelGreaterThan: 7}) && (this.bot.slots.cape?.name != "angelwings" || this.bot.slots.cape?.level < 8)) return console.debug("No angelwings level 8")
+        if(this.bot.skin == "snow_angel") return setTimeout(this.becomeHandsomeLoop, 1000)
+        
+        if(this.bot.skin != "snow_angel") {
+            if(this.bot.slots.cape?.name != "angelwings" || this.bot.slots.cape?.level < 8) {
+                let currentCape = this.bot.slots.cape
+                await this.bot.equip(this.bot.locateItem("angelwings", undefined, {levelGreaterThan: 7})).catch(debugLog)
+                
+                try {
+                    await this.bot.socket.emit("activate" as any, {slot: "cape"})
+                }
+                catch(ex) {
+                    console.debug(ex)
+                }
+                if(currentCape && currentCape.name != "angelwings") {
+                    this.bot.equip(this.bot.locateItem(currentCape?.name, undefined, {level: currentCape?.level})).catch(debugLog)
+                }
+            }
+            else {
+                try {
+                    await this.bot.socket.emit("activate" as any, {slot: "cape"})
+                }
+                catch(ex) {
+                    console.debug(ex)
+                }
+            }
+        }
+        setTimeout(this.becomeHandsomeLoop, 1000)        
+    }
+
     private async reduceSpotCDLoop() {
         if(this.deactivate || !this.bot.hasItem("orboftemporal")) return
         if(this.bot.smartMoving) return setTimeout(this.reduceSpotCDLoop, 1000)
@@ -281,9 +330,12 @@ export class PartyStrategy {
         let currentOrb = this.bot.slots.orb
         if(this.bot.slots?.orb?.name != "orboftemporal") await this.bot.equip(this.bot.locateItem("orboftemporal")).catch(debugLog)
         
-        if(this.bot.slots?.orb?.name == "orboftemporal") await this.bot.temporalSurge().catch(debugLog)
+        if(this.bot.slots?.orb?.name == "orboftemporal") {
+            await this.bot.temporalSurge().catch(debugLog)
+            // console.debug(`${this.bot.id} Temporal Surge used`)
+        }
 
-        if(currentOrb && currentOrb.name != this.bot.slots?.orb?.name) this.bot.equip(this.bot.locateItem(currentOrb?.name, undefined, {level: currentOrb?.level}))
+        if(currentOrb && currentOrb.name != this.bot.slots?.orb?.name) this.bot.equip(this.bot.locateItem(currentOrb?.name, undefined, {level: currentOrb?.level})).catch(debugLog)
 
         setTimeout(this.reduceSpotCDLoop, Math.max(100, this.bot.getCooldown("temporalsurge")))
     }

@@ -8,7 +8,7 @@ export const HPOTS_CAP = 1000
 export const SCROLLS_CAP: Map<ItemName,number> = new Map([
         ["scroll0", 100],
         ["scroll1", 25],
-        ["scroll2", 5],
+        ["scroll2", 10],
         ["cscroll0", 75],
         ["cscroll1", 20],
         ["cscroll2", 2]
@@ -201,13 +201,15 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["xarmor", { level: 3, primlingAt: 0 }],
     ["xpants", { level: 3, primlingAt: 0 }],
 
+    ["starkillers", { level: 7, primlingAt: 3, offeringAt: 5}],
+
     // Weapons
-    ["firestaff", { level: 8, primlingAt: 7, scrollUpAt: 5 }],
-    ["fireblade", { level: 8, primlingAt: 7, scrollUpAt: 5 }],
-    ["firebow", { level: 8, primlingAt: 7, scrollUpAt: 5}],
+    ["firestaff", { level: 9, primlingAt: 7, scrollUpAt: 5, offeringAt: 8}],
+    ["fireblade", { level: 9, primlingAt: 7, scrollUpAt: 5, offeringAt: 8}],
+    ["firebow", { level: 9, primlingAt: 7, scrollUpAt: 5, offeringAt: 8}],
     ["crossbow", { level: 8, primlingAt: 4, scrollUpAt: 4, offeringAt: 5 }],
     ["harbringer", { level: 7 }],
-    ["oozingterror", { level: 6 }],
+    ["oozingterror", { level: 7 }],
     ["basher", {level: 7, primlingAt: 7}],
     ["cclaw", {level: 9, scrollUpAt: 5, offeringAt: 8}],
     ["cupid", {level: 8, scrollUpAt: 4, primlingAt: 5, offeringAt: 7}],
@@ -276,8 +278,53 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
 
     // Orbs
     ["orbg", { level: 3 }],
-    ["jacko", { level: 3 }],
+    ["jacko", { level: 3, scrollUpAt: 2, primlingAt: 3, offeringAt: 4 }],
     ["orbofdex", { level: 4, scrollUpAt: 2, offeringAt: 3 }],
     ["orbofstr", { level: 4, scrollUpAt: 2, offeringAt: 3 }]
 ]);
 
+export const BUY_FROM_PONTY: Map<ItemName, number> = new Map<ItemName, number>([
+    ["5bucks", 100_000_000],
+
+    // Orbs
+    ["orbg", 10_000_000],
+    ["jacko", 10_000_000],
+    ["orbofdex", 10_000_000],
+    ["orbofstr", 10_000_000],
+
+    // Darkforge set
+    ["xhelmet", 23_500_000],
+    ["xarmor", 31_000_000],
+    ["xpants", 25_000_000],
+
+    // Rings
+    // ["intring", 7_000_000],
+    ["cring", 23_000_000],
+
+    // Earrings
+    ["intearring", 11_000_000],
+    ["strearring", 11_000_000],
+    ["cearring", 10_500_000],
+    ["dexearring", 11_000_000],
+
+    // Rare items
+    ["ololipop", 4_000_000],
+    ["glolipop", 4_000_000],
+    ["oozingterror", 10_000_000],
+    ["lmace", 80_000_000],
+    ["bataxe", 50_000_000],
+    ["crossbow", 10_000_000],
+    ["handofmidas", 10_000_000],
+
+    // Super rare items
+    ["fury", 100_000_000],
+    ["essenceofgreed", 32_259_224],
+    ["zapper", 60_000_000],
+
+    // Event items
+    ["mistletoe", 48_000],
+    ["candycane", 57_600],
+    ["ornament", 7_200],
+    ["supermittens", 20_000_000],
+
+]);

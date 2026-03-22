@@ -11,7 +11,7 @@ export const WANTED_EVENTS: Map<MonsterName|MapName,MonsterName[]> = new Map([
     ["franky",["franky","nerfedmummy"]],
     ["mrgreen",["mrgreen"]],
     ["mrpumpkin",["mrpumpkin"]],
-    ["crabxx",["crabxx", "crabx"]],
+    ["crabxx",["crabxx"]],
     ["snowman",["snowman"]],
     ["grinch",["grinch"]],
     ["goobrawl",["bgoo", "rgoo"]]    

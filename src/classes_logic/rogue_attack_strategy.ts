@@ -1,5 +1,6 @@
-import { Rogue, Game, Tools, Pathfinder } from "alclient"
+import { Rogue, Game, Tools } from "alclient"
 import * as CF from "../../src/common_functions/common_functions"
+import { debugLog } from "../../src/common_functions/common_functions"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
 
@@ -27,12 +28,12 @@ export class RogueAttackStrategy extends StateStrategy {
         }
         let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
         let totalDps = 0
-        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this.bot, e))
+        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this, e))
         if( this.bot.c.town && this.bot.hp > totalDps*15 ) {
             return setTimeout(this.basicAttackLoop, 5000)
         }
         
-        let target = this.rogue.getTargetEntity()
+        let target = this.getTarget()
         if(!target) {
             return setTimeout(this.basicAttackLoop, 500)
         }
@@ -40,7 +41,7 @@ export class RogueAttackStrategy extends StateStrategy {
         if(this.rogue.isOnCooldown("scare") && !target.target) {
             return setTimeout(this.basicAttackLoop, this.rogue.getCooldown("scare"))
         }
-        if(!target?.target && CF.calculate_monster_dps(this.rogue, target, true)/CF.calculate_hps(this.rogue) >=0.95) {
+        if(!target?.target && CF.calculate_monster_dps(this, target, true)/CF.calculate_hps(this.rogue) >=0.95) {
             return setTimeout(this.basicAttackLoop, 500)
         }
         
@@ -50,7 +51,7 @@ export class RogueAttackStrategy extends StateStrategy {
             return setTimeout(this.basicAttackLoop, 500)
         }
 
-        await this.rogue.basicAttack(target.id).catch(console.warn)
+        await this.rogue.basicAttack(target.id).catch(debugLog)
         return setTimeout(this.basicAttackLoop, Math.max(1, this.rogue.getCooldown("attack")))
     }
 
@@ -68,7 +69,7 @@ export class RogueAttackStrategy extends StateStrategy {
             return setTimeout(this.stubLoop, 500)
         }
         
-        if(!target.target && this.bot.max_hp/CF.calculate_monster_dps(this.rogue, target, true) < 10) {
+        if(!target.target && this.bot.max_hp/CF.calculate_monster_dps(this, target, true) < 10) {
             return setTimeout(this.stubLoop, 500)
         }
         if(this.rogue.isOnCooldown("scare") && !target.target) {
@@ -81,11 +82,11 @@ export class RogueAttackStrategy extends StateStrategy {
             let weaponSkill
             if(Game.G.items[this.rogue.slots.mainhand.name].wtype == "fist" && this.rogue.mp - Game.G.skills.quickpunch.mp! > this.rogue.mp_cost * 2) {
                 // weaponSkill = this.rogue.quickPunch
-                await this.rogue.quickPunch(target.id).catch(console.warn)
+                await this.rogue.quickPunch(target.id).catch(debugLog)
             }
             if(Game.G.items[this.rogue.slots.mainhand.name].wtype == "dagger" && this.rogue.mp - Game.G.skills.quickstab.mp! > this.rogue.mp_cost * 2) {
                 // weaponSkill = this.rogue.quickStab
-                await this.rogue.quickStab(target.id).catch(console.warn)
+                await this.rogue.quickStab(target.id).catch(debugLog)
             }
             // await weaponSkill(target.id).catch(console.warn)
             return setTimeout(this.stubLoop, Math.max(1,this.rogue.getCooldown("quickpunch")))

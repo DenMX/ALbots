@@ -3,7 +3,7 @@ import * as CF from "../../src/common_functions/common_functions"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
 import { debugLog } from "../../src/common_functions/common_functions"
-import { IState } from "../controllers/state_interface"
+import { PRIEST_OFFHAND_CONFIGS } from "../configs/character_items_configs"
 
 export class PriestsAttackStrategy extends StateStrategy {
 
@@ -19,6 +19,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         this.whoNeedsHeal = this.whoNeedsHeal.bind(this)
         this.pullMobsFromParty = this.pullMobsFromParty.bind(this)
         this.useMassHeal = this.useMassHeal.bind(this)
+        this.checkOffhandLoop = this.checkOffhandLoop.bind(this)
 
         this.attackOrHealLoop()
         this.useZap()
@@ -26,6 +27,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         this.useCurseLoop()
         this.pullMobsFromParty()
         this.useMassHeal()
+        this.checkOffhandLoop()
     }
 
 
@@ -67,7 +69,7 @@ export class PriestsAttackStrategy extends StateStrategy {
                 return setTimeout(this.attackOrHealLoop, Math.max(1,this.priest.getCooldown("attack")))
             }
         }
-        let target = this.priest.getTargetEntity()
+        let target = this.getTarget()
         if(!target) {
             return setTimeout(this.attackOrHealLoop, 300)
         }
@@ -128,7 +130,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(!this.priest.getTargetEntity().target && CF.calculate_monster_dps(this, this.priest.getTargetEntity())/CF.calculate_hps(this.priest) >=0.95) {
             return setTimeout(this.useCurseLoop, 500)
         }
-        if(Tools.distance(this.priest, this.priest.getTargetEntity()) <= Game.G.skills.curse.range) await this.priest.curse(this.priest.target).catch(console.warn)
+        if(Tools.distance(this.priest, this.priest.getTargetEntity()) <= Game.G.skills.curse.range) await this.priest.curse(this.priest.target).catch(debugLog)
         return setTimeout(this.useCurseLoop, this.priest.getCooldown("curse"))
     }
 
@@ -200,14 +202,14 @@ export class PriestsAttackStrategy extends StateStrategy {
         {
             // console.debug(`Party heal will appear cause:\n
             //     Party members with less than 65% hp: ${this.priest.getPlayers({isPartyMember: true, isDead: false}).filter( e => e.hp < e.max_hp*0.65).length}`)
-            this.priest.partyHeal().catch(console.warn)
+            this.priest.partyHeal().catch(debugLog)
             return setTimeout(this.useMassHeal, Math.max(1, this.priest.getCooldown("partyheal")))
         }
         if(this.bot.hp<this.bot.max_hp*0.4 || this.bot.getPlayers({isPartyMember: true, isDead: false}).filter( e => e.hp < e.max_hp* 0.4).length>0) {
             // console.debug(`Party heal will appear cause:\n
             //     Priest hp: ${this.priest.hp} is ${this.priest.hp/this.priest.max_hp*100}% of max hp: ${this.priest.max_hp}\n
             //     Party members with less than 30% hp: ${this.priest.getPlayers({isPartyMember: true, isDead: false}).filter( e => e.hp < e.max_hp*0.3).length}`)
-            this.priest.partyHeal().catch(console.warn)
+            this.priest.partyHeal().catch(debugLog)
             return setTimeout(this.useMassHeal, Math.max(1, this.priest.getCooldown("partyheal")))
         }
         if(this.getMemoryStorage.getStateController?.getBots
@@ -219,7 +221,7 @@ export class PriestsAttackStrategy extends StateStrategy {
             ).length>0) {
             // console.debug(`Party heal will appear cause:\n
             //     Party members with less than 70% hp and distance > range*2: ${this.bots?.filter( e => e.getBot().hp < e.getBot().max_hp*0.7 && (Tools.distance(this.priest, e.getBot()) > this.priest.range*2 || this.priest.map != e.getBot().map))?.length}`)
-            this.priest.partyHeal().catch(console.warn)
+            this.priest.partyHeal().catch(debugLog)
             return setTimeout(this.useMassHeal, Math.max(1, this.priest.getCooldown("partyheal")))
         }
         
@@ -239,7 +241,7 @@ export class PriestsAttackStrategy extends StateStrategy {
             return setTimeout(this.useDarkBlessingLoop, Math.max(100,this.priest.s.darkblessing.ms))
         }
 
-        await this.priest.darkBlessing().catch(console.warn)
+        await this.priest.darkBlessing().catch(debugLog)
         return setTimeout(this.useDarkBlessingLoop, Math.max(1,this.priest.getCooldown("darkblessing")))
     }
 
@@ -250,7 +252,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(this.priest.c.town) return setTimeout(this.useZap, 2000)
         if(this.priest.smartMoving) return setTimeout(this.useZap, 1000)
         if(this.priest.mp < this.priest.max_mp * 0.3) return setTimeout(this.useZap, 1000)
-        if(this.bot.ctype == "priest" && this.bot.getPlayers({isPartyMember: true, isDead: false}).filter( e => e.hp > e.max_hp*0.3 && Tools.distance(this.priest, e) < this.priest.range*1.5).length<1) return setTimeout(this.useZap, 1000)
+        if(this.bot.ctype == "priest" && this.bot.getPlayers({isPartyMember: true, isDead: false}).filter( e => ["ranger","warrior","mage"].includes(e.ctype) && e.hp > e.max_hp*0.3 && Tools.distance(this.priest, e) < this.priest.range*1.5).length<1) return setTimeout(this.useZap, 1000)
         
         let dps = CF.calculate_monsters_dps(this, this, this.priest.getEntities({targetingMe: true, targetingPartyMember: true}))
         let hps = CF.calculate_hps(this.priest)
@@ -268,6 +270,30 @@ export class PriestsAttackStrategy extends StateStrategy {
 
         return setTimeout(this.useZap, 1000)
         
+    }
+
+    private async checkOffhandLoop() {
+        if(this.deactivate) return
+        if(!PRIEST_OFFHAND_CONFIGS[this.priest.id]) return
+        if(this.priest.c.town || this.priest.rip) return setTimeout(this.checkOffhandLoop, 2000)
+        if(CF.calculate_hps(this.priest) > CF.calculate_monsters_dps(this, this, this.priest.getEntities({targetingMe: true}))) return setTimeout(this.checkOffhandLoop, 1000)
+        const physicalMobs = (this.priest.getEntities({targetingMe: true}).filter( e => e.damage_type == "physical").length > 0)
+        const magicalMobs = (this.priest.getEntities({targetingMe: true}).filter( e => e.damage_type == "magical").length > 0)
+        if(!physicalMobs && !magicalMobs) return setTimeout(this.checkOffhandLoop, 1000)
+        let wantedOffhand
+        if(physicalMobs == magicalMobs) {
+            wantedOffhand = PRIEST_OFFHAND_CONFIGS[this.priest.id]?.resistEvasion
+        }
+        else {
+            wantedOffhand = physicalMobs ? PRIEST_OFFHAND_CONFIGS[this.priest.id]?.armor : PRIEST_OFFHAND_CONFIGS[this.priest.id]?.resistance
+        }
+        const currentOffhand = this.priest.slots.offhand
+        if(currentOffhand?.name == wantedOffhand?.name && currentOffhand?.level == wantedOffhand?.level) return setTimeout(this.checkOffhandLoop, 1000)
+        
+        if(!this.bot.hasItem(wantedOffhand?.name, undefined, {level: wantedOffhand?.level})) return setTimeout(this.checkOffhandLoop, 1000)
+        
+        await this.priest.equip(this.priest.locateItem(wantedOffhand?.name, undefined, {level: wantedOffhand?.level})).catch(debugLog)
+        return setTimeout(this.checkOffhandLoop, 1000)
     }
 
 }

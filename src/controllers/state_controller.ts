@@ -1,12 +1,10 @@
-import { Constants, Game, MapName, MonsterName, Observer, PingCompensatedCharacter, Priest, Tools } from "alclient";
-import { StateStrategy } from "../common_functions/state_strategy";
-import { startBotWithStrategy } from "../common_functions/common_functions"
+import { Constants, Game, MapName, MonsterName, Observer, PingCompensatedCharacter, ServerIdentifier, ServerRegion, Tools } from "alclient";
+import { State, StateStrategy } from "../common_functions/state_strategy";
 import { WANTED_EVENTS } from "../configs/events_and_spots";
 import { MemoryStorage } from "../common_functions/memory_storage";
 import { IState } from "./state_interface";
-import { PartyStrategy } from "../common_functions/party_strategy";
-import { PriestsAttackStrategy } from "../classes_logic/priests_attack_strategy";
-import { debugLog } from "../common_functions/common_functions";
+import { debugLog, startBotWithStrategy } from "../common_functions/common_functions";
+import * as CF from "../common_functions/common_functions"
 
 export class StateController {
     private bots: IState[]
@@ -29,6 +27,7 @@ export class StateController {
         for(let i of bots) {
             let bot = i.getBot()
             bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
+            bot.socket.on("code_eval", (data) => this.manageCommand(data, bot))
             
             if(bot instanceof StateStrategy) {
                 (i as StateStrategy).startQuest()
@@ -154,5 +153,80 @@ export class StateController {
         }
 
         setTimeout( this.checkSendItems, 10000 )
+    }
+
+    /*
+    * @param start - start Warious ASIA I
+    * @param stop - stop Warious
+    * @param farm - farm Warious dryad  
+    // commands farm quest start shutdown
+    */
+    private async manageCommand(data: string, sourceBot: PingCompensatedCharacter) {
+        if (!data) return
+        if (data.split(" ").length < 1) return
+        const parts = data.split(" ")
+        const command = parts[0]
+        const name = parts[1]
+        switch (command) {
+            case "start":
+                if(this.bots.length>=4) return console.debug(`${name} too many bots`)
+                if(!CF.MY_CHARACTERS.get(name)) return console.debug(`${name} unknown character`)
+                if (!parts[2] || !parts[3]) return console.error(`Cannot start without server: ${data}`)
+                return this.addNewBot(await startBotWithStrategy(
+                    CF.MY_CHARACTERS.get(name)?.ctype,
+                    name,
+                    parts[2] as unknown as ServerRegion,
+                    parts[3] as unknown as ServerIdentifier,
+                    this.memoryStorage
+                ))
+            case "stop":
+                const botState = this.bots.find( e => e.getBot().id == name)
+                if(!botState) return
+                const botToStop = botState.getBot()
+                botState.deactivateStrat()
+                botToStop.socket.off("disconnect")
+                console.debug(`${name} shutdown. ${this.bots.length} bots left`)
+                let newList = []
+                for(let i=0; i<this.bots.length; i++) {
+                    if(this.bots[i].getBot().id == name) continue
+                    newList.push(this.bots[i])
+                }
+                this.bots = newList
+                console.debug(`${name} disconnected. ${this.bots.length} bots left`)
+                return botToStop.disconnect()
+            case "quest":
+                if (!name) return console.error(`Cannot start quest without ids: ${data}`)
+                for(const id of name.split(',')) {
+                    const botState = this.bots.find(e => e.getBot().id == id)
+                    if(botState && botState instanceof StateStrategy) (botState as StateStrategy).startQuest()
+                }
+                break
+            case "farm": 
+                if (data.split(" ").length < 3) return console.error(`Cannot set farm without mobs: ${data}`)
+                for(const id of name.split(',')) {
+                    const botState = this.bots.find( e => e.getBot().id == id)
+                    if(botState && botState instanceof StateStrategy) {
+                        botState.addStateToScheduler({
+                            state_type: "farm",
+                            wantedMob: data.split(' ')[2].split(',').filter( e => Game.G.monsters[e as MonsterName]) as MonsterName[]
+                        } as State)
+                    }
+                }
+                break;
+            case "tank":
+                if(!name || name == "") return console.error(`Cannot switch tank without name: ${data}`)
+                this.memoryStorage.setCurrentTank = name
+                break
+            case "partyleader":
+                if(!name || name == "") return console.error(`Cannot switch party leader without name: ${data}`)
+                this.memoryStorage.setCurrentPartyLeader = name
+                break
+            // case "looter":
+            //     if(data.split(' ').length<2) return console.error(`Cannot switch looter without name: ${data}`)
+            //     this.memoryStorage.setCurrentLooter = data.split(' ')[1]
+            //     break
+            default:
+                console.error(`${sourceBot?.id} unknown command ${command}\n${JSON.stringify(data)}`)
+        }
     }
 }

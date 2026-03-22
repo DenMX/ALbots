@@ -68,10 +68,11 @@ export class WarriorsAttackStrategy extends StateStrategy {
             return setTimeout(this.attackLoop, 15000)
         }
         
-        let target = this.warrior.getTargetEntity()
+        let target = this.getTarget()
         if( !target) {
             return setTimeout(this.attackLoop, 100)
         }
+        if(target?.dreturn >= 30) return setTimeout(this.attackLoop, 500)
         if( this.warrior.hasItem("jacko") && this.warrior.isOnCooldown("scare") && this.warrior.getEntities({targetingMe: true, targetingPartyMember:true}).length<1) {
             return setTimeout( this.attackLoop, this.warrior.getCooldown("scare"))
         }
@@ -118,7 +119,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
             return setTimeout(this.useWarcryLoop, this.warrior.s.warcry.ms)
         }
 
-        await this.warrior.warcry().catch(console.warn)
+        await this.warrior.warcry().catch(debugLog)
         return setTimeout(this.useWarcryLoop, this.warrior.getCooldown("warcry"))
     }
 
@@ -136,7 +137,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
             
             try {
                if(this.warrior.slots?.offhand && this.warrior.esize > 0) {
-                await this.warrior.unequip("offhand").catch(console.error)
+                await this.warrior.unequip("offhand").catch(debugLog)
                     // console.log("Unequiped offhand")
                 }
                 
@@ -146,7 +147,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
                 console.error(ex)
             }
             this.lastWeaponSwitch = Date.now()
-            return this.warrior.equip(cleave_item_idx).catch(console.error)
+            return this.warrior.equip(cleave_item_idx).catch(debugLog)
                         
         }
         else if(config?.stomp && botWC.stomp) {
@@ -167,14 +168,17 @@ export class WarriorsAttackStrategy extends StateStrategy {
             
             let stop_item_idx = this.warrior.locateItem(stomp_item.name, undefined, {level: stomp_item.level})
             this.lastWeaponSwitch = Date.now()
-            return this.warrior.equip(stop_item_idx).catch(console.error)
+            return this.warrior.equip(stop_item_idx).catch(debugLog)
         }
         else if(!config || (!config?.cleave && !config?.stomp) ) {
             let mainhand_item
             
             let offhand_item
             
-            if(CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank)) {
+            if(this.bot.getTargetEntity()?.["1hp"] && botWC.fast_mainhand) {
+                mainhand_item = botWC.fast_mainhand
+            }
+            else if(CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank)) {
                 // console.debug(`Warrior want mass weapon`)
                 mainhand_item = botWC.mass_mainhand
                 offhand_item = botWC.mass_offhand
@@ -185,7 +189,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
                 offhand_item = botWC.solo_offhand
             }
             if(this.warrior.slots.mainhand?.name == mainhand_item?.name  && this.warrior.slots.offhand?.name == offhand_item?.name) return
-            if(mainhand_item.name == offhand_item.name && mainhand_item.level == offhand_item.level) {
+            if(mainhand_item.name == offhand_item?.name && mainhand_item.level == offhand_item?.level) {
                 let items = this.bot.locateItems(mainhand_item.name, undefined, {level: mainhand_item.level})
                 if(!items) return 
                 items.length > 1 ? 
@@ -197,7 +201,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
             }
             let mainhand_idx = this.warrior.locateItem(mainhand_item.name, undefined, {level: mainhand_item?.level})
             if( mainhand_idx ) await this.warrior.equip(mainhand_idx,"mainhand").catch(debugLog)
-            let offhand_idx = this.warrior.locateItem(offhand_item.name, undefined, {level: offhand_item?.level})
+            let offhand_idx = this.warrior.locateItem(offhand_item?.name, undefined, {level: offhand_item?.level})
             if( offhand_idx ) await this.warrior.equip(offhand_idx, "offhand").catch(debugLog)
         }
         this.lastWeaponSwitch = Date.now()
@@ -270,6 +274,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
         if(this.warrior.isOnCooldown("cleave")) return 
         if(!this.warrior.canUse("cleave", {ignoreEquipped: true})) return 
         if( this.warrior.c.town) return
+        if(this.warrior.getEntities({withinRange:"cleave"}).filter(e => e?.dreturn >= 30).length>0) return //console.log("Don't want to use cleave")
         if(!CF.shouldUseMassSkill(this, this.getMemoryStorage.getCurrentTank, "cleave") || this.warrior.getEntities({withinRange:"cleave"}).length<3) return //console.log("Don't want to use cleave")
         await this.switchWeapons({cleave: true})
         if(Game.G.skills.cleave.wtype.includes(Game.G.items[this.warrior.slots.mainhand?.name].wtype)) {
@@ -321,7 +326,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
 
-        await this.warrior.agitate().catch(ex => console.error(ex))
+        await this.warrior.agitate().catch(debugLog)
 
         setTimeout(this.useMassAggroLoop, this.warrior.getCooldown("agitate"))
     }
@@ -342,7 +347,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
 
-        await this.warrior.agitate().catch(ex => console.error(ex))
+        await this.warrior.agitate().catch(debugLog)
 
     }
 
@@ -353,7 +358,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
             return setTimeout(this.hardShellLoop, 2000)
         }
         if(this.warrior.hp < this.warrior.max_hp * 0.6 && Object.values(this.warrior.getEntities({targetingMe: true})).filter(e=> e.damage_type == "physical").length>0) {
-            await this.warrior.hardshell().catch(console.error)
+            await this.warrior.hardshell().catch(debugLog)
             return setTimeout(this.hardShellLoop, this.warrior.getCooldown("hardshell"))
         }
         return setTimeout(this.hardShellLoop, 2000)

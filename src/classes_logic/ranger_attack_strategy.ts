@@ -5,6 +5,7 @@ import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
 import { RangerWeaponConfig, WEAPON_CONFIGS } from "../configs/character_items_configs"
 import { debugLog } from "../common_functions/common_functions"
+import { SPECIAL_MONSTERS } from "../configs/events_and_spots"
 
 export class RangerAttackStrategy extends StateStrategy {
 
@@ -65,7 +66,7 @@ export class RangerAttackStrategy extends StateStrategy {
             await this.ranger.threeShot(targetsForThreeShot[0]?.id,targetsForThreeShot[1]?.id,targetsForThreeShot[2]?.id).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("3shot")))
         }
-        let target = this.ranger.getTargetEntity()
+        let target = this.getTarget()
         if(!target) {
             return setTimeout(this.basicAttackLoop, 500)
         }
@@ -100,7 +101,7 @@ export class RangerAttackStrategy extends StateStrategy {
                 if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_weapon?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_weapon?.level) equipBatch.push({num: i, slot: "mainhand"})
                 if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_offhand?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_offhand?.level) equipBatch.push({num: i, slot: "offhand"})
             }
-            await this.ranger.equipBatch(equipBatch).catch(console.warn)
+            await this.ranger.equipBatch(equipBatch).catch(debugLog)
             return
         }
         else if(weaponConfig == "mass") {
@@ -122,7 +123,7 @@ export class RangerAttackStrategy extends StateStrategy {
                 if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_mainhand?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_mainhand?.level) equipBatch.push({num: i, slot: "mainhand"})
                 if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_offhand?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_offhand?.level) equipBatch.push({num: i, slot: "offhand"})
             }
-            await this.ranger.equipBatch(equipBatch).catch(console.warn)
+            await this.ranger.equipBatch(equipBatch).catch(debugLog)
             return
         }
     }
@@ -136,10 +137,10 @@ export class RangerAttackStrategy extends StateStrategy {
         let dps = CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))
         if (dps> this.bot.max_hp*0.2) return final_targets
         for(const entity of this.ranger.getEntities()) {
-            if(entity.abilities.stone && !entity.target) continue
-            if(this.bot.getEntities().filter(e => e.abilities.stone && !e.target && Tools.distance(e, entity)<40).length>0) continue
+            if(entity.abilities.stone && !this.currentState.wantedMob.includes(entity.type) ) continue
+            if(this.bot.getEntities().filter(e => e.abilities.stone && !this.currentState.wantedMob.includes(e.type) && Tools.distance(e, entity)<40).length>0) continue
             if(!entity.target && this.ranger.canKillInOneShot(entity, skill)) final_targets.push(entity)
-            if(entity.isAttackingPartyMember(this.ranger) || entity.target == this.ranger.id) final_targets.push(entity)
+            if( entity.target ) final_targets.push(entity)
             if(!entity.target && !this.ranger.canKillInOneShot(entity, skill) && dps+CF.calculate_monster_dps(this, entity)< this.bot.hp/5) {
                 switch(entity.damage_type) {
                     case "physical":
@@ -166,11 +167,14 @@ export class RangerAttackStrategy extends StateStrategy {
         return final_targets.sort( (curr, next) => {
             let curr_distance = Tools.distance(curr, this.ranger)
             let next_distance = Tools.distance(next, this.ranger)
-            if(curr.s.cursed != next.s.cursed) {
-                return (curr.s.cursed?.ms) ? -1 : 1
+            if(SPECIAL_MONSTERS.includes(curr.type)  != SPECIAL_MONSTERS.includes(next.type) ) {
+                return (SPECIAL_MONSTERS.includes(curr.type) ) ? -1 : 1
             }
-            if(curr.s.marked != next.s.marked) {
-                return (curr.s.marked?.ms) ? -1 : 1
+            if(this.currentState?.wantedMob.includes(curr.type) != this.currentState?.wantedMob.includes(next.type)) {
+                return (this.currentState?.wantedMob.includes(curr.type)) ? -1 : 1
+            }
+            if((curr.s.cursed || curr.s.marked) != (next.s.cursed || next.s.marked)) {
+                return (curr.s.cursed || curr.s.marked) ? -1 : 1
             }
             if(curr_distance != next_distance) {
                 return (curr_distance < next_distance) ? -1 : 1;
@@ -194,7 +198,7 @@ export class RangerAttackStrategy extends StateStrategy {
                 if(item.name == botWC.mass_mainhand?.name && item.level == botWC.mass_mainhand?.level) equipBatch.push({num: i, slot: "mainhand"})
                 if(item.name == botWC.mass_offhand?.name && item.level == botWC.mass_offhand?.level) equipBatch.push({num: i, slot: "offhand"})
             }
-            await this.ranger.equipBatch(equipBatch).catch(console.warn)
+            await this.ranger.equipBatch(equipBatch).catch(debugLog)
         }
         else {
             if(this.ranger.slots.mainhand?.name != botWC.solo_mainhand?.name) needChangeMainhand = true
@@ -204,7 +208,7 @@ export class RangerAttackStrategy extends StateStrategy {
                 if(item.name == botWC.solo_mainhand?.name && item.level == botWC.solo_mainhand?.level) equipBatch.push({num: i, slot: "mainhand"})
                 if(item.name == botWC.solo_offhand?.name && item.level == botWC.solo_offhand?.level) equipBatch.push({num: i, slot: "offhand"})
             }
-            await this.ranger.equipBatch(equipBatch).catch(console.warn)
+            await this.ranger.equipBatch(equipBatch).catch(debugLog)
         }
         return setTimeout(this.changeWeapon, 500)
     }
@@ -214,18 +218,19 @@ export class RangerAttackStrategy extends StateStrategy {
         if(!this.ranger.canUse("supershot")) {
             return setTimeout(this.useSupershotLoop, Math.max(2000, this.ranger.getCooldown("supershot")))
         }
+        if(this.bot.isOnCooldown("scare")) return setTimeout(this.useSupershotLoop, Math.max(1, this.bot.getCooldown("scare")))
         if(this.ranger.isOnCooldown("supershot")) {
             return setTimeout(this.useSupershotLoop, Math.max(1, this.ranger.getCooldown("supershot")))
         }
         let target = this.ranger.getTargetEntity()
-        if(!target) {
+        if(!target || (target?.abilities?.stone && !target.target)) {
             return setTimeout(this.useSupershotLoop, 500)
         }
-        if(!target.target && CF.calculate_monster_dps(this,target)/CF.calculate_hps(this.ranger)>=0.95) {
+        if(!target?.target && CF.calculate_monster_dps(this,target)/CF.calculate_hps(this.ranger)>=0.95) {
             return setTimeout(this.useSupershotLoop, 500)
         }
         if(this.ranger.mp > this.ranger.max_mp * 0.6) {
-            await this.ranger.superShot(target.id).catch(console.warn)
+            await this.ranger.superShot(target.id).catch(debugLog)
             return setTimeout(this.useSupershotLoop, Math.max(1,this.ranger.getCooldown("supershot")))
         }
 
@@ -242,12 +247,15 @@ export class RangerAttackStrategy extends StateStrategy {
         }
         
         let target = this.ranger.getTargetEntity()
-        
+        if(!target?.target && CF.calculate_monster_dps(this, target)/CF.calculate_hps(this.ranger)>=0.95) {
+            return setTimeout(this.useMarkLoop,500)
+        }
+        if(target?.abilities?.stone && !target?.target) return setTimeout(this.useMarkLoop, 500)
         if( !target || target?.hp< 15000 ) {
             return setTimeout(this.useMarkLoop, 500)
         }
         
-        await this.ranger.huntersMark(target.id).catch(console.warn)
+        await this.ranger.huntersMark(target.id).catch(debugLog)
         return setTimeout(this.useMarkLoop, Math.max(1000, this.ranger.getCooldown("huntersmark")))
     }
 }

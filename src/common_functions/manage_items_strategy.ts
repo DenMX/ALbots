@@ -40,6 +40,10 @@ export class ManageItems extends ResuplyStrategy {
         [2, ["platinumingot"]]
     ])
 
+    private GOLD_AMOUNT_FOR_CHECK_BANK: number = 100_000_000
+    private GOLD_AMOUNT_FOR_BUY_OFFERING: number = 1_000_000_000
+    private GOLD_AMOUNT_FOR_UPGRADE_WITH_OFFERING: number = 500_000_000
+
     
 
     constructor (bot: PingCompensatedCharacter, memoryStorage: MemoryStorage){
@@ -113,7 +117,7 @@ export class ManageItems extends ResuplyStrategy {
                 if( itemConfig.offeringAt && itemConfig.offeringAt <= item.level ) offering = "offering"
                 else if ( itemConfig.primlingAt && itemConfig.primlingAt <= item.level ) offering = "offeringp"
                 if( offering && !this.bot.locateItem(offering) ) {
-                    if( offering == "offering" && this.bot.gold > 500000000 && this.bot.esize>0 ) await this.bot.buy("offering").catch(debugLog)
+                    if( offering == "offering" && this.bot.gold > this.GOLD_AMOUNT_FOR_UPGRADE_WITH_OFFERING && this.bot.esize>0 ) await this.bot.buy("offering").catch(debugLog)
                     else continue
                 }
 
@@ -125,9 +129,10 @@ export class ManageItems extends ResuplyStrategy {
                 // console.debug(`[UPGRADE] NEED TO USE SCROLL UP? ${(itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2)}`)
                 let scroll_name = `scroll${scroll_grade}` as ItemName
                 // console.debug(`For ${item.name} level ${item.level} needs ${scroll_name}. Has scroll: ${this.bot.hasItem(scroll_name)}`)
-                if(!this.bot.hasItem(scroll_name)) {
+                if(this.bot.countItem(scroll_name)<1) {
                     if( scroll_grade<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
-                        await this.bot.buy(scroll_name).catch(console.warn)
+                        console.debug(`${this.bot.id} buying scroll ${scroll_name} to upgrade ${item.name} level ${item.level}`)
+                        await this.bot.buy(scroll_name).catch(debugLog)
                     }
                     else continue
                 }
@@ -169,14 +174,14 @@ export class ManageItems extends ResuplyStrategy {
                 if( itemConfig.offeringAt && itemConfig.offeringAt <= item.level ) offering = "offering"
                 else if ( itemConfig.primlingAt && itemConfig.primlingAt <= item.level ) offering = "offeringp"
                 if( offering && !this.bot.locateItem(offering) ) {
-                    if( offering == "offering" && this.bot.gold > 500000000 && this.bot.esize>0 ) await this.bot.buy("offering").catch(debugLog)
+                    if( offering == "offering" && this.bot.gold > this.GOLD_AMOUNT_FOR_UPGRADE_WITH_OFFERING && this.bot.esize>0 ) await this.bot.buy("offering").catch(debugLog)
                     else continue
                 }
 
                 let primling 
                 if(offering) primling = this.bot.locateItem(offering)
 
-                let scroll_grade = (itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2) ? item.calculateGrade()+1 : item.calculateGrade()
+                let scroll_grade = (itemConfig?.scrollUpAt <= item.level && item.calculateGrade()<2) ? item.calculateGrade()+1 : item.calculateGrade()
                
                 // console.debug(`[UPGRADE] NEED TO USE SCROLL UP? ${(itemConfig.scrollUpAt <= item.level && item.calculateGrade()<2)}`)
                 
@@ -184,9 +189,10 @@ export class ManageItems extends ResuplyStrategy {
                 
                 // console.debug(`For ${item.name} level ${item.level} needs ${scroll_name}. Has scroll: ${this.bot.hasItem(scroll_name)}`)
                 
-                if(!this.bot.hasItem(scroll_name)) {
+                if(this.bot.countItem(scroll_name)<1) {
                     if( scroll_grade<3 && this.bot.esize>0 && this.bot.gold > Game.G.items[scroll_name].g) {
-                        await this.bot.buy(scroll_name).catch(console.warn)
+                        console.debug(`${this.bot.id} buying scroll ${scroll_name} to compound ${item.name} level ${item.level}`)
+                        await this.bot.buy(scroll_name).catch(debugLog)
                     }
                     else continue
                 }
@@ -196,8 +202,13 @@ export class ManageItems extends ResuplyStrategy {
                 console.debug(`Compuond item ${item.name} to ${lvl+1}`)
                 
                 if(this.bot instanceof Merchant) {
-                    if(this.bot.canUse("massproduction")) await this.bot.massProduction().catch(console.debug)
-                    if(this.bot.canUse("massproductionpp")) await this.bot.massProductionPP().catch(console.debug)
+                    try {
+                        if(this.bot.canUse("massproduction")) await this.bot.massProduction()
+                        if(this.bot.canUse("massproductionpp")) await this.bot.massProductionPP()
+                        }
+                    catch(ex) {
+                        debugLog()
+                    }
                 }
                 await this.bot.compound(items[0],items[1],items[2], scroll_idx, primling).catch(console.warn)
                 
@@ -356,7 +367,7 @@ export class ManageItems extends ResuplyStrategy {
     protected async upgradeItemsFromBank() {
         let bot = this.bot
         if (!bot.bank && !super.getMemoryStorage.getBank) return console.debug("We don't have bank information")
-        if ( bot.gold < 500_000_000) return //console.debug("Not enough gold to upgrade items")
+        if ( bot.gold < this.GOLD_AMOUNT_FOR_CHECK_BANK) return //console.debug("Not enough gold to upgrade items")
         const items = this.getUpgradeListFromBank()
         let itemsToUpgrade = 0
         items.upgrade.forEach( (e) => { itemsToUpgrade+=e.slots.length})
@@ -476,7 +487,7 @@ export class ManageItems extends ResuplyStrategy {
 
                     // CHECK IF WE HAVE OFFERINGS FOR THIS ITEM
                     if(config.offeringAt && item.level>=config.offeringAt) {
-                        if(offeringsCount<1 && bot.gold<500_000_000) {
+                        if(offeringsCount<1 && bot.gold<this.GOLD_AMOUNT_FOR_BUY_OFFERING) {
                             // console.debug(`No big offering for item ${item.name} level: ${item.level ?? "none"}`)
                             continue
                         }
@@ -644,7 +655,7 @@ export class ManageItems extends ResuplyStrategy {
                 if( item.isLocked() ) continue
                 if( personalItems.some(e => e.name == item.name && e.level == item.level) ) continue
                 if( CharacterItems.DEFAULT_ELIXIRS.get(this.bot.ctype).includes(item.name) ) continue
-                await this.bot.sendItem(name,idx,item.q).catch(console.warn)
+                await this.bot.sendItem(name,idx,item.q).catch(debugLog)
             }
             if(this.bot.ctype != "merchant") {
                 if(this.bot.hasItem(["computer", "supercomputer"]) && this.bot.gold>CharacterItems.KEEP_GOLD_WITH_PC) await this.bot.sendGold(name, this.bot.gold-CharacterItems.KEEP_GOLD_WITH_PC)
@@ -665,7 +676,7 @@ export class ManageItems extends ResuplyStrategy {
                 && (!item.level || item.level == 0)
             ) 
             {
-                await bot.sell(idx,item.q).catch(console.warn)
+                await bot.sell(idx,item.q).catch(debugLog)
             }
         }
     }
