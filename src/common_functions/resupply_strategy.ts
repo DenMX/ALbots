@@ -90,19 +90,19 @@ export class ResuplyStrategy extends PartyStrategy {
         if(Object.keys(this.bot.c).length > 0) return setTimeout(this.usePotionsLoop, 2000)
         if(this.bot.hp < this.bot.max_hp * 0.5) {
             let hpot = this.bot.locateItem("hpot1")
-            hpot>=0 ? await this.bot.usePotion(hpot).catch(console.warn) : await this.bot.regenHP().catch(console.warn)
+            hpot>=0 ? await this.bot.usePotion(hpot).catch(CF.debugLog) : await this.bot.regenHP().catch(CF.debugLog)
             // console.log("Regening HP")
             return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
         }
         if(this.bot.mp < this.bot.max_mp-500) {
             let mpot = this.bot.locateItem("mpot1")
-            mpot>=0 ? await this.bot.usePotion(mpot).catch(console.warn) : await this.bot.regenMP().catch(console.warn)
+            mpot>=0 ? await this.bot.usePotion(mpot).catch(CF.debugLog) : await this.bot.regenMP().catch(CF.debugLog)
             // console.log("Regening MP")
             return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
         }
         if(this.bot.hp<this.bot.max_hp*0.9) {
             let hpot = this.bot.locateItem("hpot1")
-            hpot>=0 ? await this.bot.usePotion(hpot).catch(console.warn) : await this.bot.regenHP().catch(console.warn)
+            hpot>=0 ? await this.bot.usePotion(hpot).catch(CF.debugLog) : await this.bot.regenHP().catch(CF.debugLog)
             // console.log("Regening HP")
             return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
         }

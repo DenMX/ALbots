@@ -32,10 +32,10 @@ async function run(){
 
     let stateController = new StateController([
         await startBotWithStrategy("merchant", "MerchanDiser", "ASIA", "I", memoryStorage),
-        await startBotWithStrategy("warrior","Warious", "ASIA", "I", memoryStorage),
-        await startBotWithStrategy("ranger","aRanDonDon", "ASIA", "I", memoryStorage),
+        // await startBotWithStrategy("warrior","Warious", "ASIA", "I", memoryStorage),
+        // await startBotWithStrategy("ranger","aRanDonDon", "ASIA", "I", memoryStorage),
         // await startBotWithStrategy("ranger","frostyRan", "ASIA", "I", memoryStorage),
-        await startBotWithStrategy("priest","Archealer", "ASIA", "I", memoryStorage)
+        // await startBotWithStrategy("priest","Archealer", "ASIA", "I", memoryStorage)
     ], memoryStorage)
     memoryStorage.setStateController = stateController
     // bwiReporter = new BWIReporter(stateController, 924, 3000);

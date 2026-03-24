@@ -1,9 +1,9 @@
-import { Constants, Game, MapName, MonsterName, Observer, PingCompensatedCharacter, ServerIdentifier, ServerRegion, Tools } from "alclient";
+import { Constants, Game, MapName, MonsterName, Observer, PingCompensatedCharacter, ServerData, ServerIdentifier, ServerRegion, Tools } from "alclient";
 import { State, StateStrategy } from "../common_functions/state_strategy";
 import { WANTED_EVENTS } from "../configs/events_and_spots";
-import { MemoryStorage } from "../common_functions/memory_storage";
+import { DEFAULT_SERVER_REGION, DEFAULT_SERVER_NAME, MemoryStorage } from "../common_functions/memory_storage";
 import { IState } from "./state_interface";
-import { debugLog, startBotWithStrategy } from "../common_functions/common_functions";
+import { debugLog, startBotWithStrategy, MY_CHARACTERS } from "../common_functions/common_functions";
 import * as CF from "../common_functions/common_functions"
 
 export class StateController {
@@ -11,6 +11,14 @@ export class StateController {
 
     private serverObservers: Observer[] = []
 
+    private serversToObserve: ServerData[] = [
+        Game.servers.ASIA.I,
+        Game.servers.EU.I,
+        Game.servers.EU.II,
+        Game.servers.US.I,
+        Game.servers.US.II,
+        Game.servers.US.III,
+    ]
     private memoryStorage: MemoryStorage
 
     constructor(bots: IState[], memoryStorage: MemoryStorage) {
@@ -21,7 +29,8 @@ export class StateController {
         this.checkSendItems = this.checkSendItems.bind(this)
         this.reconnect = this.reconnect.bind(this)
         this.disconnectFirst = this.disconnectFirst.bind(this)
-        this.checkEvents()
+        this.manageCharactersLoop = this.manageCharactersLoop.bind(this)
+        
         this.checkSendItems()
 
         for(let i of bots) {
@@ -29,14 +38,20 @@ export class StateController {
             bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
             bot.socket.on("code_eval", (data) => this.manageCommand(data, bot))
             
-            if(bot instanceof StateStrategy) {
-                (i as StateStrategy).startQuest()
-            }
+            // if(bot instanceof StateStrategy) {
+            //     (i as StateStrategy).startQuest()
+            // }
         }
 
-        this.serverObservers.push(new Observer(Game.servers.ASIA.I, Game.G, Game.user.userAuth ))
-        this.serverObservers[0].connect(true, true).catch(debugLog)
+        this.serversToObserve.forEach( server => {
+            const observer = new Observer(server, Game.G, Game.user.userAuth )
+            this.serverObservers.push(observer)
+            observer.connect(true, true).catch(console.warn)
 
+        })
+        
+        this.checkEvents()
+        this.manageCharactersLoop()
         // setTimeout(this.disconnectFirst, 30_000)
     }
 
@@ -84,6 +99,7 @@ export class StateController {
                     console.warn(`${Date.now()} Bot started. ${i} in bots list, ready: ${new_bot.getBot().ready}. Length of bots ${this.bots.length}.`)
                     this.memoryStorage.addEventListners(new_bot.getBot())
                     new_bot.getBot().socket.on("disconnect", (data) => this.reconnect(data, new_bot.getBot()))
+                    new_bot.getBot().socket.on("code_eval", (data) => this.manageCommand(data, new_bot.getBot()))
                     // if(new_bot instanceof StateStrategy) {
                     //     new_bot.startQuest()
                     // }
@@ -115,30 +131,105 @@ export class StateController {
         }
     }
 
+
+
+    private getWantedEvents() {
+        let wantedEvents: { serverRegion: ServerRegion, serverName: ServerIdentifier, eventName: MonsterName | MapName }[] = []
+        this.serverObservers.forEach( (observer) => {
+            wantedEvents.push(...Object.keys(observer.S).filter( e => observer.S[e].live != false  && WANTED_EVENTS[e] && (WANTED_EVENTS[e].wantedOnOtherServer || (observer.serverData.region == DEFAULT_SERVER_REGION && observer.serverData.name == DEFAULT_SERVER_NAME))).map( e => ({
+                serverRegion: observer.serverData.region,
+                serverName: observer.serverData.name,
+                eventName: e as MonsterName | MapName
+            })))
+        })
+        wantedEvents.sort((a, b) => {
+            if(a.serverRegion != b.serverRegion && a.serverName != b.serverName) {
+                return (a.serverRegion == DEFAULT_SERVER_REGION && a.serverName == DEFAULT_SERVER_NAME) ? -1 : 1
+            }
+            if(WANTED_EVENTS[a.eventName]?.wantedOnOtherServer && !WANTED_EVENTS[b.eventName]?.wantedOnOtherServer) {
+                return (WANTED_EVENTS[a.eventName]?.wantedOnOtherServer == true) ? -1 : 1
+            }
+            return 0
+        })
+        return wantedEvents
+    }
+
     private async checkEvents() {
-        for(let observer of this.serverObservers) {
-            
-            let events = Object.keys(observer.S).filter( e => observer.S[e].live != false  && WANTED_EVENTS.has(e as MonsterName | MapName))
-            if(events.length ) {
-                events.forEach( (e) => {
-                    this.bots.filter(j => j instanceof StateStrategy)
-                    .forEach( (bot) => {
-                        if(bot.currentState?.eventName != e && !bot.stateScheduler.some( s => s.eventName == e)) {
-                            bot.addStateToScheduler({
-                                state_type: "event",
-                                wantedMob: WANTED_EVENTS.get(e as MonsterName),
-                                eventName: e as MonsterName | MapName,
-                                server: {region: observer.serverData.region, name: observer.serverData.name}
-                            })
-                            console.log(`Found event for ${bot.getBot().name}:`)
-                            console.log(JSON.stringify(e))
-                        }
-                })
-                })
-                
+
+        let wantedEvents = this.getWantedEvents()
+        if(wantedEvents.length == 0) return setTimeout(this.checkEvents, 10 * 1000)
+        if(this.bots.filter( e => e.getStateType() != "event" && e instanceof StateStrategy).length < 1) return setTimeout(this.checkEvents, 10 * 1000)
+        const mostWantedEvent = wantedEvents[0]
+        let wantedCharacters = Object.keys(MY_CHARACTERS).filter( e => MY_CHARACTERS.get(e)?.server.region == mostWantedEvent.serverRegion && MY_CHARACTERS.get(e)?.server.name == mostWantedEvent.serverName)
+        if(wantedCharacters.length < 3) {
+            if(!wantedCharacters.includes("Archealer")) {
+                wantedCharacters.push("Archealer")
+            }
+            if(wantedCharacters.length < 3 && !wantedCharacters.includes("arMAGEdon")) {
+                wantedCharacters.push("arMAGEdon")
             }
         }
+        for(const char of this.bots) {
+            if(char.getBot().ctype == "merchant") continue
+            if(!wantedCharacters.includes(char.getBot().id)) {
+                this.stopCharacter(char.getBot().id)
+                continue
+            }
+            const bot = char.getBot()
+            if(bot.serverData.region != mostWantedEvent.serverRegion || bot.serverData.name != mostWantedEvent.serverName) {
+                await this.stopCharacter(bot.id)
+                await this.addNewBot(await startBotWithStrategy(
+                    char.getBot().ctype,
+                    char.getBot().id,
+                    mostWantedEvent.serverRegion,
+                    mostWantedEvent.serverName,
+                    this.memoryStorage
+                ));
+                (this.bots.find( e => e.getBot().id == bot?.id) as StateStrategy)?.addStateToScheduler({
+                    state_type: "event",
+                    wantedMob: WANTED_EVENTS[mostWantedEvent.eventName].monsters,
+                    eventName: mostWantedEvent.eventName,
+                    server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}
+                } as State)
+            }
+            else {
+                (char as StateStrategy).addStateToScheduler({
+                    state_type: "event",
+                    wantedMob: WANTED_EVENTS[mostWantedEvent.eventName].monsters,
+                    eventName: mostWantedEvent.eventName,
+                    server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}
+                } as State)
+            }
+
+        }
+        
         setTimeout(this.checkEvents, 10 * 1000)
+    }
+
+    private async manageCharactersLoop() {
+        if(this.getWantedEvents().length == 0) return setTimeout(this.manageCharactersLoop, 10 * 1000)
+        for(const char of this.bots) {
+            //not management merchant
+            if(char.getBot().ctype == "merchant") continue
+            const bot = char.getBot()
+            //main setup character
+            if(MY_CHARACTERS.get(bot.id)?.isMainSetup == true) continue
+            console.debug(`Stopping ${bot.id} cause not in main setup and no events`)
+            this.stopCharacter(bot.id)
+        }
+        for(const char of MY_CHARACTERS.keys()) {
+            if(this.bots.find( e => e.getBot().id == char)) continue
+            if(MY_CHARACTERS.get(char)?.isMainSetup != true)
+            console.debug(`Starting ${char} cause no events`)
+            this.addNewBot(await startBotWithStrategy(
+                MY_CHARACTERS.get(char)?.ctype,
+                char,
+                MY_CHARACTERS.get(char)?.server.region,
+                MY_CHARACTERS.get(char)?.server.name,
+                this.memoryStorage
+            ))
+        }
+        setTimeout(this.manageCharactersLoop, 10 * 1000)
     }
 
     private checkSendItems() {
@@ -171,7 +262,7 @@ export class StateController {
             case "start":
                 if(this.bots.length>=4) return console.debug(`${name} too many bots`)
                 if(!CF.MY_CHARACTERS.get(name)) return console.debug(`${name} unknown character`)
-                if (!parts[2] || !parts[3]) return console.error(`Cannot start without server: ${data}`)
+                // if (!parts[2] || !parts[3]) return console.error(`Cannot start without server: ${data}`)
                 return this.addNewBot(await startBotWithStrategy(
                     CF.MY_CHARACTERS.get(name)?.ctype,
                     name,
@@ -182,18 +273,8 @@ export class StateController {
             case "stop":
                 const botState = this.bots.find( e => e.getBot().id == name)
                 if(!botState) return
-                const botToStop = botState.getBot()
-                botState.deactivateStrat()
-                botToStop.socket.off("disconnect")
-                console.debug(`${name} shutdown. ${this.bots.length} bots left`)
-                let newList = []
-                for(let i=0; i<this.bots.length; i++) {
-                    if(this.bots[i].getBot().id == name) continue
-                    newList.push(this.bots[i])
-                }
-                this.bots = newList
-                console.debug(`${name} disconnected. ${this.bots.length} bots left`)
-                return botToStop.disconnect()
+                name.split(',').forEach( e => this.stopCharacter(e))
+                break
             case "quest":
                 if (!name) return console.error(`Cannot start quest without ids: ${data}`)
                 for(const id of name.split(',')) {
@@ -228,5 +309,22 @@ export class StateController {
             default:
                 console.error(`${sourceBot?.id} unknown command ${command}\n${JSON.stringify(data)}`)
         }
+    }
+
+    private stopCharacter(name: string) {
+        const botState = this.bots.find( e => e.getBot().id == name)
+        if(!botState) return
+        const botToStop = botState.getBot()
+        botState.deactivateStrat()
+        botToStop.socket.off("disconnect")
+        console.debug(`${name} shutdown. ${this.bots.length} bots left`)
+        let newList = []
+        for(let i=0; i<this.bots.length; i++) {
+            if(this.bots[i].getBot().id == name) continue
+            newList.push(this.bots[i])
+        }
+        this.bots = newList
+        console.debug(`${name} shutdown. ${this.bots.length} bots left`)
+        return botToStop.disconnect()
     }
 }

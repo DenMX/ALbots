@@ -59,7 +59,7 @@ export class MemoryStorage {
             // if response.status == 200, it was successfully updated
             fetch(url, settings).then((response) => console.log(`Sending tracker info code: ${response.status}`));
             });
-            bot.socket.emit("tracker");
+        bot.socket.emit("tracker");
     }
 
     private async loadBankFromMongo() {

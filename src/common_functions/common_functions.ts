@@ -220,12 +220,9 @@ export function shouldUseMassWeapon(bot: PartyStrategy, tank: string) {
     if(bot.getBot().getEntities().filter( e => e.target == bot.getBot().id || bot.getBot().partyData?.list.includes(e.target) && bot.getBot().getEntities().filter( addentity => addentity.abilities.stone && Tools.distance(e, addentity)<40).length<1).length>1) return true
     
     if(bot.getBot().getEntities().filter( e => Tools.distance(e, target)<= 40 && e.abilities.stone && !e.target).length>0) return false
-    let willTank 
-    if(bot.getBot().name == tank ) willTank = bot.getBot()
-    else {
-        willTank = bot.getBot().getPlayers().filter( e => e.name == tank && Tools.distance(e,bot.getBot())<200)[0] || bot.getBot()
-    }
-    let entitiesTargetingUs = bot.getBot().getEntities().filter( e => Tools.distance(e, target)<= 40 && (bot.getBot().partyData?.list.includes(e.target) || e.target == willTank.name))
+    let willTank = getActualTank(bot, tank)
+    const tankName = willTank instanceof Player ? willTank.name : willTank.getBot().name
+    let entitiesTargetingUs = bot.getBot().getEntities().filter( e => Tools.distance(e, target)<= 40 && (bot.getBot().partyData?.list.includes(e.target) || e.target == tankName))
     
     if(entitiesTargetingUs.length>1) return true
 
@@ -234,6 +231,13 @@ export function shouldUseMassWeapon(bot: PartyStrategy, tank: string) {
 
     
     return ( entitiesInRadiusWT.length>0 && calculate_monsters_dps(bot, willTank, [...entitiesInRadiusWT, ...entitiesTargetingUs]) / calculate_hps(bot.getBot()) <= 0.95)
+}
+
+export function getActualTank(bot: PartyStrategy, tank: string): Player | PartyStrategy {
+    
+    let willTank = bot.getBot().getPlayer({id: tank, withinRange: 200})
+    if(!willTank) return bot
+    return willTank
 }
 
 export function shouldUseMassSkill(bot: PartyStrategy, tank: string, skill: SkillName) {
