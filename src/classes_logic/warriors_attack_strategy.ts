@@ -199,10 +199,15 @@ export class WarriorsAttackStrategy extends StateStrategy {
                 this.lastWeaponSwitch = Date.now()
                 return 
             }
-            let mainhand_idx = this.warrior.locateItem(mainhand_item.name, undefined, {level: mainhand_item?.level})
-            if( mainhand_idx ) await this.warrior.equip(mainhand_idx,"mainhand").catch(debugLog)
-            let offhand_idx = this.warrior.locateItem(offhand_item?.name, undefined, {level: offhand_item?.level})
-            if( offhand_idx ) await this.warrior.equip(offhand_idx, "offhand").catch(debugLog)
+            try {
+                let mainhand_idx = this.warrior.locateItem(mainhand_item.name, undefined, {level: mainhand_item?.level})
+                if( mainhand_idx ) await this.warrior.equip(mainhand_idx,"mainhand").catch(debugLog)
+                let offhand_idx = this.warrior.locateItem(offhand_item?.name, undefined, {level: offhand_item?.level})
+                if( offhand_idx ) await this.warrior.equip(offhand_idx, "offhand").catch(debugLog)
+            }
+            catch(ex){
+                console.error(ex)
+            }
         }
         this.lastWeaponSwitch = Date.now()
     }
