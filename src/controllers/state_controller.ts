@@ -24,8 +24,6 @@ export class StateController {
     constructor(bots: IState[], memoryStorage: MemoryStorage) {
         this.bots = bots
         this.memoryStorage = memoryStorage
-        // this.serverObserver = serverObserver
-        this.checkEvents = this.checkEvents.bind(this)
         this.checkSendItems = this.checkSendItems.bind(this)
         this.reconnect = this.reconnect.bind(this)
         this.disconnectFirst = this.disconnectFirst.bind(this)
@@ -37,10 +35,7 @@ export class StateController {
             let bot = i.getBot()
             bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
             bot.socket.on("code_eval", (data) => this.manageCommand(data, bot))
-            
-            // if(bot instanceof StateStrategy) {
-            //     (i as StateStrategy).startQuest()
-            // }
+
         }
 
         this.serversToObserve.forEach( server => {
@@ -50,9 +45,7 @@ export class StateController {
 
         })
         
-        // this.checkEvents()
         this.manageCharactersLoop()
-        // setTimeout(this.disconnectFirst, 30_000)
     }
 
     private disconnectFirst(){
@@ -70,10 +63,8 @@ export class StateController {
         this.bots.push(state)
         let bot = state.getBot()
         bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
+        bot.socket.on("code_eval", (data) => this.manageCommand(data, bot))
         this.memoryStorage.addEventListners(bot)
-        if(bot instanceof StateStrategy) {
-            bot.startQuest()
-        }
     }
 
     private deactivateStrategy(bot: PingCompensatedCharacter) {
@@ -151,58 +142,6 @@ export class StateController {
         })
         wantedEvents.forEach( e => { console.debug(`Found event ${e.eventName} on ${e.serverRegion} ${e.serverName}`) })
         return wantedEvents
-    }
-
-    private async checkEvents() {
-
-        let wantedEvents = this.getWantedEvents()
-        if(wantedEvents.length == 0) return setTimeout(this.checkEvents, 10 * 1000)
-        if(this.bots.filter( e => e.getStateType() != "event" && e instanceof StateStrategy).length < 1) return setTimeout(this.checkEvents, 10 * 1000)
-        const mostWantedEvent = wantedEvents[0]
-        let wantedCharacters = Object.keys(MY_CHARACTERS).filter( e => MY_CHARACTERS.get(e)?.server.region == mostWantedEvent.serverRegion && MY_CHARACTERS.get(e)?.server.name == mostWantedEvent.serverName)
-        if(wantedCharacters.length < 3) {
-            if(!wantedCharacters.includes("Archealer")) {
-                wantedCharacters.push("Archealer")
-            }
-            if(wantedCharacters.length < 3 && !wantedCharacters.includes("arMAGEdon")) {
-                wantedCharacters.push("arMAGEdon")
-            }
-        }
-        for(const char of this.bots) {
-            if(char.getBot().ctype == "merchant") continue
-            if(!wantedCharacters.includes(char.getBot().id)) {
-                this.stopCharacter(char.getBot().id)
-                continue
-            }
-            const bot = char.getBot()
-            if(bot.serverData.region != mostWantedEvent.serverRegion || bot.serverData.name != mostWantedEvent.serverName) {
-                await this.stopCharacter(bot.id)
-                await this.addNewBot(await startBotWithStrategy(
-                    char.getBot().ctype,
-                    char.getBot().id,
-                    mostWantedEvent.serverRegion,
-                    mostWantedEvent.serverName,
-                    this.memoryStorage
-                ));
-                (this.bots.find( e => e.getBot().id == bot?.id) as StateStrategy)?.addStateToScheduler({
-                    state_type: "event",
-                    wantedMob: WANTED_EVENTS[mostWantedEvent.eventName].monsters,
-                    eventName: mostWantedEvent.eventName,
-                    server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}
-                } as State)
-            }
-            else {
-                (char as StateStrategy).addStateToScheduler({
-                    state_type: "event",
-                    wantedMob: WANTED_EVENTS[mostWantedEvent.eventName].monsters,
-                    eventName: mostWantedEvent.eventName,
-                    server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}
-                } as State)
-            }
-
-        }
-        
-        setTimeout(this.checkEvents, 10 * 1000)
     }
 
     private async manageCharactersLoop() {
