@@ -115,7 +115,6 @@ export class WarriorsAttackStrategy extends StateStrategy {
     }
 
     private async switchWeapons(config?: warriorWeaponSwitchConfig) {
-        console.debug(`Switching weapons with config: ${JSON.stringify(config)}`)
         let botWC = Items.WEAPON_CONFIGS[this.bot.name] as Items.WarriorWeaponsConfig
         if(!botWC) return  
         if(config?.cleave && botWC.cleave) {
