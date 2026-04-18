@@ -48,7 +48,7 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         fast_offhand: { name: "wbookhs", level: 3 }
     },
     "aRanDonDon": {
-        solo_mainhand: { name: "crossbow", level: 8},
+        solo_mainhand: { name: "crossbow", level: 9},
         solo_offhand: { name: "t2quiver", level: 8 },
         mass_mainhand: { name: "pouchbow", level: 11},
         mass_offhand: { name: "alloyquiver", level: 8},
@@ -114,7 +114,6 @@ export const SET_CONFIGS: {
                 {name: 'mittens', level: 9},
                 {name: 'spookyamulet', level: 1},
                 {name: 'mshield', level: 9},
-                {name: 'lmace', level: 8},
                 {name: 'rabbitsfoot', level: 1},
                 {name: 'mearring', level: 0, slot: "earring1"},
                 {name: 'mearring', level: 1, slot: "earring2"},
@@ -132,10 +131,9 @@ export const SET_CONFIGS: {
             "tank": [
                 {name: 'xhelmet', level: 7},
                 {name: 'xarmor', level: 6},
-                {name: 'starkillers', level: 7},
+                {name: 'starkillers', level: 8},
                 {name: 'wingedboots', level: 8},
                 {name: 'mittens', level: 9},
-                {name: 'ornamentstaff', level: 10},
                 {name: 't2intamulet', level: 3},
                 {name: 'intearring', level: 4, slot: "earring1"},
                 {name: 'sbelt', level: 1},

@@ -159,7 +159,8 @@ export const ITEMS_TO_SELL: ItemName[] = [
     "mcape",
 
     //trash weapon
-    "t2bow"
+    "t2bow",
+    "woodensword"
     
 ]
 
@@ -214,6 +215,8 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["cclaw", {level: 9, scrollUpAt: 5, offeringAt: 8}],
     ["cupid", {level: 8, scrollUpAt: 4, primlingAt: 5, offeringAt: 7}],
     ["pmace", {level: 9, scrollUpAt: 4, primlingAt: 6, offeringAt: 8}],
+    ["candycanesword", {level: 9, scrollUpAt: 4, primlingAt: 7, offeringAt: 8}],
+    ["broom", {level: 8, scrollUpAt: 4, primlingAt: 6}],
     
 
     // Halloween
