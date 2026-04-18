@@ -126,6 +126,7 @@ export class ResuplyStrategy extends PartyStrategy {
         }
         else {
             if(mpot < 100 && !this.bot.smartMoving && !this.bot.moving) {
+                this.addLog(`Resupplying pots: ${mpot} mpots and ${hpot} hpots`)
                 await this.bot.smartMove("main", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
                 if( Tools.distance(this.bot, {x: -35, y: -162, map: "main"}) > Constants.NPC_INTERACTION_DISTANCE ) {
                     return setTimeout( this.resupplyPots, 5000 )

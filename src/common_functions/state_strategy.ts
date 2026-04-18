@@ -46,12 +46,9 @@ export class StateStrategy extends ManageItems implements IState {
         this.kiteLoop = this.kiteLoop.bind(this)
         this.switchState = this.switchState.bind(this)
 
-
-
         //trigger started functions
         this.runLoops()
         this.kiteLoop()
-        
     }
 
     public getStateType() : string {
@@ -268,6 +265,8 @@ export class StateStrategy extends ManageItems implements IState {
         //     state_type: "farm",
         //     server: {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME}
         // }
+
+
         // load saved in DB
         if(Database.connection) {
             try{
@@ -340,6 +339,7 @@ export class StateStrategy extends ManageItems implements IState {
 
     private switchState() {
         this.current_state = (this.state_scheduler.length>0) ? this.state_scheduler.shift() : this.last_state ?? this.default_state
+        this.addLog(`Switched to state: ${JSON.stringify(this.current_state)}`)
     }
 
     private async checkState() {
@@ -597,4 +597,6 @@ export class StateStrategy extends ManageItems implements IState {
                 return 0;
         })
     }
+
+    
 }

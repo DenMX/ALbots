@@ -30,6 +30,8 @@ export class PartyStrategy {
 
     private loot_interval: number = 30_000
 
+    private logs: string[] = []
+
     constructor(bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
         this.bot = bot as PingCompensatedCharacter
         this.memoryStorage = memoryStorage
@@ -343,6 +345,16 @@ export class PartyStrategy {
 
     public get getMemoryStorage() {
         return this.memoryStorage
+    }
+
+    public getLogs(): string[] {
+        return this.logs
+    }
+
+    public addLog(log: string, showLog: boolean = true) {
+        if(showLog) console.log(log)
+        this.logs.push(`[${new Date().toLocaleString()}] ${log}`)
+        if(this.logs.length > 20 ) this.logs.splice(0, this.logs.length - 20)
     }
 
 }

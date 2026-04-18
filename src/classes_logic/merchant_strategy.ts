@@ -225,7 +225,7 @@ export class MerchantStrategy extends ManageItems implements IState {
      */
     private changeMerchState(state: string) {
         this.merch_state.state_type = state
-        // console.debug(`State was changed to ${state}`)
+        this.addLog(`State was changed to ${state}`, false)
         if(this.DEFAULT_STATE == state && this.job_scheduler.length<1) {
             let partyMember = this.bot.partyData?.party[this.bot.partyData?.list.filter(e => e != this.bot.id)[0]]
             if(partyMember && !this.bot.smartMoving && (Tools.distance(this.bot, partyMember) > 400 || partyMember.map != this.bot.map)) this.bot.smartMove(partyMember, {getWithin: 100}).catch(console.debug)
@@ -554,4 +554,6 @@ export class MerchantStrategy extends ManageItems implements IState {
         else if(!this.bot.stand && !this.bot.moving && !this.bot.smartMoving) this.bot.openMerchantStand().catch(CF.debugLog)
         setTimeout(this.switchTradeStandLoop, 500)
     }
+
+    
 }

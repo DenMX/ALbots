@@ -6,4 +6,5 @@ export interface IState {
     getBot(): PingCompensatedCharacter
     getWantedMob(): MonsterName|MonsterName[]
     deactivateStrat(): void
+    getLogs(): string[]
 }
