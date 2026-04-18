@@ -5,7 +5,7 @@ import { calculate_hps, calculate_monster_dps, debugLog } from "./common_functio
 import fs from "fs"
 import { DEFAULT_SERVER_NAME, DEFAULT_SERVER_REGION, MemoryStorage } from "./memory_storage"
 import { ManageItems } from "./manage_items_strategy"
-import { SPECIAL_MONSTERS } from "../configs/events_and_spots"
+import { SPECIAL_MONSTERS, WANTED_EVENTS } from "../configs/events_and_spots"
 
 export type MobsSortFilter = {
     sortSpawns? : boolean,
@@ -398,11 +398,11 @@ export class StateStrategy extends ManageItems implements IState {
                 if(this.current_state.state_type == "event") {
                     if( this.bot.S[this.current_state?.eventName] && this.bot.S[this.current_state.eventName]?.live != false) {
                         let join
-                        if((this.current_state?.eventName in Game.G.maps || this.current_state?.eventName in Game.G.monsters) && (!this.bot.S[this.current_state.eventName].map || this.current_state?.eventName == "icegolem")) {
+                        if(WANTED_EVENTS[this.current_state?.eventName]?.join) {
                             join = (this.current_state?.eventName in Game.G.maps) ? this.current_state.eventName as MapName : this.current_state.eventName as MonsterName;
                         }
                         
-                        await this.bot.smartMove(join ?? this.bot.S[this.current_state.eventName], {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
+                        await this.bot.smartMove(join ?? this.bot.S[this.current_state.eventName], {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.warn)
                         return setTimeout(this.checkState, 1000)
                     }
                     else if(this.bot.getEntities().filter( e => this.currentState.wantedMob.includes(e.type) || SPECIAL_MONSTERS.includes(e.type)).length<1) {

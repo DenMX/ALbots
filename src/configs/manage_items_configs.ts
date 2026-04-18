@@ -170,6 +170,15 @@ export const DISMANTLE_ITEMS: ItemName[] = [
     'goldenegg'
 ]
 
+export const ITEMS_TO_CRAFT: { [T in ItemName]?: {items?: {name: ItemName, quantity: number}[]} } = {
+    "basketofeggs": {},
+    "xbox": {},
+    "fireblade": {items: [{name: "goldingot", quantity: 50}]},
+    "wingedboots": {},
+    "cclaw": {},
+    "carrotsword": {}
+}
+
 export type UpgradeConfig = {
     level: number,
     primlingAt?: number,

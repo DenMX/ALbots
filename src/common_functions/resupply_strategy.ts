@@ -61,6 +61,7 @@ export class ResuplyStrategy extends PartyStrategy {
                 await this.bot.smartMove("premium", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
             }
             await this.bot.buy("xptome").catch(console.warn)
+            this.addLog(`Bought XP tome`)
         }
     }
 
@@ -194,7 +195,7 @@ export class ResuplyStrategy extends PartyStrategy {
         if( ((!this.bot.hasItem("jacko") && this.bot.slots?.orb?.name != "jacko") || this.bot.isOnCooldown("scare") )
             && CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))>this.bot.hp ) {
             try {
-                console.error(`${this.bot.name} SUICIDE BY LOW HP. HP: ${this.bot.hp}, DPS: ${CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))}`)
+                this.addLog(`${this.bot.name} SUICIDE BY LOW HP. HP: ${this.bot.hp}, DPS: ${CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))}`)
                 await this.bot.socket.emit("harakiri")
                 
             }
@@ -205,7 +206,7 @@ export class ResuplyStrategy extends PartyStrategy {
         if(this.bot.s.burned && this.bot.hp < Math.max(this.bot.max_hp*0.15, 2000)) {
             try {
                 await this.bot.socket.emit("harakiri")
-                console.error(`SUICIDE BY BURNED HP ${this.bot.hp} burning ${JSON.stringify(this.bot.s.burned)}`)
+                this.addLog(`SUICIDE BY BURNED HP ${this.bot.hp} burning ${JSON.stringify(this.bot.s.burned)}`)
             }
             catch(ex) {
                 console.error(ex)

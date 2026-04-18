@@ -5,16 +5,16 @@ export type BossSpot = {
     location: IPosition
 }
 
-export const WANTED_EVENTS: { [T in MonsterName|MapName]?: { monsters: MonsterName[], wantedOnOtherServer?: boolean}} = {
+export const WANTED_EVENTS: { [T in MonsterName|MapName]?: { monsters: MonsterName[], wantedOnOtherServer?: boolean, join?: boolean}} = {
     dragold: { monsters: ["dragold"], wantedOnOtherServer: true },
-    icegolem: { monsters: ["icegolem"] },
+    icegolem: { monsters: ["icegolem"], join: true },
     franky: { monsters: ["franky","nerfedmummy"], wantedOnOtherServer: true },
     mrgreen: { monsters: ["mrgreen"], wantedOnOtherServer: true },
     mrpumpkin: { monsters: ["mrpumpkin"], wantedOnOtherServer: true },
     crabxx: { monsters: ["crabxx"], wantedOnOtherServer: true },
     snowman: { monsters: ["snowman"] },
     grinch: { monsters: ["grinch"] },
-    goobrawl: { monsters: ["bgoo", "rgoo"], wantedOnOtherServer: true } 
+    goobrawl: { monsters: ["bgoo", "rgoo"], wantedOnOtherServer: true, join: true } 
 }
 
 export const BOSS_CHECK_ROUTE: BossSpot[] = [
