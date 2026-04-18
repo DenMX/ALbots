@@ -50,7 +50,7 @@ export class StateController {
 
         })
         
-        this.checkEvents()
+        // this.checkEvents()
         this.manageCharactersLoop()
         // setTimeout(this.disconnectFirst, 30_000)
     }
@@ -100,9 +100,6 @@ export class StateController {
                     this.memoryStorage.addEventListners(new_bot.getBot())
                     new_bot.getBot().socket.on("disconnect", (data) => this.reconnect(data, new_bot.getBot()))
                     new_bot.getBot().socket.on("code_eval", (data) => this.manageCommand(data, new_bot.getBot()))
-                    // if(new_bot instanceof StateStrategy) {
-                    //     new_bot.startQuest()
-                    // }
                     break
                 }
             }
@@ -134,12 +131,13 @@ export class StateController {
 
 
     private getWantedEvents() {
-        let wantedEvents: { serverRegion: ServerRegion, serverName: ServerIdentifier, eventName: MonsterName | MapName }[] = []
+        let wantedEvents: { serverRegion: ServerRegion, serverName: ServerIdentifier, eventName: MonsterName | MapName, monsters: MonsterName[] }[] = []
         this.serverObservers.forEach( (observer) => {
             wantedEvents.push(...Object.keys(observer.S).filter( e => observer.S[e].live != false  && WANTED_EVENTS[e] && (WANTED_EVENTS[e].wantedOnOtherServer || (observer.serverData.region == DEFAULT_SERVER_REGION && observer.serverData.name == DEFAULT_SERVER_NAME))).map( e => ({
                 serverRegion: observer.serverData.region,
                 serverName: observer.serverData.name,
-                eventName: e as MonsterName | MapName
+                eventName: e as MonsterName | MapName,
+                monsters: WANTED_EVENTS[e]?.monsters
             })))
         })
         wantedEvents.sort((a, b) => {
@@ -151,6 +149,7 @@ export class StateController {
             }
             return 0
         })
+        wantedEvents.forEach( e => { console.debug(`Found event ${e.eventName} on ${e.serverRegion} ${e.serverName}`) })
         return wantedEvents
     }
 
@@ -207,27 +206,54 @@ export class StateController {
     }
 
     private async manageCharactersLoop() {
-        if(this.getWantedEvents().length == 0) return setTimeout(this.manageCharactersLoop, 10 * 1000)
-        for(const char of this.bots) {
-            //not management merchant
-            if(char.getBot().ctype == "merchant") continue
-            const bot = char.getBot()
-            //main setup character
-            if(MY_CHARACTERS.get(bot.id)?.isMainSetup == true) continue
-            console.debug(`Stopping ${bot.id} cause not in main setup and no events`)
-            this.stopCharacter(bot.id)
+        let wantedEvents = this.getWantedEvents()
+        // GETTING WANTED BOTS
+        let wantedBots = []
+        if(wantedEvents.length == 0) {
+            let wantedCharacters = Object.keys(MY_CHARACTERS).filter( e => MY_CHARACTERS.get(e)?.isMainSetup == true)
+            wantedCharacters.forEach( e => wantedBots.push({id: e, server: {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME}}))
+            console.debug('Wanted bots without events: ' + wantedBots.map( e => e.id).join(', '))
         }
-        for(const char of MY_CHARACTERS.keys()) {
-            if(this.bots.find( e => e.getBot().id == char)) continue
-            if(MY_CHARACTERS.get(char)?.isMainSetup != true)
-            console.debug(`Starting ${char} cause no events`)
-            this.addNewBot(await startBotWithStrategy(
-                MY_CHARACTERS.get(char)?.ctype,
-                char,
-                MY_CHARACTERS.get(char)?.server.region,
-                MY_CHARACTERS.get(char)?.server.name,
-                this.memoryStorage
-            ))
+        else {
+            const mostWantedEvent = wantedEvents[0]
+            Object.keys(MY_CHARACTERS)
+            .filter( e => MY_CHARACTERS.get(e)?.server.region == mostWantedEvent.serverRegion && MY_CHARACTERS.get(e)?.server.name == mostWantedEvent.serverName && MY_CHARACTERS.get(e)?.ctype != "merchant")
+            .forEach( e => wantedBots.push({id: e, server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}}))
+            if(wantedBots.length < 3 && !wantedBots.some( e => e.id == "Archealer")) {
+                wantedBots.push({id: "Archealer", server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}})
+            }
+            if(wantedBots.length < 3 && !wantedBots.some( e => e.id == "arMAGEdon")) {
+                wantedBots.push({id: "arMAGEdon", server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}})
+            }
+            console.debug('Wanted bots with events: ' + wantedBots.map( e => e.id).join(', '))
+        }
+        // STOPPING UNWANTED BOTS
+        for(const char of this.bots) {
+            if(char.getBot().ctype == "merchant") continue
+            if(char.getStateType() == "event") continue
+            const bot = char.getBot()
+            if(!wantedBots.some( e => e.id == bot.id && e.server.region == bot.serverData.region && e.server.name == bot.serverData.name)) 
+            {
+                console.debug(`Stopping ${bot.id} cause not in main setup and no events`)
+                this.stopCharacter(bot.id)
+            }
+        }
+        // STARTING WANTED BOTS
+        for(const bot of wantedBots) {
+            if(this.bots.find( e => e.getBot().id == bot.id )) continue
+            console.debug(`Starting ${bot.id}`)
+            this.addNewBot(await startBotWithStrategy(MY_CHARACTERS.get(bot.id)?.ctype, bot.id, bot.server.region, bot.server.name, this.memoryStorage))
+        }
+
+        if(wantedEvents.length > 0) {
+            const mostWantedEvent = wantedEvents[0]
+            this.bots.filter( e => e.getBot().ctype != "merchant").
+            forEach( e => (e as StateStrategy).addStateToScheduler({
+                state_type: "event",
+                wantedMob: WANTED_EVENTS[mostWantedEvent.eventName].monsters,
+                eventName: mostWantedEvent.eventName,
+                server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}
+                } as State))
         }
         setTimeout(this.manageCharactersLoop, 10 * 1000)
     }
