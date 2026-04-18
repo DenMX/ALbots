@@ -210,13 +210,13 @@ export class StateController {
         // GETTING WANTED BOTS
         let wantedBots = []
         if(wantedEvents.length == 0) {
-            let wantedCharacters = Object.keys(MY_CHARACTERS).filter( e => MY_CHARACTERS.get(e)?.isMainSetup == true)
+            let wantedCharacters = Array.from(MY_CHARACTERS.keys()).filter( e => MY_CHARACTERS.get(e)?.isMainSetup == true)
             wantedCharacters.forEach( e => wantedBots.push({id: e, server: {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME}}))
             console.debug('Wanted bots without events: ' + wantedBots.map( e => e.id).join(', '))
         }
         else {
             const mostWantedEvent = wantedEvents[0]
-            Object.keys(MY_CHARACTERS)
+            Array.from(MY_CHARACTERS.keys())
             .filter( e => MY_CHARACTERS.get(e)?.server.region == mostWantedEvent.serverRegion && MY_CHARACTERS.get(e)?.server.name == mostWantedEvent.serverName && MY_CHARACTERS.get(e)?.ctype != "merchant")
             .forEach( e => wantedBots.push({id: e, server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}}))
             if(wantedBots.length < 3 && !wantedBots.some( e => e.id == "Archealer")) {

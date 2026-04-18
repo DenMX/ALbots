@@ -33,8 +33,8 @@ export type CharacterSettings = {
 
 export const MY_CHARACTERS: Map<string, CharacterSettings> = new Map([
     ["Warious", {ctype: "warrior", server: {region: "ASIA", name: "I"}, isMainSetup: true}],
-    ["aRanDonDon", {ctype: "ranger", server: {region: "ASIA", name: "I", isMainSetup: true}}],
-    ["Archealer", {ctype: "priest", server: {region: "ASIA", name: "I", isMainSetup: true}}],
+    ["aRanDonDon", {ctype: "ranger", server: {region: "ASIA", name: "I"}, isMainSetup: true}],
+    ["Archealer", {ctype: "priest", server: {region: "ASIA", name: "I"}, isMainSetup: true}],
     ["DonWar", {ctype:"warrior", server: {region: "EU", name: "I"}}],
     ["MerchanDiser", {ctype: "merchant", server: {region: "ASIA", name: "I"}}],
     ["arMAGEdon", {ctype:"mage", server: {region: "US", name: "III"}}],
