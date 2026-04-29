@@ -60,11 +60,17 @@ export class StateController {
     }
 
     public addNewBot(state: IState) {
-        this.bots.push(state)
-        let bot = state.getBot()
-        bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
-        bot.socket.on("code_eval", (data) => this.manageCommand(data, bot))
-        this.memoryStorage.addEventListners(bot)
+        try {
+            this.bots.push(state)
+            let bot = state.getBot()
+            bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
+            bot.socket.on("code_eval", (data) => this.manageCommand(data, bot))
+            this.memoryStorage.addEventListners(bot)
+        }
+        catch(ex) {
+            console.error(`Error adding new bot:\n${ex}`)
+        }
+        
     }
 
     private deactivateStrategy(bot: PingCompensatedCharacter) {
@@ -151,6 +157,7 @@ export class StateController {
         if(wantedEvents.length == 0) {
             let wantedCharacters = Array.from(MY_CHARACTERS.keys()).filter( e => MY_CHARACTERS.get(e)?.isMainSetup == true)
             wantedCharacters.forEach( e => wantedBots.push({id: e, server: {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME}}))
+            wantedBots.push({id: "MerchanDiser", server: {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME}})
         }
         else {
             const mostWantedEvent = wantedEvents[0]
@@ -163,11 +170,12 @@ export class StateController {
             if(wantedBots.length < 3 && !wantedBots.some( e => e.id == "arMAGEdon")) {
                 wantedBots.push({id: "arMAGEdon", server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}})
             }
+            wantedBots.push({id: "MerchanDiser", server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}})
             console.debug('Wanted bots with events: ' + wantedBots.map( e => e.id).join(', '))
         }
         // STOPPING UNWANTED BOTS
         for(const char of this.bots) {
-            if(char.getBot().ctype == "merchant") continue
+            // if(char.getBot().ctype == "merchant") continue
             if(char.getStateType() == "event") continue
             const bot = char.getBot()
             if(!wantedBots.some( e => e.id == bot.id && e.server.region == bot.serverData.region && e.server.name == bot.serverData.name)) 
@@ -178,9 +186,10 @@ export class StateController {
         }
         // STARTING WANTED BOTS
         for(const bot of wantedBots) {
-            if(this.bots.find( e => e.getBot().id == bot.id )) continue
+            if(this.bots.find( e => e?.getBot()?.id == bot.id )) continue
             console.debug(`Starting ${bot.id}`)
-            this.addNewBot(await startBotWithStrategy(MY_CHARACTERS.get(bot.id)?.ctype, bot.id, bot.server.region, bot.server.name, this.memoryStorage))
+            const state = await startBotWithStrategy(MY_CHARACTERS.get(bot.id)?.ctype, bot.id, bot.server.region, bot.server.name, this.memoryStorage)
+            if(state) this.addNewBot(state)
         }
 
         if(wantedEvents.length > 0) {

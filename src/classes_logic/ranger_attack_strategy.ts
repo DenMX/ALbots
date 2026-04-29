@@ -137,8 +137,8 @@ export class RangerAttackStrategy extends StateStrategy {
         let dps = CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))
         if (dps> this.bot.max_hp*0.2) return final_targets
         for(const entity of this.ranger.getEntities()) {
-            if(entity.abilities.stone && !this.currentState.wantedMob.includes(entity.type) ) continue
-            if(this.bot.getEntities().filter(e => e.abilities.stone && !this.currentState.wantedMob.includes(e.type) && Tools.distance(e, entity)<40).length>0) continue
+            if(entity.abilities.stone && !this.currentState?.wantedMob.includes(entity.type) ) continue
+            if(this.bot.getEntities().filter(e => e.abilities.stone && !this.currentState?.wantedMob.includes(e.type) && Tools.distance(e, entity)<40).length>0) continue
             if(!entity.target && this.ranger.canKillInOneShot(entity, skill)) final_targets.push(entity)
             if( entity.target ) final_targets.push(entity)
             if(!entity.target && !this.ranger.canKillInOneShot(entity, skill) && dps+CF.calculate_monster_dps(this, entity)< this.bot.hp/5) {

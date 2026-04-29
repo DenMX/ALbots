@@ -14,7 +14,7 @@ export const WANTED_EVENTS: { [T in MonsterName|MapName]?: { monsters: MonsterNa
     crabxx: { monsters: ["crabxx"], wantedOnOtherServer: true },
     snowman: { monsters: ["snowman"] },
     grinch: { monsters: ["grinch"] },
-    goobrawl: { monsters: ["bgoo", "rgoo"], wantedOnOtherServer: true, join: true } 
+    goobrawl: { monsters: ["bgoo", "rgoo"], join: true } 
 }
 
 export const BOSS_CHECK_ROUTE: BossSpot[] = [

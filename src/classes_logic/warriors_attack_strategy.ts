@@ -69,11 +69,10 @@ export class WarriorsAttackStrategy extends StateStrategy {
         if( !target) {
             return setTimeout(this.attackLoop, 100)
         }
-        if(target?.dreturn >= 30) return setTimeout(this.attackLoop, 500)
         if( this.warrior.hasItem("jacko") && this.warrior.isOnCooldown("scare") && this.warrior.getEntities({targetingMe: true, targetingPartyMember:true}).length<1) {
             return setTimeout( this.attackLoop, this.warrior.getCooldown("scare"))
         }
-        if(!target.target && this.bot.max_hp/CF.calculate_monster_dps(this, target, true) < 10) {
+        if( !this.shouldAttack(target)) {
             console.log(`Monster DPS: ${CF.calculate_monster_dps(this, target, true)}, ${this.warrior.name} HPS: ${CF.calculate_hps(this.warrior)}`)
             return setTimeout(this.attackLoop, 500)
         }
@@ -132,7 +131,6 @@ export class WarriorsAttackStrategy extends StateStrategy {
             catch(ex){
                 console.error(ex)
             }
-            this.lastWeaponSwitch = Date.now()
             return this.warrior.equip(cleave_item_idx).catch(debugLog)
                         
         }
@@ -153,7 +151,6 @@ export class WarriorsAttackStrategy extends StateStrategy {
             
             
             let stop_item_idx = this.warrior.locateItem(stomp_item.name, undefined, {level: stomp_item.level})
-            this.lastWeaponSwitch = Date.now()
             return this.warrior.equip(stop_item_idx).catch(debugLog)
         }
         else {
@@ -173,16 +170,16 @@ export class WarriorsAttackStrategy extends StateStrategy {
                 offhand_item = botWC.solo_offhand
             }
             if(this.warrior.slots.mainhand?.name == mainhand_item?.name  && this.warrior.slots.offhand?.name == offhand_item?.name) return
-            if(mainhand_item.name == offhand_item?.name && mainhand_item.level == offhand_item?.level) {
-                let items = this.bot.locateItems(mainhand_item.name, undefined, {level: mainhand_item.level})
-                if(!items) return 
-                items.length > 1 ? 
-                    await this.bot.equipBatch([{num: items[0], slot: "mainhand"},{num: items[1], slot: "offhand"}]).catch(debugLog)
-                    :
-                    await this.bot.equipBatch([{num: items[0], slot: "mainhand"}]).catch(debugLog)
-                this.lastWeaponSwitch = Date.now()
-                return 
-            }
+            // if(mainhand_item.name == offhand_item?.name && mainhand_item.level == offhand_item?.level) {
+            //     let items = this.bot.locateItems(mainhand_item.name, undefined, {level: mainhand_item.level})
+            //     if(!items) return 
+            //     items.length > 1 ? 
+            //         await this.bot.equipBatch([{num: items[0], slot: "mainhand"},{num: items[1], slot: "offhand"}]).catch(debugLog)
+            //         :
+            //         await this.bot.equipBatch([{num: items[0], slot: "mainhand"}]).catch(debugLog)
+                
+            //     return 
+            // }
             try {
                 let mainhand_idx = this.warrior.locateItem(mainhand_item.name, undefined, {level: mainhand_item?.level})
                 if( mainhand_idx ) await this.warrior.equip(mainhand_idx,"mainhand").catch(debugLog)
@@ -193,7 +190,6 @@ export class WarriorsAttackStrategy extends StateStrategy {
                 console.error(ex)
             }
         }
-        this.lastWeaponSwitch = Date.now()
     }
 
     private async useCharge() {

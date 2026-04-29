@@ -455,7 +455,7 @@ export class StateStrategy extends ManageItems implements IState {
                     await this.bot.smartMove(this.bot.s.monsterhunt!.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
                 }
                 const questMonsters = this.bot.getEntities().filter( e => e.type == this.bot.s.monsterhunt?.id )
-                const questMonstersCanBeKilled = questMonsters.filter( e => this.bot.max_hp/calculate_monster_dps(this,e) > 10)
+                const questMonstersCanBeKilled = questMonsters.filter( e => this.shouldAttack(e))
                 if(questMonsters?.length>1 && questMonstersCanBeKilled.length<1) {
                     this.switchState()
                     setTimeout(() => {
@@ -470,6 +470,7 @@ export class StateStrategy extends ManageItems implements IState {
                     await this.bot.smartMove("monsterhunter", {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
                     await this.bot.getMonsterHuntQuest().catch(debugLog)
                     this.current_state = {state_type: "quest", wantedMob: this.bot.s.monsterhunt?.id, server: {region: this.bot.serverData.region, name: this.bot.serverData.name}}
+                    this.addLog(`Quest started: ${this.bot.s.monsterhunt?.id}`)
                     if(this.bot.s.monsterhunt?.id) await this.bot.smartMove(this.bot.s.monsterhunt.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
                     return setTimeout(this.checkState, 1000)
                 }
@@ -512,7 +513,7 @@ export class StateStrategy extends ManageItems implements IState {
         //we don't want to targeting mob with dps more than 2x hps
         // console.log(`Target loop, ${this.bot.target}`)
         let target = this.bot.getTargetEntity()
-        let entities = this.bot.getEntities().filter( e => e.xp > 0 && (calculate_monster_dps(this,e)/calculate_hps(this.bot) < 1 || e.target))
+        let entities = this.bot.getEntities().filter( e => this.shouldAttack(e))
         if(entities.length<1) {
             return target
         }

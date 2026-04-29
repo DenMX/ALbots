@@ -176,8 +176,14 @@ export const ITEMS_TO_CRAFT: { [T in ItemName]?: {items?: {name: ItemName, quant
     "fireblade": {items: [{name: "goldingot", quantity: 50}]},
     "wingedboots": {},
     "cclaw": {},
-    "carrotsword": {}
+    "carrotsword": {},
 }
+
+
+export const ITEMS_TO_EXCHANGE_FROM_BANK: Map<ItemName, number> = new Map<ItemName, number>([
+    ["xbox", 1_000_000_000],
+    ["basketofeggs", 1_000_000_000],
+])
 
 export type UpgradeConfig = {
     level: number,

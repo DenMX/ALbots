@@ -140,7 +140,7 @@ export class MemoryStorage {
                 console.debug(`error while fetching bank in api:\n${ex}`)
             }
         }
-        if(bot.gold > 1000000000 && (!this.lastDepositGold || Date.now() - this.lastDepositGold > this.DEPOSIT_GOLD_THRESHOLD)) {
+        if(bot.gold > 1_800_000_000 && (!this.lastDepositGold || Date.now() - this.lastDepositGold > this.DEPOSIT_GOLD_THRESHOLD)) {
             bot.depositGold(bot.gold*0.05).catch(debugLog)
             this.lastDepositGold = Date.now()
         }

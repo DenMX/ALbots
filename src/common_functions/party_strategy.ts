@@ -1,4 +1,4 @@
-import { Item, Game, Constants, InviteData, PingCompensatedCharacter, Tools, HitData, LimitDCReportData, ItemName, SlotType } from "alclient";
+import { Item, Game, Constants, InviteData, PingCompensatedCharacter, Tools, HitData, LimitDCReportData, ItemName, SlotType, Entity } from "alclient";
 import { MemoryStorage } from "./memory_storage";
 import { debugLog,  } from "./common_functions";
 import * as CF from "./common_functions"
@@ -160,7 +160,7 @@ export class PartyStrategy {
 
     private async loot() {
         if(this.deactivate) return
-        if(!this.bot.chests) return setTimeout( this.loot, 500)
+        if(!this.bot.chests.size) return setTimeout( this.loot, 500)
         if(this.canLoot()) {
             if( (this.bot.chests.size>0 && this.last_loot < Date.now() - this.loot_interval) 
                 || (this.bot.chests.size>0 && this.bot.smartMoving)
@@ -263,8 +263,9 @@ export class PartyStrategy {
         if(this.bot.name == looter) return true
         let looterEntity = this.bot.getPlayers().filter( e => e.name == looter && Tools.distance(this.bot, e) < Constants.NPC_INTERACTION_DISTANCE)
         let defaultLooterEntity = this.bot.getPlayers().filter( e => e.name == defaultLooter && Tools.distance(this.bot, e) < Constants.NPC_INTERACTION_DISTANCE)
-        if( !this.bot.partyData || !this.bot.partyData?.list?.includes(looter) ) return true
-        if( !looterEntity && (!defaultLooterEntity || this.bot.name == defaultLooter) ) return true
+        const partyList = Array.isArray(this.bot.partyData?.list) ? this.bot.partyData.list : []
+        if (!partyList.includes(looter)) return true
+        if( !looterEntity.length && (!defaultLooterEntity.length || this.bot.name == defaultLooter) ) return true
         return false
     }
 
@@ -355,6 +356,21 @@ export class PartyStrategy {
         if(showLog) console.log(log)
         this.logs.push(`[${new Date().toLocaleString()}] ${log}`)
         if(this.logs.length > 20 ) this.logs.splice(0, this.logs.length - 20)
+    }
+
+    protected shouldAttack(entity: Entity): boolean {
+        if(!entity) return false
+        if(entity.xp <1) return false
+        if((this.bot.ctype == "warrior" || this.bot.ctype == "rogue") && entity.dreturn > 30) return false
+        if(this.bot.ctype == "mage" && entity.reflection >= 40)  return false
+        if(this.bot.ctype == "priest" || Tools.distance(this.bot, this.memoryStorage?.getStateController?.getBots?.find( e => e.getBot()?.ctype == "priest")?.getBot()) < 200) {
+            if (CF.calculate_monster_dps(this, entity, true)/CF.calculate_hps(this.bot) >=0.95 && !entity.target) return false
+            else return true
+        }
+        else {
+            if(CF.calculate_monster_dps(this, entity, true)> this.bot.max_hp/10 && !entity.target) return false
+        }
+        return true        
     }
 
 }

@@ -5,6 +5,7 @@ import { MemoryStorage } from "./memory_storage"
 import * as CharacterItems from "../configs/character_items_configs"
 import * as CF from "./common_functions"
 import { debugLog } from "./common_functions"
+import { DO_NOT_EXCHANGE } from "../configs/manage_items_configs"
 
 
 export type PackItems = [BankPackName, number[]]
@@ -40,7 +41,7 @@ export class ManageItems extends ResuplyStrategy {
         [2, ["platinumingot"]]
     ])
 
-    private GOLD_AMOUNT_FOR_CHECK_BANK: number = 100_000_000
+    protected GOLD_AMOUNT_FOR_CHECK_BANK: number = 100_000_000
     private GOLD_AMOUNT_FOR_BUY_OFFERING: number = 1_000_000_000
     private GOLD_AMOUNT_FOR_UPGRADE_WITH_OFFERING: number = 500_000_000
 
@@ -59,6 +60,7 @@ export class ManageItems extends ResuplyStrategy {
         this.sendItems = this.sendItems.bind(this)
         this.shinyItems = this.shinyItems.bind(this)
         this.startManageLogic = this.startManageLogic.bind(this)
+        this.exchangeItemsFromBank = this.exchangeItemsFromBank.bind(this)
 
         if(bot.ctype != 'merchant') this.startManageLogic()
         else this.exchangeItems()
@@ -679,6 +681,42 @@ export class ManageItems extends ResuplyStrategy {
                 await bot.sell(idx,item.q).catch(debugLog)
             }
         }
+    }
+
+    private getItemsForExchange(): Map<BankPackName, [number, number][]> {
+        if (this.deactivate) return new Map<BankPackName, [number, number][]>()
+        // getBankItems() in alclient only populates when map.startsWith("bank"); do NOT return early here.
+        let itemsForExchange: Map<BankPackName, [number, number][]> = new Map<BankPackName, [number, number][]>()
+        for(const [pack, items] of this.bot.getBankItems()) {
+            let itemsInPack: [number, number][] = []
+            for(const [idx,item] of items) {
+                const gItem = Game.G.items[item.name]
+                if(!gItem.e) continue
+                if(DO_NOT_EXCHANGE.includes(item.name)) continue
+                if(ItemsConfig.ITEMS_TO_EXCHANGE_FROM_BANK.has(item.name) && this.bot.gold < ItemsConfig.ITEMS_TO_EXCHANGE_FROM_BANK.get(item.name)) continue
+                if(item.q < gItem.e) continue
+                console.debug(`Item ${item.name} level ${item.level} quantity ${item.q} can be exchanged`)
+                itemsInPack.push([idx, Math.floor(item.q/gItem.e)])
+            }
+            if(itemsInPack.length) itemsForExchange.set(pack, itemsInPack)
+        }
+        return itemsForExchange
+    }
+
+    protected async exchangeItemsFromBank() {
+        if(this.deactivate) return
+        if(this.bot.esize<5) return
+        if(!this.bot.map.startsWith("bank")) await this.bot.smartMove("bank").catch(debugLog)
+        const itemsForExchange = this.getItemsForExchange()
+        for(const [pack, items] of itemsForExchange) {
+            for(const [idx, q] of items) {
+                await this.bot.smartMove(pack, {getWithin: 9999}).catch(debugLog)
+                console.debug(`Withdrawing item ${idx} from pack ${pack}`)
+                await this.bot.withdrawItem(pack, idx).catch(console.debug)
+                if(this.bot.esize<5) break
+            }
+        }
+        await this.bot.smartMove("main").catch(debugLog)
     }
 
 }

@@ -44,8 +44,8 @@ export const MY_CHARACTERS: Map<string, CharacterSettings> = new Map([
 ])
 
 export async function startBotWithStrategy(ctype: CharacterType, name: string, sRegion: ServerRegion = DEFAULT_SERVER_REGION, sID: ServerIdentifier = DEFAULT_SERVER_NAME, memory_storage: MemoryStorage): Promise<IState> {
-    
-    switch (ctype) {
+    try {
+        switch (ctype) {
         case "mage":
             return new MageAttackStrategy(await Game.startMage(name, sRegion, sID), memory_storage)
         case "merchant":
@@ -60,10 +60,16 @@ export async function startBotWithStrategy(ctype: CharacterType, name: string, s
             return new RogueAttackStrategy(await Game.startRogue(name, sRegion, sID), memory_storage)
         case "paladin":
             console.error("NO CODE FOR PALADIN")
+            return undefined
         default:
             console.error(`Unknown ctype ${ctype}`)
+            return undefined
     }
-    return undefined
+    // return undefined
+    }
+    catch(ex) {
+        console.error(`Error starting bot ${name}:\n${ex}`)
+    }
 }
 
 // ?????????
