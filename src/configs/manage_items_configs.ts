@@ -94,6 +94,10 @@ export const ITEMS_TO_SELL: ItemName[] = [
 	'warmscarf',
 	'merry',
 
+    //rabbit stuff
+    'epyjamas',
+    'eears',
+
 	//Jewelery
 	'hpamulet',
 	'hpbelt',
@@ -244,14 +248,14 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["horsecapeg", {level: 7, primlingAt: 5}],
 
     // Bunny stuff
-    ["ecape", { level: 7, scrollUpAt: 5 }],
-    ["pinkie", { level: 7 }],
-    ["eslippers", { level: 7, scrollUpAt: 5 }],
+    ["ecape", { level: 8, scrollUpAt: 5 }],
+    ["pinkie", { level: 8, scrollUpAt: 5, primlingAt: 7 }],
+    ["eslippers", { level: 9, scrollUpAt: 5, offeringAt: 8 }],
 
     ["wingedboots", { level: 7, scrollUpAt: 5 }],
     ["lmace", { level: 8, primlingAt: 0, offeringAt: 3 }],
     ["handofmidas", { level: 5, primlingAt: 3 }],
-    ["bataxe", { level: 8, scrollUpAt: 4, primlingAt: 4, offeringAt: 6, shouldBeShiny: true }],
+    ["bataxe", { level: 8, scrollUpAt: 4, primlingAt: 4, offeringAt: 6 }],
 
     // Winter holidays
     ["gcape", { level: 7 }],
@@ -265,6 +269,7 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     // --- COMPOUND SECTION --- \\
     // Offhands
     ["wbookhs", { level: 3, primlingAt: 1 }],
+    ["lantern", {level: 3, primlingAt: 2}],
 
     // Earrings
     ["strearring", { level: 4, primlingAt: 2, scrollUpAt: 1 }],
@@ -298,7 +303,10 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["orbg", { level: 3 }],
     ["jacko", { level: 3, scrollUpAt: 2, primlingAt: 3, offeringAt: 4 }],
     ["orbofdex", { level: 4, scrollUpAt: 2, offeringAt: 3 }],
-    ["orbofstr", { level: 4, scrollUpAt: 2, offeringAt: 3 }]
+    ["orbofstr", { level: 4, scrollUpAt: 2, offeringAt: 3 }],
+    ["orboftemporal", {level: 3, primlingAt: 1, offeringAt: 3}],
+    ["talkingskull", {level: 3, primlingAt: 2, scrollUpAt: 2}],
+
 ]);
 
 export const BUY_FROM_PONTY: Map<ItemName, number> = new Map<ItemName, number>([

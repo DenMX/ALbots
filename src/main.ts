@@ -18,7 +18,7 @@ async function run(){
         let memoryStorage = new MemoryStorage()
 
         let stateController = new StateController([
-            await startBotWithStrategy("merchant", "MerchanDiser", "ASIA", "I", memoryStorage),
+            // await startBotWithStrategy("merchant", "MerchanDiser", "ASIA", "I", memoryStorage),
         ], memoryStorage)
         memoryStorage.setStateController = stateController
         startCursorUI(stateController, CURSOR_UI_PORT);

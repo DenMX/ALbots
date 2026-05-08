@@ -1,5 +1,6 @@
 import { Constants, Game, MapName, MonsterName, Observer, PingCompensatedCharacter, ServerData, ServerIdentifier, ServerRegion, Tools } from "alclient";
 import { State, StateStrategy } from "../common_functions/state_strategy";
+import { PartyStrategy } from "../common_functions/party_strategy";
 import { WANTED_EVENTS } from "../configs/events_and_spots";
 import { DEFAULT_SERVER_REGION, DEFAULT_SERVER_NAME, MemoryStorage } from "../common_functions/memory_storage";
 import { IState } from "./state_interface";
@@ -64,8 +65,8 @@ export class StateController {
             this.bots.push(state)
             let bot = state.getBot()
             bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
-            bot.socket.on("code_eval", (data) => this.manageCommand(data, bot))
-            this.memoryStorage.addEventListners(bot)
+            bot.socket.on("code_eval", (data) => this.manageCommand(data, bot));
+            // (state as unknown as PartyStrategy).enablePartyEvents()
         }
         catch(ex) {
             console.error(`Error adding new bot:\n${ex}`)
@@ -94,7 +95,7 @@ export class StateController {
                     new_bot = await startBotWithStrategy(bot.ctype, bot.name, sRegion, sID, this.memoryStorage)
                     this.bots[i] = new_bot
                     console.warn(`${Date.now()} Bot started. ${i} in bots list, ready: ${new_bot.getBot().ready}. Length of bots ${this.bots.length}.`)
-                    this.memoryStorage.addEventListners(new_bot.getBot())
+                    // this.memoryStorage.addEventListners(new_bot.getBot())
                     new_bot.getBot().socket.on("disconnect", (data) => this.reconnect(data, new_bot.getBot()))
                     new_bot.getBot().socket.on("code_eval", (data) => this.manageCommand(data, new_bot.getBot()))
                     break
@@ -169,6 +170,9 @@ export class StateController {
             }
             if(wantedBots.length < 3 && !wantedBots.some( e => e.id == "arMAGEdon")) {
                 wantedBots.push({id: "arMAGEdon", server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}})
+            }
+            if(wantedBots.length < 3 && !wantedBots.some( e => e.id == "Warious")) {
+                wantedBots.push({id: "Warious", server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}})
             }
             wantedBots.push({id: "MerchanDiser", server: {region: mostWantedEvent.serverRegion, name: mostWantedEvent.serverName}})
             console.debug('Wanted bots with events: ' + wantedBots.map( e => e.id).join(', '))

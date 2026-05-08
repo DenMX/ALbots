@@ -203,6 +203,7 @@ export class MerchantStrategy extends ManageItems implements IState {
             await fn()
         }
         else if ( this.DEFAULT_STATE == this.merch_state.state_type 
+            && this.job_scheduler.length < 1
             && !this.bot.smartMoving && this.bot.partyData?.list.length>0
             && this.bot.getPlayers({isPartyMember: true, withinRange: 300}).length<1) {
                 await this.bot.smartMove(this.bot.partyData.party[Object.keys(this.bot.partyData.party).find( e => e != this.bot.id)]).catch(CF.debugLog)
@@ -263,7 +264,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         }
         if(this.bot.esize<20 && this.bot.hasItem(["computer", "supercomputer"])) {
             await this.sellTrash()
-            await this.resuplyScrolls()
+            // await this.resuplyScrolls()
             await this.upgradeItems()
             await this.compoundItems()
         }
@@ -277,25 +278,28 @@ export class MerchantStrategy extends ManageItems implements IState {
             if(!this.bot.hasItem(["computer","supercomputer"])) {
                 this.changeMerchState("Move main")
                 await this.bot.smartMove(CF.UPGRADE_POSITION)
-                this.changeMerchState("selling")
-                await this.sellTrash()
-                this.changeMerchState("upgrading")
-                await this.upgradeItems()
-                this.changeMerchState("compounding")
-                await this.compoundItems()
-                this.changeMerchState("exchanging")
-                await this.exchangeItems()
-            }
-            this.changeMerchState("Going to bank")
-            let bot = this.bot
-            await bot.smartMove("bank")
-            this.changeMerchState("Store")
-            await this.storeItems()
-            await this.sellTrashFromBank()
-            if ( this.bot.gold > this.GOLD_AMOUNT_FOR_CHECK_BANK) {
-                this.changeMerchState("Upgrading bank")
-                await this.upgradeItemsFromBank()
-                this.changeMerchState(this.DEFAULT_STATE)
+            }    
+            this.changeMerchState("selling")
+            await this.sellTrash()
+            this.changeMerchState("upgrading")
+            await this.upgradeItems()
+            this.changeMerchState("compounding")
+            await this.compoundItems()
+            this.changeMerchState("exchanging")
+            await this.exchangeItems()
+            
+            if(!this.canUpgradeItems() && this.bot.esize < 5) {
+                this.changeMerchState("Going to bank")
+                let bot = this.bot
+                await bot.smartMove("bank")
+                this.changeMerchState("Store")
+                await this.storeItems()
+                await this.sellTrashFromBank()
+                if ( this.bot.gold > this.GOLD_AMOUNT_FOR_CHECK_BANK) {
+                    this.changeMerchState("Upgrading bank")
+                    await this.upgradeItemsFromBank()
+                    this.changeMerchState(this.DEFAULT_STATE)
+                }
             }
         }
         catch(ex) {
@@ -400,7 +404,7 @@ export class MerchantStrategy extends ManageItems implements IState {
     private shouldCheckBossesLoop() {
         if(this.deactivate) return console.debug("Should check bosses loop is deactivated")
         if( this.getMemoryStorage.getStateController?.getBots
-            .filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "mage")
+            .filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "mage" && e.getStateType() != "event")
             .length < 1
         ) 
         {
@@ -488,7 +492,7 @@ export class MerchantStrategy extends ManageItems implements IState {
                 this.job_scheduler.push( async() => {
                     if(!this.bot.hasItem(["computer", "supercomputer"])) {
                         this.changeMerchState("Move to main")
-                        this.bot.smartMove("main").catch(console.warn)
+                        await this.bot.smartMove("main").catch(console.warn)
                         await this.bot.buy("hpot1", hpot).catch(console.warn)
                         await this.bot.buy("mpot1", mpot).catch(console.warn)
                     }
@@ -571,11 +575,13 @@ export class MerchantStrategy extends ManageItems implements IState {
 
     private async exchangeItemsFromBankLoop() {
         if(this.deactivate) return
-        if(this.bot.esize<10) return this.job_scheduler.push(this.exchangeItemsFromBankLoop)
+        if(this.bot.esize<5 || !this.hasItemsToExchange()) return this.job_scheduler.push(this.exchangeItemsFromBankLoop)
         this.changeMerchState("Exchanging items from bank")
         await this.exchangeItemsFromBank().catch(console.debug)
+        await this.bot.smartMove("main").catch(console.debug)
+        this.exchangeItems()
         this.changeMerchState(this.DEFAULT_STATE)
-        setTimeout(() => {this.job_scheduler.push(this.exchangeItemsFromBankLoop)}, 15 * 60_000)
+        setTimeout(() => {this.job_scheduler.push(this.exchangeItemsFromBankLoop)}, 60_000)
     }
     
 }

@@ -125,6 +125,7 @@ export class MemoryStorage {
             setTimeout(() => { this.updateBank(bot) }, 100)
         }
         if(bot.bank) {
+            this.bank = bot.bank
             if(this.secretKey == "") return console.error("Create api_token.txt")
             const url = `https://aldata.earthiverse.ca/bank/${bot.owner}/${this.secretKey}`;
             const settings = {
@@ -144,5 +145,6 @@ export class MemoryStorage {
             bot.depositGold(bot.gold*0.05).catch(debugLog)
             this.lastDepositGold = Date.now()
         }
+        
     }
 }

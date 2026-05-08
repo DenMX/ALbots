@@ -92,7 +92,7 @@ export const PRIEST_OFFHAND_CONFIGS: { [T in string]: PriestOffhandConfig} = {
 export const ORB_CONFIGS: { [T in string]: {name: ItemName, level: number}} = {
     "Warious": {name: "orbofstr", level: 4},
     "arMAGEdon": {name: "jacko", level: 4},
-    "aRanDonDon": {name: "rabbitsfoot", level: 1},
+    "aRanDonDon": {name: "rabbitsfoot", level: 2},
     "Archealer": {name: "jacko", level: 4}
 }
 
@@ -121,7 +121,7 @@ export const SET_CONFIGS: {
             //     {name: 'mittens', level: 9},
             //     {name: 'spookyamulet', level: 1},
             //     {name: 'mshield', level: 9},
-            //     {name: 'rabbitsfoot', level: 1},
+            //     {name: 'rabbitsfoot', level: 2},
             //     {name: 'mearring', level: 0, slot: "earring1"},
             //     {name: 'mearring', level: 1, slot: "earring2"},
             //     {name: 'ecape', level: 6}
