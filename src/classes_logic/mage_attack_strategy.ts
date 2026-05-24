@@ -118,13 +118,15 @@ export class MageAttackStrategy extends StateStrategy {
         }
 
         const stateBots = this.getMemoryStorage?.getStateController?.getBots
-        .filter( 
-            e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().name != this.bot.id && e.getBot().ctype != "merchant" 
-        )
-        if(!stateBots) return setTimeout(this.magiportCheckLoop, 2000)
+        ?.filter( e => {
+            const b = e?.getBot?.()
+            return b && b.serverData.region == this.bot.serverData.region && b.serverData.name == this.bot.serverData.name && b.name != this.bot.id && b.ctype != "merchant"
+        })
+        if(!stateBots?.length) return setTimeout(this.magiportCheckLoop, 2000)
         for(const botState of stateBots) {
             if(this.mage.mp < Game.G.skills["magiport"].mp) break
-            let bot = botState.getBot()
+            const bot = botState.getBot?.()
+            if(!bot) continue
             if(Tools.distance(this.bot, bot) < 400) continue
             // SUMMON WHEN WE HAVE SPECIALS NEAR AND OTHER DOESN'T
             if(this.bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type) && calculate_monster_dps(this,e)/calculate_hps(bot) < 1).length<1) {

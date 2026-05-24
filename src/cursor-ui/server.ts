@@ -205,7 +205,13 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
         const activeIds = new Set<string>();
         for (const b of bots) {
             if(!b) continue
-            const bot = b.getBot();
+            let bot
+            try {
+                bot = b.getBot()
+            } catch {
+                continue
+            }
+            if(!bot?.id) continue
             activeIds.add(bot.id);
             const d = ensureBot(bot.id);
 

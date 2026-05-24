@@ -334,19 +334,26 @@ export class MerchantStrategy extends ManageItems implements IState {
 
     private async monitoringSpecialsLoop() {
         if(this.deactivate) return console.debug("Monitoring specials loop is deactivated")
-        const mageState = this.getMemoryStorage.getStateController?.getBots.filter( e => e && e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "mage")[0]
+        const mageState = this.getMemoryStorage.getStateController?.getBots.find( e => {
+            const b = e?.getBot?.()
+            return b && b.serverData.region == this.bot.serverData.region && b.serverData.name == this.bot.serverData.name && b.ctype == "mage"
+        })
         if( !mageState ) {
             // console.debug("No mage on the server while monitoring specials loop is running")
             return setTimeout(this.monitoringSpecialsLoop, 10_000)
         }
-        const mage = mageState.getBot()
+        const mage = mageState.getBot?.()
+        if(!mage) return setTimeout(this.monitoringSpecialsLoop, 10_000)
         const specials = this.bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type))
         const wantedSpecials = this.bot.getEntities().filter( e => SPECIAL_ALWAYS_WANTED.includes(e.type))
 
         if(wantedSpecials.length>0) {
             wantedSpecials.forEach( e => {
                 this.getMemoryStorage?.getStateController?.getBots
-                .filter( botState => botState.getBot().serverData.region == this.bot.serverData.region && botState.getBot().serverData.name == this.bot.serverData.name && botState instanceof StateStrategy)
+                .filter( botState => {
+                    const b = botState?.getBot?.()
+                    return b && b.serverData.region == this.bot.serverData.region && b.serverData.name == this.bot.serverData.name && botState instanceof StateStrategy
+                })
                 .forEach( botState => {
                     if(!(botState as StateStrategy).stateScheduler.some( bState => bState.state_type == "boss" && bState.wantedMob.includes(e.type)) && !(botState as StateStrategy).currentState.wantedMob.includes(e.type)) {
                         let state = botState as StateStrategy

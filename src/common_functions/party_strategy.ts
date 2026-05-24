@@ -365,7 +365,8 @@ export class PartyStrategy {
         if(entity.xp <1) return false
         if((this.bot.ctype == "warrior" || this.bot.ctype == "rogue") && entity.dreturn > 30) return false
         if(this.bot.ctype == "mage" && entity.reflection >= 40)  return false
-        if(this.bot.ctype == "priest" || Tools.distance(this.bot, this.memoryStorage?.getStateController?.getBots?.find( e => e?.getBot()?.ctype == "priest")?.getBot()) < 200) {
+        const priestBot = this.memoryStorage?.getStateController?.getBots?.find( e => e?.getBot?.()?.ctype == "priest")?.getBot?.()
+        if(this.bot.ctype == "priest" || (priestBot && Tools.distance(this.bot, priestBot) < 200)) {
             if (CF.calculate_monster_dps(this, entity, true)/CF.calculate_hps(this.bot) >=0.95 && !entity.target) return false
             else return true
         }

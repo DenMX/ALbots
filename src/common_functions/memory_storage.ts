@@ -66,7 +66,7 @@ export class MemoryStorage {
         if(!this.stateController?.getBots.length || this.stateController?.getBots.length<1) return setTimeout(this.loadBankFromMongo, 500)
         if(Database.connection) {
             this.bank = await BankModel.findOne( {
-                owner: this.stateController?.getBots[0]?.getBot().owner
+                owner: this.stateController?.getBots[0]?.getBot?.()?.owner
             }).lean<BankInfo>() ?? null
             // console.debug(`Bank loaded from MONGO\nCurrent bank: ${JSON.stringify(this.bank)}`)
             setTimeout(this.loadBankFromMongo, 5000)

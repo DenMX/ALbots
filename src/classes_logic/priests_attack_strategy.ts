@@ -213,12 +213,13 @@ export class PriestsAttackStrategy extends StateStrategy {
             return setTimeout(this.useMassHeal, Math.max(1, this.priest.getCooldown("partyheal")))
         }
         if(this.getMemoryStorage.getStateController?.getBots
-            .filter( 
-                e => !e?.getBot().rip && e?.getBot().hp < e?.getBot().max_hp*0.7 
-                && (Tools.distance(this.priest, e?.getBot()) > this.priest.range*2 || this.priest.map != e?.getBot().map) 
-                && e?.getBot().serverData.region == this.priest.serverData.region 
-                && e?.getBot().serverData.name == this.priest.serverData.name
-            ).length>0) {
+            .filter( e => {
+                const b = e?.getBot?.()
+                return b && !b.rip && b.hp < b.max_hp*0.7
+                && (Tools.distance(this.priest, b) > this.priest.range*2 || this.priest.map != b.map)
+                && b.serverData.region == this.priest.serverData.region
+                && b.serverData.name == this.priest.serverData.name
+            }).length>0) {
             // console.debug(`Party heal will appear cause:\n
             //     Party members with less than 70% hp and distance > range*2: ${this.bots?.filter( e => e.getBot().hp < e.getBot().max_hp*0.7 && (Tools.distance(this.priest, e.getBot()) > this.priest.range*2 || this.priest.map != e.getBot().map))?.length}`)
             this.priest.partyHeal().catch(debugLog)

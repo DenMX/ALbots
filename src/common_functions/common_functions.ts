@@ -69,6 +69,7 @@ export async function startBotWithStrategy(ctype: CharacterType, name: string, s
     }
     catch(ex) {
         console.error(`Error starting bot ${name}:\n${ex}`)
+        if (/ingame/i.test(String(ex))) throw ex
     }
 }
 
@@ -251,7 +252,10 @@ export function shouldUseMassSkill(bot: PartyStrategy, tank: string, skill: Skil
 
     if(bot.getBot().getEntities({hasTarget: false}).filter( e => e.abilities.stone).length>0) return false
     
-    let willTank =  bot.getMemoryStorage?.getStateController?.getBots.find( e => e.getBot().id == tank && e.getBot().serverData.region == bot.getBot().serverData.region && e.getBot().serverData.name == bot.getBot().serverData.name && Tools.distance(e.getBot(), bot.getBot()) < 200) as StateStrategy
+    let willTank =  bot.getMemoryStorage?.getStateController?.getBots.find( e => {
+        const b = e?.getBot?.()
+        return b && b.id == tank && b.serverData.region == bot.getBot().serverData.region && b.serverData.name == bot.getBot().serverData.name && Tools.distance(b, bot.getBot()) < 200
+    }) as StateStrategy
                     || bot.getBot().getPlayer({id: tank}) || bot
 
 

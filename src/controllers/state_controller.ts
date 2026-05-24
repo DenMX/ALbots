@@ -10,9 +10,15 @@ import * as CF from "../common_functions/common_functions"
 export class StateController {
     private bots: IState[]
 
+    /** Персонажи в процессе подключения — не запускать повторно (ingame / дубли). */
+    private pendingBotStarts = new Set<string>()
+    /** После Failed: ingame — пауза перед повторной попыткой. */
+    private botStartBlockedUntil = new Map<string, number>()
+
     /** Не переключать ростер сразу после пропажи ивента в observer (фликер S). */
     private lastWantedEventAt = 0
     private static readonly EVENT_GRACE_MS = 30_000
+    private static readonly INGAME_RETRY_MS = 120_000
 
     private serverObservers: Observer[] = []
 
@@ -37,7 +43,8 @@ export class StateController {
         this.checkSendItems()
 
         for(let i of bots) {
-            let bot = i.getBot()
+            const bot = this.getBotFromState(i)
+            if(!bot?.socket) continue
             bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
             bot.socket.on("code_eval", (data) => this.manageCommand(data, bot))
 
@@ -53,10 +60,28 @@ export class StateController {
         this.manageCharactersLoop()
     }
 
+    private getBotFromState(state: IState | undefined | null): PingCompensatedCharacter | undefined {
+        try {
+            return state?.getBot?.()
+        } catch {
+            return undefined
+        }
+    }
+
+    private hasBotOnServer(id: string, server: { region: ServerRegion, name: ServerIdentifier }): boolean {
+        return this.bots.some((s) => {
+            const b = this.getBotFromState(s)
+            return b?.id === id
+                && b.serverData?.region === server.region
+                && b.serverData?.name === server.name
+        })
+    }
+
     private disconnectFirst(){
-        if(this.bots[0].getBot().ready) {
-            console.debug(`Disconnecting ${this.bots[0].getBot().id}`)
-            this.bots[0].getBot().disconnect()
+        const bot = this.getBotFromState(this.bots[0])
+        if(bot?.ready) {
+            console.debug(`Disconnecting ${bot.id}`)
+            bot.disconnect()
         }
     }
 
@@ -66,8 +91,16 @@ export class StateController {
 
     public addNewBot(state: IState) {
         try {
+            const bot = this.getBotFromState(state)
+            if(!bot?.socket) {
+                console.warn("addNewBot: strategy has no connected character")
+                return
+            }
+            if(this.bots.some((s) => this.getBotFromState(s)?.id === bot.id)) {
+                console.warn(`addNewBot: ${bot.id} already in bots list`)
+                return
+            }
             this.bots.push(state)
-            let bot = state.getBot()
             bot.socket.on("disconnect", (data) => this.reconnect(data, bot))
             bot.socket.on("code_eval", (data) => this.manageCommand(data, bot));
             // (state as unknown as PartyStrategy).enablePartyEvents()
@@ -80,7 +113,8 @@ export class StateController {
 
     private deactivateStrategy(bot: PingCompensatedCharacter) {
         for(const strat of this.bots) {
-            if(strat.getBot().id != bot.id) continue
+            const stratBot = this.getBotFromState(strat)
+            if(!stratBot || stratBot.id != bot.id) continue
             return strat.deactivateStrat()
         }
     }
@@ -93,24 +127,29 @@ export class StateController {
 
             for(let i = 0; i<this.bots.length; i++) {
                 let state = this.bots[i]
-                if( state.getBot().name == bot.name ) {
+                const stateBot = this.getBotFromState(state)
+                if( stateBot?.name == bot.name ) {
                     const sRegion = bot.serverData?.ServerRegion ?? bot.serverData?.region
                     const sID = bot.serverData?.name
                     new_bot = await startBotWithStrategy(bot.ctype, bot.name, sRegion, sID, this.memoryStorage)
                     this.bots[i] = new_bot
-                    console.warn(`${Date.now()} Bot started. ${i} in bots list, ready: ${new_bot.getBot().ready}. Length of bots ${this.bots.length}.`)
-                    // this.memoryStorage.addEventListners(new_bot.getBot())
-                    new_bot.getBot().socket.on("disconnect", (data) => this.reconnect(data, new_bot.getBot()))
-                    new_bot.getBot().socket.on("code_eval", (data) => this.manageCommand(data, new_bot.getBot()))
+                    const reconnected = this.getBotFromState(new_bot)
+                    if(!reconnected?.socket) break
+                    console.warn(`${Date.now()} Bot started. ${i} in bots list, ready: ${reconnected.ready}. Length of bots ${this.bots.length}.`)
+                    // this.memoryStorage.addEventListners(reconnected)
+                    reconnected.socket.on("disconnect", (data) => this.reconnect(data, reconnected))
+                    reconnected.socket.on("code_eval", (data) => this.manageCommand(data, reconnected))
                     break
                 }
             }
         }
         catch(ex) {
             if(new_bot) {
-                const newBotChar = new_bot.getBot()
-                newBotChar.socket.removeAllListeners("disconnect")
-                newBotChar.disconnect()
+                const newBotChar = this.getBotFromState(new_bot)
+                if(newBotChar?.socket) {
+                    newBotChar.socket.removeAllListeners("disconnect")
+                    newBotChar.disconnect()
+                }
             }
 
             console.error(`Couldn't recconect ${bot?.name}\n Cause:\n${ex}`)
@@ -198,7 +237,8 @@ export class StateController {
         for(const char of this.bots) {
             // if(char.getBot().ctype == "merchant") continue
             if(this.isActiveEventState(char)) continue
-            const bot = char.getBot()
+            const bot = this.getBotFromState(char)
+            if(!bot) continue
             if(!wantedBots.some( e => e.id == bot.id && e.server.region == bot.serverData.region && e.server.name == bot.serverData.name)) 
             {
                 console.debug(`Stopping ${bot.id} cause not in main setup and no events`)
@@ -207,15 +247,29 @@ export class StateController {
         }
         // STARTING WANTED BOTS
         for(const bot of wantedBots) {
-            if(this.bots.find( e => e?.getBot()?.id == bot.id )) continue
+            if(this.hasBotOnServer(bot.id, bot.server)) continue
+            if(this.pendingBotStarts.has(bot.id)) continue
+            if((this.botStartBlockedUntil.get(bot.id) ?? 0) > Date.now()) continue
+
             console.debug(`Starting ${bot.id}`)
-            const state = await startBotWithStrategy(MY_CHARACTERS.get(bot.id)?.ctype, bot.id, bot.server.region, bot.server.name, this.memoryStorage)
+            this.pendingBotStarts.add(bot.id)
+            let state: IState | undefined
+            try {
+                state = await startBotWithStrategy(MY_CHARACTERS.get(bot.id)?.ctype, bot.id, bot.server.region, bot.server.name, this.memoryStorage)
+            } catch (ex) {
+                if (/ingame/i.test(String(ex))) {
+                    this.botStartBlockedUntil.set(bot.id, Date.now() + StateController.INGAME_RETRY_MS)
+                    console.warn(`${bot.id} already ingame — retry in ${StateController.INGAME_RETRY_MS / 1000}s`)
+                }
+            } finally {
+                this.pendingBotStarts.delete(bot.id)
+            }
             if(state) this.addNewBot(state)
         }
 
         if(wantedEvents.length > 0) {
             const mostWantedEvent = wantedEvents[0]
-            this.bots.filter( e => e.getBot().ctype != "merchant").
+            this.bots.filter( e => this.getBotFromState(e)?.ctype != "merchant").
             forEach( e => (e as StateStrategy).addStateToScheduler({
                 state_type: "event",
                 wantedMob: WANTED_EVENTS[mostWantedEvent.eventName].monsters,
@@ -231,7 +285,8 @@ export class StateController {
         if( !merchant ) return setTimeout( this.checkSendItems, 1000 )
         
         for(const i of this.bots) {
-            let bot = i.getBot()
+            const bot = this.getBotFromState(i)
+            if(!bot) continue
             if( merchant.serverData.name != bot.serverData.name || merchant.serverData.region != bot.serverData.region ) continue;
             if( Tools.distance(merchant,bot) > Constants.NPC_INTERACTION_DISTANCE ) continue
             if(i instanceof StateStrategy) i.sendItems(merchant.name)
@@ -257,29 +312,31 @@ export class StateController {
                 if(this.bots.length>=4) return console.debug(`${name} too many bots`)
                 if(!CF.MY_CHARACTERS.get(name)) return console.debug(`${name} unknown character`)
                 // if (!parts[2] || !parts[3]) return console.error(`Cannot start without server: ${data}`)
-                return this.addNewBot(await startBotWithStrategy(
+                const started = await startBotWithStrategy(
                     CF.MY_CHARACTERS.get(name)?.ctype,
                     name,
                     parts[2] as unknown as ServerRegion,
                     parts[3] as unknown as ServerIdentifier,
                     this.memoryStorage
-                ))
+                )
+                if(started) return this.addNewBot(started)
+                return
             case "stop":
-                const botState = this.bots.find( e => e.getBot().id == name)
+                const botState = this.bots.find( e => this.getBotFromState(e)?.id == name)
                 if(!botState) return
                 name.split(',').forEach( e => this.stopCharacter(e))
                 break
             case "quest":
                 if (!name) return console.error(`Cannot start quest without ids: ${data}`)
                 for(const id of name.split(',')) {
-                    const botState = this.bots.find(e => e.getBot().id == id)
+                    const botState = this.bots.find(e => this.getBotFromState(e)?.id == id)
                     if(botState && botState instanceof StateStrategy) (botState as StateStrategy).startQuest()
                 }
                 break
             case "farm": 
                 if (data.split(" ").length < 3) return console.error(`Cannot set farm without mobs: ${data}`)
                 for(const id of name.split(',')) {
-                    const botState = this.bots.find( e => e.getBot().id == id)
+                    const botState = this.bots.find( e => this.getBotFromState(e)?.id == id)
                     if(botState && botState instanceof StateStrategy) {
                         botState.addStateToScheduler({
                             state_type: "farm",
@@ -306,15 +363,16 @@ export class StateController {
     }
 
     private stopCharacter(name: string) {
-        const botState = this.bots.find( e => e.getBot().id == name)
+        const botState = this.bots.find( e => this.getBotFromState(e)?.id == name)
         if(!botState) return
-        const botToStop = botState.getBot()
+        const botToStop = this.getBotFromState(botState)
+        if(!botToStop) return
         botState.deactivateStrat()
         botToStop.socket.off("disconnect")
         console.debug(`${name} shutdown. ${this.bots.length} bots left`)
         let newList = []
         for(let i=0; i<this.bots.length; i++) {
-            if(this.bots[i].getBot().id == name) continue
+            if(this.getBotFromState(this.bots[i])?.id == name) continue
             newList.push(this.bots[i])
         }
         this.bots = newList

@@ -1,44 +1,37 @@
-import { Game, Warrior, ItemName, Tools, PingCompensatedCharacter, LimitDCReportData} from "alclient"
+import { Game, ItemName, Tools, Warrior, SlotType } from "alclient"
 import * as Items from "../configs/character_items_configs"
 import * as CF from "../../src/common_functions/common_functions"
 import { debugLog } from "../../src/common_functions/common_functions";
 import { MemoryStorage } from "../common_functions/memory_storage";
 import { StateStrategy } from "../common_functions/state_strategy";
 
-export type warriorWeaponSwitchConfig = {
-    cleave?:  boolean
-    stomp?: boolean
-}
+type WeaponItemRef = { name: ItemName; level: number }
+type EquipBatchEntry = { num: number; slot: SlotType }
+
 export class WarriorsAttackStrategy extends StateStrategy {
 
     public warrior: Warrior
 
     private _firehazard : boolean = false;
 
-    private lastWeaponSwitch: number
+    /** Сериализует equip/unequip — stomp и cleave не пересекаются. */
+    private weaponOpChain: Promise<void> = Promise.resolve()
 
     constructor (bot: Warrior, memoryStorage: MemoryStorage){
-        super(bot as PingCompensatedCharacter,memoryStorage)
+        super(bot, memoryStorage)
         this.warrior = bot
         this.bot = bot
 
-        //binding
         this.attackLoop = this.attackLoop.bind(this)
         this.hardShellLoop = this.hardShellLoop.bind(this)
         this.useWarcryLoop = this.useWarcryLoop.bind(this)
         this.useMassAggroLoop = this.useMassAggroLoop.bind(this)
-        this.switchWeapons = this.switchWeapons.bind(this)
-        this.useStomp = this.useStomp.bind(this)
-        this.useCleave = this.useCleave.bind(this)
-        this.useCharge = this.useCharge.bind(this)
 
-        //trigger started loops
         this.attackLoop()
         this.useMassAggroLoop()
         this.hardShellLoop()
         this.useWarcryLoop()
     }
-
 
     public toogleFireHazard(){
         if (this._firehazard == true) this._firehazard = false
@@ -49,63 +42,204 @@ export class WarriorsAttackStrategy extends StateStrategy {
         return this._firehazard
     }
 
+    private runWeaponOp(fn: () => Promise<void>): Promise<void> {
+        const op = this.weaponOpChain.then(fn)
+        this.weaponOpChain = op.then(() => undefined, () => undefined)
+        return op
+    }
+
+    private getWeaponConfig(): Items.WarriorWeaponsConfig | undefined {
+        return Items.WEAPON_CONFIGS[this.bot.name] as Items.WarriorWeaponsConfig
+    }
+
+    private isSlotEquipped(slot: SlotType, item: { name: string; level: number }): boolean {
+        const eq = this.warrior.slots?.[slot]
+        return eq?.name === item.name && eq?.level === item.level
+    }
+
+    private isCleaveMainhand(): boolean {
+        const cleave = this.getWeaponConfig()?.cleave
+        return cleave ? this.isSlotEquipped("mainhand", cleave) : false
+    }
+
+    private getAttackWeaponPair(): { mainhand: WeaponItemRef; offhand?: WeaponItemRef } | null {
+        const botWC = this.getWeaponConfig()
+        if (!botWC?.solo_mainhand) return null
+        if (this.bot.getTargetEntity()?.["1hp"] && botWC.fast_mainhand) {
+            return { mainhand: botWC.fast_mainhand, offhand: botWC.fast_offhand }
+        }
+        if (CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank)) {
+            return { mainhand: botWC.mass_mainhand!, offhand: botWC.mass_offhand }
+        }
+        return { mainhand: botWC.solo_mainhand, offhand: botWC.solo_offhand }
+    }
+
+    private isAttackWeaponsEquipped(): boolean {
+        const pair = this.getAttackWeaponPair()
+        if (!pair) return true
+        if (!this.isSlotEquipped("mainhand", pair.mainhand)) return false
+        if (!pair.offhand) return true
+        return this.isSlotEquipped("offhand", pair.offhand)
+    }
+
+    private buildEquipBatch(wanted: { item: WeaponItemRef; slot: SlotType }[]): EquipBatchEntry[] {
+        const batch: EquipBatchEntry[] = []
+        for (const [num, inv] of this.bot.getItems()) {
+            const spec = wanted.find(w => w.item.name === inv.name && w.item.level === inv.level)
+            if (!spec) continue
+            if (this.isSlotEquipped(spec.slot, spec.item)) continue
+            batch.push({ num, slot: spec.slot })
+        }
+        return batch
+    }
+
+    private async applyEquipBatch(wanted: { item: WeaponItemRef; slot: SlotType }[]): Promise<void> {
+        const batch = this.buildEquipBatch(wanted)
+        if (!batch.length) return
+        await this.runWeaponOp(async () => {
+            await this.warrior.equipBatch(batch).catch(debugLog)
+        })
+    }
+
+    private async unequipOffhandIfNeeded(): Promise<void> {
+        if (!this.warrior.slots?.offhand || this.warrior.esize <= 0) return
+        await this.runWeaponOp(async () => {
+            await this.warrior.unequip("offhand").catch(debugLog)
+        })
+    }
+
+    private async equipCleaveWeapon(): Promise<void> {
+        const cleave = this.getWeaponConfig()?.cleave
+        if (!cleave || this.isCleaveMainhand()) return
+        if (!this.bot.hasItem(cleave.name, undefined, { level: cleave.level })) return
+        await this.unequipOffhandIfNeeded()
+        await this.applyEquipBatch([{ item: cleave, slot: "mainhand" }])
+    }
+
+    private async equipAttackWeapons(): Promise<void> {
+        if (this.isAttackWeaponsEquipped()) return
+        const pair = this.getAttackWeaponPair()
+        if (!pair) return
+        const wanted: { item: WeaponItemRef; slot: SlotType }[] = [
+            { item: pair.mainhand, slot: "mainhand" },
+        ]
+        if (pair.offhand) wanted.push({ item: pair.offhand, slot: "offhand" })
+        await this.applyEquipBatch(wanted)
+    }
+
+    private async equipStompWeapon(): Promise<void> {
+        const stomp = this.getWeaponConfig()?.stomp
+        if (!stomp || this.isSlotEquipped("mainhand", stomp)) return
+        if (!this.bot.hasItem(stomp.name, undefined, { level: stomp.level })) return
+        await this.unequipOffhandIfNeeded()
+        await this.applyEquipBatch([{ item: stomp, slot: "mainhand" }])
+    }
+
+    private shouldTryCleave(): boolean {
+        if (this.warrior.isOnCooldown("cleave")) return false
+        if (!this.warrior.canUse("cleave", { ignoreEquipped: true })) return false
+        if (this.warrior.c.town) return false
+        if (this.warrior.getEntities({ withinRange: "cleave" }).some(e => e?.dreturn >= 30)) return false
+        if (!CF.shouldUseMassSkill(this, this.getMemoryStorage.getCurrentTank, "cleave")) return false
+        if (this.warrior.getEntities({ withinRange: "cleave" }).length < 3) return false
+        const cleave = this.getWeaponConfig()?.cleave
+        return !!(cleave && this.bot.hasItem(cleave.name, undefined, { level: cleave.level }))
+    }
+
+    /** axe → cleave → основное оружие. Возвращает true, если cleave был использован. */
+    private async tryCleaveSequence(): Promise<boolean> {
+        if (!this.shouldTryCleave()) return false
+
+        await this.equipCleaveWeapon()
+
+        const mhName = this.warrior.slots.mainhand?.name
+        if (!mhName || !Game.G.skills.cleave.wtype.includes(Game.G.items[mhName].wtype)) {
+            await this.equipAttackWeapons()
+            return false
+        }
+
+        await this.warrior.cleave().catch(debugLog)
+        await this.equipAttackWeapons()
+        return true
+    }
+
+    private async tryStomp(): Promise<void> {
+        if (this.warrior.isOnCooldown("stomp")) return
+        if (!this.warrior.canUse("stomp", { ignoreEquipped: true })) return
+
+        let dps = 0
+        for (const mob of this.warrior.getEntities({ targetingMe: true, targetingPartyMember: true })) {
+            const mobTarget = this.bot.getPlayers().find(e => e.id == mob.target)
+            dps += CF.calculate_monster_dps(mobTarget, mob)
+        }
+        const partyHurt = this.warrior.getPlayers({ isPartyMember: true, isDead: false })
+            .some(e => e.hp < e.max_hp * 0.6 && this.bot.getEntities().some(m => m.target == e.id))
+        if (dps <= CF.calculate_hps(this.warrior) / 2 && !partyHurt) return
+
+        await this.equipStompWeapon()
+        const mhName = this.warrior.slots.mainhand?.name
+        if (mhName && Game.G.skills.stomp.wtype?.includes(Game.G.items[mhName].wtype)) {
+            await this.warrior.stomp().catch(debugLog)
+        }
+        await this.equipAttackWeapons()
+    }
+
     private async attackLoop() {
-        if(this.deactivate) return
-        if(!this.warrior.canUse("attack")) {
+        if (this.deactivate) return
+        if (!this.warrior.canUse("attack")) {
             return setTimeout(this.attackLoop, 500)
         }
-        if(this.warrior.isOnCooldown("attack")) {
+        if (this.warrior.isOnCooldown("attack")) {
             return setTimeout(this.attackLoop, Math.max(1, this.warrior.getCooldown("attack")))
         }
-        let mobsTargetingMe = this.bot.getEntities({targetingMe: true})
+
+        const mobsTargetingMe = this.bot.getEntities({ targetingMe: true })
         let totalDps = 0
-        mobsTargetingMe.forEach( e => totalDps+= CF.calculate_monster_dps(this, e))
-        if( this.bot.c.town && this.bot.hp > totalDps*15 ) {
+        mobsTargetingMe.forEach(e => totalDps += CF.calculate_monster_dps(this, e))
+        if (this.bot.c.town && this.bot.hp > totalDps * 15) {
             return setTimeout(this.attackLoop, 15000)
         }
-        await this.useCleave()
-        await this.useStomp()
-        let target = this.getTarget()
-        if( !target) {
-            return setTimeout(this.attackLoop, 100)
+
+        const target = this.getTarget()
+        if (!target) {
+            return setTimeout(this.attackLoop, 200)
         }
-        if( this.warrior.hasItem("jacko") && this.warrior.isOnCooldown("scare") && this.warrior.getEntities({targetingMe: true, targetingPartyMember:true}).length<1) {
-            return setTimeout( this.attackLoop, this.warrior.getCooldown("scare"))
+
+        if (this.warrior.hasItem("jacko") && this.warrior.isOnCooldown("scare")
+            && this.warrior.getEntities({ targetingMe: true, targetingPartyMember: true }).length < 1) {
+            return setTimeout(this.attackLoop, this.warrior.getCooldown("scare"))
         }
-        if( !this.shouldAttack(target)) {
-            console.log(`Monster DPS: ${CF.calculate_monster_dps(this, target, true)}, ${this.warrior.name} HPS: ${CF.calculate_hps(this.warrior)}`)
+
+        if (!this.shouldAttack(target)) {
             return setTimeout(this.attackLoop, 500)
         }
-        try {            
-            if(Tools.distance(this.warrior,target)<this.warrior.range) {
-                await this.switchWeapons()
+
+        try {
+            if (Tools.distance(this.warrior, target) < this.warrior.range) {
+                const usedCleave = await this.tryCleaveSequence()
+                if (!usedCleave) await this.tryStomp()
+                if (!this.isAttackWeaponsEquipped()) await this.equipAttackWeapons()
                 await this.warrior.basicAttack(target.id).catch(debugLog)
-            }
-            else if( !this.warrior.moving && !this.warrior.smartMoving ) {
-                // console.log("trying move halfway to the target")
-                let location = CF.getHalfWay(this.warrior, target)
+            } else if (!this.warrior.moving && !this.warrior.smartMoving) {
+                const location = CF.getHalfWay(this.warrior, target)
                 CF.moveHalfWay(this.warrior, location)
-                // return setTimeout(this.attackLoop, 500)
             }
-        }
-        catch(Ex) {
+        } catch (Ex) {
             console.error(Ex)
-        }
-        finally {
+        } finally {
             setTimeout(this.attackLoop, Math.max(1, this.warrior.getCooldown("attack")))
         }
     }
 
     private async useWarcryLoop() {
-        if(this.deactivate) return
-        // console.log("Warcry loop")
-        if(this.warrior.isOnCooldown("warcry")) {
+        if (this.deactivate) return
+        if (this.warrior.isOnCooldown("warcry")) {
             return setTimeout(this.useWarcryLoop, this.warrior.getCooldown("warcry"))
         }
-        if(!this.warrior.canUse("warcry") || this.warrior.smartMoving) {
+        if (!this.warrior.canUse("warcry") || this.warrior.smartMoving) {
             return setTimeout(this.useWarcryLoop, 2000)
         }
-        if(this.warrior.s.warcry) {
+        if (this.warrior.s.warcry) {
             return setTimeout(this.useWarcryLoop, this.warrior.s.warcry.ms)
         }
 
@@ -113,184 +247,52 @@ export class WarriorsAttackStrategy extends StateStrategy {
         return setTimeout(this.useWarcryLoop, this.warrior.getCooldown("warcry"))
     }
 
-    private async switchWeapons(config?: warriorWeaponSwitchConfig) {
-        let botWC = Items.WEAPON_CONFIGS[this.bot.name] as Items.WarriorWeaponsConfig
-        if(!botWC) return  
-        if(config?.cleave && botWC.cleave) {
-            //console.debug("Want to switch to cleave weapon")
-            let cleave_weapon = botWC.cleave
-            if(cleave_weapon.name == this.warrior.slots?.mainhand?.name) return console.log("Cleave weapon is already equiped")
-            if(!this.bot.hasItem(cleave_weapon.name, undefined, {level: cleave_weapon.level})) return
-            let cleave_item_idx = this.warrior.locateItem(cleave_weapon.name, undefined, {level: cleave_weapon.level})
-            
-            try {
-               if(this.warrior.slots?.offhand && this.warrior.esize > 0) {
-                await this.warrior.unequip("offhand").catch(debugLog)
-                }
-            }
-            catch(ex){
-                console.error(ex)
-            }
-            return this.warrior.equip(cleave_item_idx).catch(debugLog)
-                        
-        }
-        else if(config?.stomp && botWC.stomp) {
-            let stomp_item = botWC.stomp
-            if(!this.bot.hasItem(stomp_item.name, undefined, {level: stomp_item.level})) return
-            if(this.bot.slots.mainhand.name == stomp_item.name) return
-            if(this.warrior.slots.offhand && this.warrior.esize > 0) {
-                try {
-                    
-                    this.warrior.unequip("offhand").catch(debugLog)
-                    
-                }
-                catch(ex){
-                    console.error(ex)
-                }
-            }
-            
-            
-            let stop_item_idx = this.warrior.locateItem(stomp_item.name, undefined, {level: stomp_item.level})
-            return this.warrior.equip(stop_item_idx).catch(debugLog)
-        }
-        else {
-            let mainhand_item
-            
-            let offhand_item
-            
-            if(this.bot.getTargetEntity()?.["1hp"] && botWC.fast_mainhand) {
-                mainhand_item = botWC.fast_mainhand
-            }
-            else if(CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank)) {
-                mainhand_item = botWC.mass_mainhand
-                offhand_item = botWC.mass_offhand
-            }
-            else {
-                mainhand_item = botWC.solo_mainhand
-                offhand_item = botWC.solo_offhand
-            }
-            if(this.warrior.slots.mainhand?.name == mainhand_item?.name  && this.warrior.slots.offhand?.name == offhand_item?.name) return
-            // if(mainhand_item.name == offhand_item?.name && mainhand_item.level == offhand_item?.level) {
-            //     let items = this.bot.locateItems(mainhand_item.name, undefined, {level: mainhand_item.level})
-            //     if(!items) return 
-            //     items.length > 1 ? 
-            //         await this.bot.equipBatch([{num: items[0], slot: "mainhand"},{num: items[1], slot: "offhand"}]).catch(debugLog)
-            //         :
-            //         await this.bot.equipBatch([{num: items[0], slot: "mainhand"}]).catch(debugLog)
-                
-            //     return 
-            // }
-            try {
-                let mainhand_idx = this.warrior.locateItem(mainhand_item.name, undefined, {level: mainhand_item?.level})
-                if( mainhand_idx ) await this.warrior.equip(mainhand_idx,"mainhand").catch(debugLog)
-                let offhand_idx = this.warrior.locateItem(offhand_item?.name, undefined, {level: offhand_item?.level})
-                if( offhand_idx ) await this.warrior.equip(offhand_idx, "offhand").catch(debugLog)
-            }
-            catch(ex){
-                console.error(ex)
-            }
-        }
-    }
-
-    private async useCharge() {
-        if(this.deactivate) return
-        if(this.bot.smartMoving && !this.bot.isOnCooldown("charge")) {
-            await this.warrior.charge()
-            return setTimeout(this.useCharge, Math.max(1,this.bot.getCooldown("charge")))
-        }
-        else if(this.bot.isOnCooldown("charge")) return setTimeout(this.useCharge, Math.max(1,this.bot.getCooldown("charge")))
-        
-        return setTimeout(this.useCharge, 1000)
-    }
-
-
-    private async useCleave() {
-        // console.log("Cealve loop")
-        if(this.warrior.isOnCooldown("cleave")) return 
-        if(!this.warrior.canUse("cleave", {ignoreEquipped: true})) return 
-        if( this.warrior.c.town) return
-        if(this.warrior.getEntities({withinRange:"cleave"}).filter(e => e?.dreturn >= 30).length>0) return //console.log("Don't want to use cleave")
-        if(!CF.shouldUseMassSkill(this, this.getMemoryStorage.getCurrentTank, "cleave") || this.warrior.getEntities({withinRange:"cleave"}).length<3) return //console.log("Don't want to use cleave")
-        await this.switchWeapons({cleave: true})
-        if(Game.G.skills.cleave.wtype.includes(Game.G.items[this.warrior.slots.mainhand?.name].wtype)) {
-            await this.warrior.cleave().catch(debugLog)
-            
-        }
-    }
-
-    private async useStomp() {
-        // console.log("Calculating needs to use stomp")
-        if(this.deactivate) return
-        if(this.warrior.isOnCooldown("stomp")) return
-        if(!this.warrior.canUse("stomp", {ignoreEquipped: true})) return
-        let dps = 0
-        for(let mob of this.warrior.getEntities({targetingMe: true, targetingPartyMember: true, })) {
-            let mobTarget = this.bot.getPlayers().filter( e => e.id == mob.target)[0]
-            dps+= CF.calculate_monster_dps(mobTarget,mob)
-        }
-        if ( (dps> CF.calculate_hps(this.warrior) / 2)
-            || this.warrior.getPlayers({isPartyMember: true, isDead: false})
-                .filter( e => e.hp < e.max_hp * 0.6 && this.bot.getEntities().filter(m => m.target == e.id).length>0).length > 0
-            ) {
-            // console.log("we want to use stomp")
-            await this.switchWeapons({stomp: true})
-            if( Game.G.skills.stomp.wtype?.includes(Game.G.items[this.warrior.slots.mainhand?.name].wtype) )await this.warrior.stomp().catch(debugLog)
-        }
-        // console.log("we won't use stomp")
-    }
-
-    private async  useAggro() {
-        
-    }
-
     private async useMassAggroLoop() {
-        if(this.deactivate) return
-        if(this.warrior.c.town) return
-        if(this.warrior.isOnCooldown("scare")) {
+        if (this.deactivate) return
+        if (this.warrior.c.town) return
+        if (this.warrior.isOnCooldown("scare")) {
             return setTimeout(this.useMassAggroLoop, this.warrior.getCooldown("scare"))
         }
-        if(this.warrior.smartMoving || !this.warrior.canUse("agitate")) {
+        if (this.warrior.smartMoving || !this.warrior.canUse("agitate")) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
-        if(!CF.shouldUseMassSkill(this, this.memoryStorage.getCurrentTank, "agitate")) {
+        if (!CF.shouldUseMassSkill(this, this.memoryStorage.getCurrentTank, "agitate")) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
-        if(this.warrior.getEntities({hasTarget: false, withinRange: "agitate"}).length<2) {
+        if (this.warrior.getEntities({ hasTarget: false, withinRange: "agitate" }).length < 2) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
 
         await this.warrior.agitate().catch(debugLog)
-
         setTimeout(this.useMassAggroLoop, this.warrior.getCooldown("agitate"))
     }
 
     public async useMassAggro() {
-        if(this.deactivate) return
-        if(this.warrior.c.town) return
-        if(this.warrior.isOnCooldown("scare")) {
+        if (this.deactivate) return
+        if (this.warrior.c.town) return
+        if (this.warrior.isOnCooldown("scare")) {
             return setTimeout(this.useMassAggroLoop, this.warrior.getCooldown("scare"))
         }
-        if(this.warrior.smartMoving) {
+        if (this.warrior.smartMoving) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
-        if(!CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank)) {
+        if (!CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank)) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
-        if(this.warrior.getEntities({hasTarget: false}).length<2) {
+        if (this.warrior.getEntities({ hasTarget: false }).length < 2) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
 
         await this.warrior.agitate().catch(debugLog)
-
     }
 
     private async hardShellLoop() {
-        if(this.deactivate) return
-        // console.log("Hardshell loop")
-        if(this.warrior.smartMoving || !this.warrior.canUse("hardshell") || this.warrior.moving) {
+        if (this.deactivate) return
+        if (this.warrior.smartMoving || !this.warrior.canUse("hardshell") || this.warrior.moving) {
             return setTimeout(this.hardShellLoop, 2000)
         }
-        if(this.warrior.hp < this.warrior.max_hp * 0.6 && Object.values(this.warrior.getEntities({targetingMe: true})).filter(e=> e.damage_type == "physical").length>0) {
+        if (this.warrior.hp < this.warrior.max_hp * 0.6
+            && Object.values(this.warrior.getEntities({ targetingMe: true })).some(e => e.damage_type == "physical")) {
             await this.warrior.hardshell().catch(debugLog)
             return setTimeout(this.hardShellLoop, this.warrior.getCooldown("hardshell"))
         }
