@@ -61,6 +61,7 @@ export class ResuplyStrategy extends PartyStrategy {
                 await this.bot.smartMove("premium", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
             }
             await this.bot.buy("xptome").catch(console.warn)
+            this.addLog(`Bought XP tome`)
         }
     }
 
@@ -90,19 +91,19 @@ export class ResuplyStrategy extends PartyStrategy {
         if(Object.keys(this.bot.c).length > 0) return setTimeout(this.usePotionsLoop, 2000)
         if(this.bot.hp < this.bot.max_hp * 0.5) {
             let hpot = this.bot.locateItem("hpot1")
-            hpot>=0 ? await this.bot.usePotion(hpot).catch(console.warn) : await this.bot.regenHP().catch(console.warn)
+            hpot>=0 ? await this.bot.usePotion(hpot).catch(CF.debugLog) : await this.bot.regenHP().catch(CF.debugLog)
             // console.log("Regening HP")
             return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
         }
         if(this.bot.mp < this.bot.max_mp-500) {
             let mpot = this.bot.locateItem("mpot1")
-            mpot>=0 ? await this.bot.usePotion(mpot).catch(console.warn) : await this.bot.regenMP().catch(console.warn)
+            mpot>=0 ? await this.bot.usePotion(mpot).catch(CF.debugLog) : await this.bot.regenMP().catch(CF.debugLog)
             // console.log("Regening MP")
             return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
         }
         if(this.bot.hp<this.bot.max_hp*0.9) {
             let hpot = this.bot.locateItem("hpot1")
-            hpot>=0 ? await this.bot.usePotion(hpot).catch(console.warn) : await this.bot.regenHP().catch(console.warn)
+            hpot>=0 ? await this.bot.usePotion(hpot).catch(CF.debugLog) : await this.bot.regenHP().catch(CF.debugLog)
             // console.log("Regening HP")
             return setTimeout( () => this.usePotionsLoop(), Math.max(1,this.bot.getCooldown("regen_hp")))
         }
@@ -126,6 +127,7 @@ export class ResuplyStrategy extends PartyStrategy {
         }
         else {
             if(mpot < 100 && !this.bot.smartMoving && !this.bot.moving) {
+                this.addLog(`Resupplying pots: ${mpot} mpots and ${hpot} hpots`)
                 await this.bot.smartMove("main", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
                 if( Tools.distance(this.bot, {x: -35, y: -162, map: "main"}) > Constants.NPC_INTERACTION_DISTANCE ) {
                     return setTimeout( this.resupplyPots, 5000 )
@@ -193,7 +195,7 @@ export class ResuplyStrategy extends PartyStrategy {
         if( ((!this.bot.hasItem("jacko") && this.bot.slots?.orb?.name != "jacko") || this.bot.isOnCooldown("scare") )
             && CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))>this.bot.hp ) {
             try {
-                console.error(`${this.bot.name} SUICIDE BY LOW HP. HP: ${this.bot.hp}, DPS: ${CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))}`)
+                this.addLog(`${this.bot.name} SUICIDE BY LOW HP. HP: ${this.bot.hp}, DPS: ${CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))}`)
                 await this.bot.socket.emit("harakiri")
                 
             }
@@ -204,7 +206,7 @@ export class ResuplyStrategy extends PartyStrategy {
         if(this.bot.s.burned && this.bot.hp < Math.max(this.bot.max_hp*0.15, 2000)) {
             try {
                 await this.bot.socket.emit("harakiri")
-                console.error(`SUICIDE BY BURNED HP ${this.bot.hp} burning ${JSON.stringify(this.bot.s.burned)}`)
+                this.addLog(`SUICIDE BY BURNED HP ${this.bot.hp} burning ${JSON.stringify(this.bot.s.burned)}`)
             }
             catch(ex) {
                 console.error(ex)

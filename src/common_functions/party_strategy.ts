@@ -1,8 +1,8 @@
-import { Item, Game, Constants, InviteData, PingCompensatedCharacter, Tools, HitData, LimitDCReportData, ItemName, SlotType } from "alclient";
+import { Item, Game, Constants, InviteData, PingCompensatedCharacter, Tools, HitData, LimitDCReportData, ItemName, SlotType, Entity } from "alclient";
 import { MemoryStorage } from "./memory_storage";
 import { debugLog,  } from "./common_functions";
 import * as CF from "./common_functions"
-import { SET_CONFIGS, SetConfig, PRIEST_OFFHAND_CONFIGS } from "../configs/character_items_configs";
+import { SET_CONFIGS, SetConfig, PRIEST_OFFHAND_CONFIGS, ORB_CONFIGS } from "../configs/character_items_configs";
 
 export class PartyStrategy {
 
@@ -30,6 +30,8 @@ export class PartyStrategy {
 
     private loot_interval: number = 30_000
 
+    private logs: string[] = []
+
     constructor(bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
         this.bot = bot as PingCompensatedCharacter
         this.memoryStorage = memoryStorage
@@ -39,6 +41,7 @@ export class PartyStrategy {
         this.checkEquippedSetLoop = this.checkEquippedSetLoop.bind(this)
         this.reduceSpotCDLoop = this.reduceSpotCDLoop.bind(this)
         this.becomeHandsomeLoop = this.becomeHandsomeLoop.bind(this)
+        this.equipOrbLoop = this.equipOrbLoop.bind(this)
 
         this.becomeHandsomeLoop()
 
@@ -46,7 +49,7 @@ export class PartyStrategy {
         this.loot()
         this.enablePartyEvents()
         this.reduceSpotCDLoop()
-        
+        this.equipOrbLoop()
 
         let logLimitDCReport = (data: LimitDCReportData) => {
             console.debug(`=== START LIMITDCREPORT (${bot.id}) ===`)
@@ -158,7 +161,7 @@ export class PartyStrategy {
 
     private async loot() {
         if(this.deactivate) return
-        if(!this.bot.chests) return setTimeout( this.loot, 500)
+        if(!this.bot.chests.size) return setTimeout( this.loot, 500)
         if(this.canLoot()) {
             if( (this.bot.chests.size>0 && this.last_loot < Date.now() - this.loot_interval) 
                 || (this.bot.chests.size>0 && this.bot.smartMoving)
@@ -169,7 +172,8 @@ export class PartyStrategy {
                 if(active_booster && this.bot.items[active_booster].name !== "goldbooster") await this.bot.shiftBooster(active_booster, "goldbooster").catch(debugLog)
                 if(SET_CONFIGS[this.bot.id]?.gold && burstDamage<this.bot.max_hp*0.5 && !this.bot.smartMoving) await this.equipSet("gold", SET_CONFIGS[this.bot.id]?.gold)
                 this.bot.chests.forEach( (e) => this.bot.openChest(e.id).catch(console.warn))
-                if(this.memoryStorage.getCurrentLooter != this.bot.id || this.memoryStorage.getDefaultLooter != this.bot.id) this.bot.shiftBooster(active_booster, "xpbooster").catch(debugLog)
+                if(this.memoryStorage.getCurrentLooter != this.bot.id || this.memoryStorage.getDefaultLooter != this.bot.id 
+                    && (this.bot.getPlayer({id: this.memoryStorage.getCurrentLooter, withinRange: 400}) || this.bot.getPlayer({id: this.memoryStorage.getDefaultLooter, withinRange: 400}))) this.bot.shiftBooster(active_booster, "xpbooster").catch(debugLog)
                 else await this.bot.shiftBooster(active_booster, "luckbooster").catch(debugLog)
                 this.last_loot = Date.now()
             }
@@ -261,8 +265,9 @@ export class PartyStrategy {
         if(this.bot.name == looter) return true
         let looterEntity = this.bot.getPlayers().filter( e => e.name == looter && Tools.distance(this.bot, e) < Constants.NPC_INTERACTION_DISTANCE)
         let defaultLooterEntity = this.bot.getPlayers().filter( e => e.name == defaultLooter && Tools.distance(this.bot, e) < Constants.NPC_INTERACTION_DISTANCE)
-        if( !this.bot.partyData || !this.bot.partyData?.list?.includes(looter) ) return true
-        if( !looterEntity && (!defaultLooterEntity || this.bot.name == defaultLooter) ) return true
+        const partyList = Array.isArray(this.bot.partyData?.list) ? this.bot.partyData.list : []
+        if (!partyList.includes(looter)) return true
+        if( !looterEntity.length && (!defaultLooterEntity.length || this.bot.name == defaultLooter) ) return true
         return false
     }
 
@@ -343,6 +348,42 @@ export class PartyStrategy {
 
     public get getMemoryStorage() {
         return this.memoryStorage
+    }
+
+    public getLogs(): string[] {
+        return this.logs
+    }
+
+    public addLog(log: string, showLog: boolean = true) {
+        if(showLog) console.log(log)
+        this.logs.push(`[${new Date().toLocaleString()}] ${log}`)
+        if(this.logs.length > 20 ) this.logs.splice(0, this.logs.length - 20)
+    }
+
+    protected shouldAttack(entity: Entity): boolean {
+        if(!entity) return false
+        if(entity.xp <1) return false
+        if((this.bot.ctype == "warrior" || this.bot.ctype == "rogue") && entity.dreturn > 30) return false
+        if(this.bot.ctype == "mage" && entity.reflection >= 40)  return false
+        if(this.bot.ctype == "priest" || Tools.distance(this.bot, this.memoryStorage?.getStateController?.getBots?.find( e => e?.getBot()?.ctype == "priest")?.getBot()) < 200) {
+            if (CF.calculate_monster_dps(this, entity, true)/CF.calculate_hps(this.bot) >=0.95 && !entity.target) return false
+            else return true
+        }
+        else {
+            if(CF.calculate_monster_dps(this, entity, true)> this.bot.max_hp/10 && !entity.target) return false
+        }
+        return true        
+    }
+
+    private async equipOrbLoop() {
+        if(this.deactivate) return
+        if(!ORB_CONFIGS[this.bot.id]) return
+        let currentOrb = this.bot.slots.orb
+        let desiredOrb = ORB_CONFIGS[this.bot.id]
+        if(currentOrb?.name == desiredOrb?.name && currentOrb?.level == desiredOrb?.level) return setTimeout(this.equipOrbLoop, 5000)
+        if(!this.bot.hasItem(desiredOrb?.name, undefined, {level: desiredOrb?.level})) return setTimeout(this.equipOrbLoop, 5000)
+        await this.bot.equip(this.bot.locateItem(desiredOrb?.name, undefined, {level: desiredOrb?.level})).catch(debugLog)
+        setTimeout(this.equipOrbLoop, 5000)
     }
 
 }

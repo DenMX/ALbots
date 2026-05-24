@@ -214,10 +214,10 @@ export class PriestsAttackStrategy extends StateStrategy {
         }
         if(this.getMemoryStorage.getStateController?.getBots
             .filter( 
-                e => !e.getBot().rip && e.getBot().hp < e.getBot().max_hp*0.7 
-                && (Tools.distance(this.priest, e.getBot()) > this.priest.range*2 || this.priest.map != e.getBot().map) 
-                && e.getBot().serverData.region == this.priest.serverData.region 
-                && e.getBot().serverData.name == this.priest.serverData.name
+                e => !e?.getBot().rip && e?.getBot().hp < e?.getBot().max_hp*0.7 
+                && (Tools.distance(this.priest, e?.getBot()) > this.priest.range*2 || this.priest.map != e?.getBot().map) 
+                && e?.getBot().serverData.region == this.priest.serverData.region 
+                && e?.getBot().serverData.name == this.priest.serverData.name
             ).length>0) {
             // console.debug(`Party heal will appear cause:\n
             //     Party members with less than 70% hp and distance > range*2: ${this.bots?.filter( e => e.getBot().hp < e.getBot().max_hp*0.7 && (Tools.distance(this.priest, e.getBot()) > this.priest.range*2 || this.priest.map != e.getBot().map))?.length}`)

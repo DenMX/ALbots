@@ -130,6 +130,7 @@ export class RangerAttackStrategy extends StateStrategy {
 
     private getTargets(skill : SkillName) : Entity[] {
         if(!["5shot", "3shot"].includes(skill)) return this.ranger.getEntities({withinRange: this.ranger.range})
+        const wantedMob = this.getWantedMobList()
         let final_targets: Entity[] = []
         let pcourage = this.bot.getEntities({targetingMe: true}).filter( e => e.damage_type == "pure").length
         let mcourage = this.bot.getEntities({targetingMe: true}).filter( e => e.damage_type == "magical").length
@@ -137,8 +138,9 @@ export class RangerAttackStrategy extends StateStrategy {
         let dps = CF.calculate_monsters_dps(this, this, this.bot.getEntities({targetingMe: true}))
         if (dps> this.bot.max_hp*0.2) return final_targets
         for(const entity of this.ranger.getEntities()) {
-            if(entity.abilities.stone && !this.currentState.wantedMob.includes(entity.type) ) continue
-            if(this.bot.getEntities().filter(e => e.abilities.stone && !this.currentState.wantedMob.includes(e.type) && Tools.distance(e, entity)<40).length>0) continue
+            if(entity.abilities.stone && !wantedMob.includes(entity.type) ) continue
+            if(entity.willBurnToDeath() || entity.willDieToProjectiles(this.bot, this.bot.projectiles, this.bot.players, this.bot.entities)) continue
+            if(this.bot.getEntities().filter(e => e.abilities.stone && !wantedMob.includes(e.type) && Tools.distance(e, entity)<40).length>0) continue
             if(!entity.target && this.ranger.canKillInOneShot(entity, skill)) final_targets.push(entity)
             if( entity.target ) final_targets.push(entity)
             if(!entity.target && !this.ranger.canKillInOneShot(entity, skill) && dps+CF.calculate_monster_dps(this, entity)< this.bot.hp/5) {
@@ -170,8 +172,8 @@ export class RangerAttackStrategy extends StateStrategy {
             if(SPECIAL_MONSTERS.includes(curr.type)  != SPECIAL_MONSTERS.includes(next.type) ) {
                 return (SPECIAL_MONSTERS.includes(curr.type) ) ? -1 : 1
             }
-            if(this.currentState?.wantedMob.includes(curr.type) != this.currentState?.wantedMob.includes(next.type)) {
-                return (this.currentState?.wantedMob.includes(curr.type)) ? -1 : 1
+            if(wantedMob.includes(curr.type) != wantedMob.includes(next.type)) {
+                return (wantedMob.includes(curr.type)) ? -1 : 1
             }
             if((curr.s.cursed || curr.s.marked) != (next.s.cursed || next.s.marked)) {
                 return (curr.s.cursed || curr.s.marked) ? -1 : 1

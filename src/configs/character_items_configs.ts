@@ -7,7 +7,7 @@ export const DEFAULT_ELIXIRS: Map<CharacterType, ItemName[]> = new Map([
     ["mage", ["pumpkinspice","elixirluck"]],
     ["priest", ["elixirluck"]],
     ["warrior", ["pumpkinspice"]],
-    ["ranger", ["pumpkinspice", "elixirluck"]],
+    ["ranger", ["elixirluck","pumpkinspice", ]],
     ["rogue", ["pumpkinspice"]]
 ])
 
@@ -89,6 +89,13 @@ export const PRIEST_OFFHAND_CONFIGS: { [T in string]: PriestOffhandConfig} = {
     }
 }
 
+export const ORB_CONFIGS: { [T in string]: {name: ItemName, level: number}} = {
+    "Warious": {name: "orbofstr", level: 4},
+    "arMAGEdon": {name: "jacko", level: 4},
+    "aRanDonDon": {name: "rabbitsfoot", level: 2},
+    "Archealer": {name: "jacko", level: 4}
+}
+
 
 export type SetConfig = {
     name: string,
@@ -106,19 +113,19 @@ export const SET_CONFIGS: {
         [T in string]: SetListConfig
     } = {
         "Archealer": {
-            "luck": [
-                {name: 'oxhelmet'},
-                {name: 'tshirt88', level: 4},
-                {name: 'xmaspants', level: 9},
-                {name: 'eslippers', level: 8},
-                {name: 'mittens', level: 9},
-                {name: 'spookyamulet', level: 1},
-                {name: 'mshield', level: 9},
-                {name: 'rabbitsfoot', level: 1},
-                {name: 'mearring', level: 0, slot: "earring1"},
-                {name: 'mearring', level: 1, slot: "earring2"},
-                {name: 'ecape', level: 6}
-            ],
+            // "luck": [
+            //     {name: 'oxhelmet'},
+            //     {name: 'tshirt88', level: 4},
+            //     {name: 'xmaspants', level: 9},
+            //     {name: 'eslippers', level: 8},
+            //     {name: 'mittens', level: 9},
+            //     {name: 'spookyamulet', level: 1},
+            //     {name: 'mshield', level: 9},
+            //     {name: 'rabbitsfoot', level: 2},
+            //     {name: 'mearring', level: 0, slot: "earring1"},
+            //     {name: 'mearring', level: 1, slot: "earring2"},
+            //     {name: 'ecape', level: 6}
+            // ],
             "gold": [
                 {name: 'wcap', level: 9},
                 {name: 'wattire', level: 8},

@@ -135,7 +135,7 @@ export class MageAttackStrategy extends StateStrategy {
                 continue
             }
             // SUMMON IF WE HAVE SAME FARM STATE MONSTERTYPE AND WE ARE ON SPOT
-            if(this.currentState.state_type == "farm" && (botState as StateStrategy).currentState.state_type == "farm" && this.currentState.wantedMob == (botState as StateStrategy).currentState.wantedMob) {
+            if(this.currentState?.state_type == "farm" && (botState as StateStrategy).currentState?.state_type == "farm" && this.currentState.wantedMob == (botState as StateStrategy).currentState.wantedMob) {
                 let wantedMonsters = (typeof this.currentState.wantedMob === "string") ? [this.currentState.wantedMob] : this.currentState.wantedMob
                 if(this.bot.getEntities().filter( e => wantedMonsters.includes(e.type)).length>0 && bot.getEntities().filter( e => wantedMonsters.includes(e.type)).length<1) {
                     await this.mage.magiport(bot.id).catch(debugLog)

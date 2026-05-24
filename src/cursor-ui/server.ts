@@ -48,6 +48,8 @@ export type CursorUIBotData = {
     special: string[];
     ttlu: string;
     equipment: Record<string, EquipSlotData>;
+    /** Строки из IState.getLogs() */
+    logs: string[];
 };
 
 type BotDataInternal = CursorUIBotData & {
@@ -183,6 +185,7 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
                 special: [],
                 ttlu: "N/A",
                 equipment: {},
+                logs: [],
                 goldHisto: [],
                 xpHisto: [],
             });
@@ -199,8 +202,11 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
         const bots = sc?.getBots;
         if (!bots) return;
 
+        const activeIds = new Set<string>();
         for (const b of bots) {
+            if(!b) continue
             const bot = b.getBot();
+            activeIds.add(bot.id);
             const d = ensureBot(bot.id);
 
             d.realm = `${bot.serverData?.region ?? ""}${bot.serverData?.name ?? ""}`;
@@ -250,6 +256,9 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
             d.debuffs = extractStates(d.statusInfo, DEBUFF_KEYS);
             d.special = extractSpecial(d.statusInfo);
 
+            const logLines = b.getLogs?.();
+            d.logs = Array.isArray(logLines) ? [...logLines] : [];
+
             const sl = (bot as { slots?: Record<string, { name?: string; level?: number; q?: number } | null> }).slots;
             d.equipment = {};
             for (const k of EQUIP_SLOTS) {
@@ -274,6 +283,12 @@ export function startCursorUI(sc: StateController, port: number): { stop: () => 
                     ((d.maxXp - d.xp) * 3_600_000) / d.xpPh,
                     { unitCount: 2 }
                 );
+            }
+        }
+
+        for (const id of [...botMap.keys()]) {
+            if (!activeIds.has(id)) {
+                botMap.delete(id);
             }
         }
     }

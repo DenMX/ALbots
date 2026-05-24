@@ -144,6 +144,19 @@
         </div>
       </div>
     </section>
+
+    <!-- Logs (IState.getLogs), collapsible, same in min/max card -->
+    <section class="section collapsible logs-section">
+      <h4 class="section-title toggle" @click="openLogs = !openLogs">
+        <span>Logs</span>
+        <span class="count">({{ logCount }})</span>
+        <span class="chevron" :class="{ up: openLogs }">▼</span>
+      </h4>
+      <div v-show="openLogs" class="log-scroll" role="log" :aria-label="'Logs for ' + (bot.name || '')">
+        <div v-for="(line, i) in logLines" :key="'log-' + i" class="log-line">{{ line }}</div>
+        <div v-if="logCount === 0" class="log-line muted">No logs yet</div>
+      </div>
+    </section>
   </article>
 </template>
 
@@ -180,10 +193,14 @@ function toggleMode() {
 }
 
 const openEffects = ref(props.defaultEffectsOpen)
+const openLogs = ref(false)
 
 const totalEffects = computed(() =>
   (props.bot.buffs || []).length + (props.bot.debuffs || []).length + (props.bot.special || []).length
 )
+
+const logLines = computed(() => (Array.isArray(props.bot.logs) ? props.bot.logs : []))
+const logCount = computed(() => logLines.value.length)
 
 const displayStatus = computed(() => {
   const t = props.bot.state_type
@@ -443,6 +460,47 @@ function fmt(n) {
 .effect-line.debuff { border-left-color: #ef4444; }
 .effect-line.special { border-left-color: #a855f7; }
 .effect-line.muted { color: #71717a; border-left-color: #3f3f46; }
+
+.logs-section {
+  margin-top: 2px;
+}
+.logs-section .section-title.toggle {
+  margin-bottom: 6px;
+}
+/* ~4 строки минимум по высоте, до ~5.5 с прокруткой */
+.log-scroll {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  min-height: calc(4 * 1.35 * 0.7rem);
+  max-height: calc(5.5 * 1.35 * 0.7rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 8px;
+  background: #121214;
+  border-radius: 6px;
+  border: 1px solid #27272a;
+  scrollbar-gutter: stable;
+}
+.log-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 2px 0;
+  color: #d4d4d8;
+  border-bottom: 1px solid #1c1c20;
+}
+.log-line:last-child {
+  border-bottom: none;
+}
+.log-line.muted {
+  color: #52525b;
+  border-bottom: none;
+}
+.card-min .log-scroll {
+  font-size: 0.65rem;
+  min-height: calc(4 * 1.35 * 0.65rem);
+  max-height: calc(5.5 * 1.35 * 0.65rem);
+}
 
 /* Equipment grid 4x4 - Adventure Land style */
 .equip-grid {

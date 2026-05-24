@@ -59,14 +59,14 @@ export class MemoryStorage {
             // if response.status == 200, it was successfully updated
             fetch(url, settings).then((response) => console.log(`Sending tracker info code: ${response.status}`));
             });
-            bot.socket.emit("tracker");
+        bot.socket.emit("tracker");
     }
 
     private async loadBankFromMongo() {
         if(!this.stateController?.getBots.length || this.stateController?.getBots.length<1) return setTimeout(this.loadBankFromMongo, 500)
         if(Database.connection) {
             this.bank = await BankModel.findOne( {
-                owner: this.stateController.getBots[0].getBot().owner
+                owner: this.stateController?.getBots[0]?.getBot().owner
             }).lean<BankInfo>() ?? null
             // console.debug(`Bank loaded from MONGO\nCurrent bank: ${JSON.stringify(this.bank)}`)
             setTimeout(this.loadBankFromMongo, 5000)
@@ -125,6 +125,7 @@ export class MemoryStorage {
             setTimeout(() => { this.updateBank(bot) }, 100)
         }
         if(bot.bank) {
+            this.bank = bot.bank
             if(this.secretKey == "") return console.error("Create api_token.txt")
             const url = `https://aldata.earthiverse.ca/bank/${bot.owner}/${this.secretKey}`;
             const settings = {
@@ -140,9 +141,10 @@ export class MemoryStorage {
                 console.debug(`error while fetching bank in api:\n${ex}`)
             }
         }
-        if(bot.gold > 1000000000 && (!this.lastDepositGold || Date.now() - this.lastDepositGold > this.DEPOSIT_GOLD_THRESHOLD)) {
+        if(bot.gold > 1_800_000_000 && (!this.lastDepositGold || Date.now() - this.lastDepositGold > this.DEPOSIT_GOLD_THRESHOLD)) {
             bot.depositGold(bot.gold*0.05).catch(debugLog)
             this.lastDepositGold = Date.now()
         }
+        
     }
 }

@@ -5,6 +5,7 @@ import { MemoryStorage } from "./memory_storage"
 import * as CharacterItems from "../configs/character_items_configs"
 import * as CF from "./common_functions"
 import { debugLog } from "./common_functions"
+import { DO_NOT_EXCHANGE } from "../configs/manage_items_configs"
 
 
 export type PackItems = [BankPackName, number[]]
@@ -40,7 +41,7 @@ export class ManageItems extends ResuplyStrategy {
         [2, ["platinumingot"]]
     ])
 
-    private GOLD_AMOUNT_FOR_CHECK_BANK: number = 100_000_000
+    protected GOLD_AMOUNT_FOR_CHECK_BANK: number = 100_000_000
     private GOLD_AMOUNT_FOR_BUY_OFFERING: number = 1_000_000_000
     private GOLD_AMOUNT_FOR_UPGRADE_WITH_OFFERING: number = 500_000_000
 
@@ -59,6 +60,7 @@ export class ManageItems extends ResuplyStrategy {
         this.sendItems = this.sendItems.bind(this)
         this.shinyItems = this.shinyItems.bind(this)
         this.startManageLogic = this.startManageLogic.bind(this)
+        this.exchangeItemsFromBank = this.exchangeItemsFromBank.bind(this)
 
         if(bot.ctype != 'merchant') this.startManageLogic()
         else this.exchangeItems()
@@ -217,9 +219,9 @@ export class ManageItems extends ResuplyStrategy {
     }
 
     protected async exchangeItems() {
-        if(this.bot.esize<1) return setTimeout(this.exchangeItems, 1000)
-        if(this.bot.rip) return setTimeout(this.exchangeItems, 1000)
-        if(["bank", "bank_u","bank_b", "cyberland"].includes(this.bot.map) ) return setTimeout(this.exchangeItems, 1000)
+        if(this.bot.esize<1) return //setTimeout(this.exchangeItems, 1000)
+        if(this.bot.rip) return //setTimeout(this.exchangeItems, 1000)
+        if(["bank", "bank_u","bank_b", "cyberland"].includes(this.bot.map) ) return //setTimeout(this.exchangeItems, 1000)
         items: for(const [idx, item] of this.bot.getItems()) {
             if( !item.e || ItemsConfig.DO_NOT_EXCHANGE.includes(item.name) || item.q < item.e ) {
                 continue
@@ -240,7 +242,7 @@ export class ManageItems extends ResuplyStrategy {
             }
         }
 
-        if(this.bot.hasItem(["computer", "supercomputer"])) setTimeout(this.exchangeItems, 1000)
+        //if(this.bot.hasItem(["computer", "supercomputer"])) setTimeout(this.exchangeItems, 1000)
     }
 
     protected async shinyItems() {
@@ -249,6 +251,31 @@ export class ManageItems extends ResuplyStrategy {
         //withdraw all from bank while esize > 0
         //shiny
         //this.bot.upgrade(itm_idx, undefined, ingot_idx)
+    }
+
+    protected canUpgradeItems(): boolean {
+        if(this.bot.esize>0) return true
+        for(const [, item] of this.bot.getItems()) {
+            if(!item) continue
+            if(!ItemsConfig.MERCHANT_UPGRADE.has(item.name)) continue
+            let itemConfig = ItemsConfig.MERCHANT_UPGRADE.get(item.name)
+            if(item.level != itemConfig.level || item.level>= itemConfig.level) continue
+            if(item.level == 0 && itemConfig.shouldBeShiny && item.p != "shiny") continue
+            
+            let grade = item.calculateGrade()
+            if(grade<2 && itemConfig.scrollUpAt && itemConfig.scrollUpAt <= item.level) grade++
+
+            let scroll = item.compound ? `cscroll${grade}` : `scroll${grade}`
+            if(this.bot.countItem(scroll as ItemName) < 1) return false
+
+            let offering: ItemName
+            if( itemConfig.primlingAt && itemConfig.primlingAt <= item.level ) offering = "offeringp"
+            if( itemConfig.offeringAt && itemConfig.offeringAt <= item.level ) offering = "offering"
+            if( offering && this.bot.locateItem(offering) == undefined ) return false
+
+            return true
+        }
+        return false
     }
 
     protected async storeItems() {
@@ -452,10 +479,7 @@ export class ManageItems extends ResuplyStrategy {
 
 
         let bank = (bot.map.startsWith("bank")) ? bot.bank : super.getMemoryStorage.getBank;
-        // (bot.map.startsWith("bank")) ? console.debug('using bank info') : console.debug('using bank info from DB')
-        // console.debug(`bank in memory storage:\n${JSON.stringify(this.memoryStorage.getBank)}`)
 
-        // console.debug(`Packs in bank: ${Object.keys(bank).filter( e => e != "gold").length}`)
 
         let upgradeItems : UpgradeItems = {
             upgrade: [],
@@ -679,6 +703,77 @@ export class ManageItems extends ResuplyStrategy {
                 await bot.sell(idx,item.q).catch(debugLog)
             }
         }
+    }
+
+    private getItemsForExchange(): Map<BankPackName, number[]>{
+        if (this.deactivate || !this.bot.bank) return new Map<BankPackName, number[]>()
+        // getBankItems() in alclient only populates when map.startsWith("bank"); do NOT return early here.
+        let itemsForExchange: Map<BankPackName, number[]> = new Map<BankPackName, number[]>()
+        let bank = this.bot.bank
+
+
+        let bankPackName: keyof BankInfo
+
+        for(bankPackName in bank) {
+            let itemsInPack: number[] = []
+            // console.debug(`${bankPackName} = \n${bank[bankPackName]}`)
+            if(bankPackName == "gold" || bankPackName == "owner" as BankPackName || bankPackName == "_id" as BankPackName) continue
+
+            itemsFor: for(let i = 0; i < bank[bankPackName].length; i++) {
+                let item = bank[bankPackName][i]
+                if(!item) continue
+                const gItem = Game.G.items[item.name]
+                if(!gItem.e) continue
+                if(DO_NOT_EXCHANGE.includes(item.name)) continue
+                if(ItemsConfig.ITEMS_TO_EXCHANGE_FROM_BANK.has(item.name) && this.bot.gold < ItemsConfig.ITEMS_TO_EXCHANGE_FROM_BANK.get(item.name)) continue
+                if(item.q < gItem.e) continue
+                console.debug(`Item ${item.name} quantity ${item.q} can be exchanged`)
+                itemsInPack.push(i)
+            }
+            if(itemsInPack.length>0) itemsForExchange.set(bankPackName, itemsInPack)
+        }
+        return itemsForExchange
+    }
+
+    protected async exchangeItemsFromBank() {
+        if(this.deactivate) return
+        if(this.bot.esize<5) return
+        if(!this.bot.map.startsWith("bank")) await this.bot.smartMove("bank").catch(console.debug)
+        await CF.sleep(500)
+
+        if(!this.bot.map.startsWith("bank")) {
+            console.debug(`Cannot exchange from bank: ${this.bot.name} is on ${this.bot.map}, not in bank`)
+            return
+        }
+        const itemsForExchange = this.getItemsForExchange()
+        console.debug("Items for exchange:", [...itemsForExchange.entries()])
+        outer: for(const [pack, items] of itemsForExchange) {
+            console.debug(`Moving to pack ${pack}`)
+            await this.bot.smartMove(pack, {getWithin: 9999}).catch(console.debug)
+            for(const idx of items) {
+                if(!this.bot.bank?.[pack]?.[idx]) {
+                    console.debug(`Skip withdraw: no item in ${pack}[${idx}] at withdraw time`)
+                    continue
+                }
+                console.debug(`Withdrawing item ${idx} from pack ${pack}`)
+                let gItem = Game.G.items[this.bot.bank[pack][idx].name]
+                await this.bot.withdrawItem(pack, idx).catch(console.debug)
+                let item = this.bot.items[this.bot.locateItem(gItem.name as ItemName, this.bot.items)]
+                if(item?.q/gItem.e > this.bot.esize) break outer
+                if(this.bot.esize<5) break outer
+            }
+        }
+        await this.bot.smartMove("main").catch(debugLog)
+    }
+
+    protected hasItemsToExchange(): boolean {
+        for(const [,item] of this.bot.getItems()) {
+            if(!item) continue
+            let gItem = new Item({name: item.name, level: item.level}, Game.G)
+            if(gItem.e) return true
+
+        }
+        return false
     }
 
 }

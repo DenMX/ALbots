@@ -41,7 +41,7 @@ export class RogueAttackStrategy extends StateStrategy {
         if(this.rogue.isOnCooldown("scare") && !target.target) {
             return setTimeout(this.basicAttackLoop, this.rogue.getCooldown("scare"))
         }
-        if(!target?.target && CF.calculate_monster_dps(this, target, true)/CF.calculate_hps(this.rogue) >=0.95) {
+        if(!this.shouldAttack(target)) {
             return setTimeout(this.basicAttackLoop, 500)
         }
         

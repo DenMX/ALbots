@@ -5,7 +5,7 @@ import { calculate_hps, calculate_monster_dps, debugLog } from "./common_functio
 import fs from "fs"
 import { DEFAULT_SERVER_NAME, DEFAULT_SERVER_REGION, MemoryStorage } from "./memory_storage"
 import { ManageItems } from "./manage_items_strategy"
-import { SPECIAL_MONSTERS } from "../configs/events_and_spots"
+import { SPECIAL_MONSTERS, WANTED_EVENTS } from "../configs/events_and_spots"
 
 export type MobsSortFilter = {
     sortSpawns? : boolean,
@@ -46,12 +46,9 @@ export class StateStrategy extends ManageItems implements IState {
         this.kiteLoop = this.kiteLoop.bind(this)
         this.switchState = this.switchState.bind(this)
 
-
-
         //trigger started functions
         this.runLoops()
         this.kiteLoop()
-        
     }
 
     public getStateType() : string {
@@ -268,6 +265,8 @@ export class StateStrategy extends ManageItems implements IState {
         //     state_type: "farm",
         //     server: {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME}
         // }
+
+
         // load saved in DB
         if(Database.connection) {
             try{
@@ -340,6 +339,7 @@ export class StateStrategy extends ManageItems implements IState {
 
     private switchState() {
         this.current_state = (this.state_scheduler.length>0) ? this.state_scheduler.shift() : this.last_state ?? this.default_state
+        this.addLog(`Switched to state: ${JSON.stringify(this.current_state)}`)
     }
 
     private async checkState() {
@@ -398,14 +398,14 @@ export class StateStrategy extends ManageItems implements IState {
                 if(this.current_state.state_type == "event") {
                     if( this.bot.S[this.current_state?.eventName] && this.bot.S[this.current_state.eventName]?.live != false) {
                         let join
-                        if((this.current_state?.eventName in Game.G.maps || this.current_state?.eventName in Game.G.monsters) && (!this.bot.S[this.current_state.eventName].map || this.current_state?.eventName == "icegolem")) {
+                        if(WANTED_EVENTS[this.current_state?.eventName]?.join) {
                             join = (this.current_state?.eventName in Game.G.maps) ? this.current_state.eventName as MapName : this.current_state.eventName as MonsterName;
                         }
                         
-                        await this.bot.smartMove(join ?? this.bot.S[this.current_state.eventName], {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
+                        await this.bot.smartMove(join ?? this.bot.S[this.current_state.eventName], {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(console.warn)
                         return setTimeout(this.checkState, 1000)
                     }
-                    else if(this.bot.getEntities().filter( e => this.currentState.wantedMob.includes(e.type) || SPECIAL_MONSTERS.includes(e.type)).length<1) {
+                    else if(this.bot.getEntities().filter( e => wanted_monster.includes(e.type) || SPECIAL_MONSTERS.includes(e.type)).length<1) {
                         this.switchState()// double check
                         return setTimeout(this.checkState, 1000)
                     }
@@ -418,7 +418,7 @@ export class StateStrategy extends ManageItems implements IState {
                         // for bosses we should have location
                         await this.bot.smartMove(this.current_state.location, {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
                     }
-                    const currentBoss = this.bot.getEntities().filter( e=> e.type == this.current_state.wantedMob)[0]
+                    const currentBoss = this.bot.getEntities().filter( e=> wanted_monster.includes(e.type))[0]
                     console.debug(`${this.bot.name} current boss: ${currentBoss?.type}\n
                         target: ${currentBoss?.target} dps: ${calculate_monster_dps(this,currentBoss,true)} hps: ${calculate_hps(this.bot)} ratio: ${calculate_monster_dps(this,currentBoss,true)/calculate_hps(this.bot)}`)
                     // if we smartmoved and still not found or boss is OP
@@ -451,11 +451,14 @@ export class StateStrategy extends ManageItems implements IState {
             }
             //Quest not completed
             else if(this.bot.s.monsterhunt && this.bot.s.monsterhunt.c > 0) {
+                if(!this.getWantedMobList().includes(this.bot.s.monsterhunt?.id)) {
+                    this.current_state = {state_type: "quest", wantedMob: this.bot.s.monsterhunt?.id }
+                }
                 if(this.bot.getEntities().filter( e => this.bot.s.monsterhunt?.id == e.type).length <1) {
                     await this.bot.smartMove(this.bot.s.monsterhunt!.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
                 }
                 const questMonsters = this.bot.getEntities().filter( e => e.type == this.bot.s.monsterhunt?.id )
-                const questMonstersCanBeKilled = questMonsters.filter( e => this.bot.max_hp/calculate_monster_dps(this,e) > 10)
+                const questMonstersCanBeKilled = questMonsters.filter( e => this.shouldAttack(e))
                 if(questMonsters?.length>1 && questMonstersCanBeKilled.length<1) {
                     this.switchState()
                     setTimeout(() => {
@@ -469,7 +472,9 @@ export class StateStrategy extends ManageItems implements IState {
                 if(this.state_scheduler.length<1){
                     await this.bot.smartMove("monsterhunter", {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
                     await this.bot.getMonsterHuntQuest().catch(debugLog)
+                    if(!this.bot.s.monsterhunt?.id) return setTimeout(this.checkState, 1000)
                     this.current_state = {state_type: "quest", wantedMob: this.bot.s.monsterhunt?.id, server: {region: this.bot.serverData.region, name: this.bot.serverData.name}}
+                    this.addLog(`Quest started: ${this.bot.s.monsterhunt?.id}`)
                     if(this.bot.s.monsterhunt?.id) await this.bot.smartMove(this.bot.s.monsterhunt.id, {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
                     return setTimeout(this.checkState, 1000)
                 }
@@ -502,6 +507,12 @@ export class StateStrategy extends ManageItems implements IState {
         return this.current_state?.wantedMob
     }
 
+    protected getWantedMobList(): MonsterName[] {
+        if (typeof this.current_state?.wantedMob === "string") return [this.current_state.wantedMob]
+        if (Array.isArray(this.current_state?.wantedMob)) return this.current_state.wantedMob
+        return []
+    }
+
     protected getTarget(): Entity | null {
         if(this.deactivate) return
         //we want to switch if target will die 
@@ -512,7 +523,8 @@ export class StateStrategy extends ManageItems implements IState {
         //we don't want to targeting mob with dps more than 2x hps
         // console.log(`Target loop, ${this.bot.target}`)
         let target = this.bot.getTargetEntity()
-        let entities = this.bot.getEntities().filter( e => e.xp > 0 && (calculate_monster_dps(this,e)/calculate_hps(this.bot) < 1 || e.target))
+        const wantedMob = this.getWantedMobList()
+        let entities = this.bot.getEntities().filter( e => this.shouldAttack(e))
         if(entities.length<1) {
             return target
         }
@@ -520,6 +532,7 @@ export class StateStrategy extends ManageItems implements IState {
             if(!target || (target && target.willBurnToDeath()) || target.map != this.bot.map || Tools.distance(this.bot, target) > this.bot.range * 1.5) {
                 // console.log("Searching target")
                 entities = this.sortEntities(entities)
+                if (!entities[0]) return target
                 this.bot.target = entities[0].id
                 // console.log(`Target found?: ${this.bot.target}`)
                 return entities[0]
@@ -531,11 +544,14 @@ export class StateStrategy extends ManageItems implements IState {
             }
             else if (target && !SPECIAL_MONSTERS.includes(target.type)) {
                 entities = this.sortEntities(entities)
-                if(!SPECIAL_MONSTERS.includes(target.type) && SPECIAL_MONSTERS.includes(entities[0].type)) {
+                if(
+                    (!SPECIAL_MONSTERS.includes(target.type) && SPECIAL_MONSTERS.includes(entities[0].type))
+                    || (!wantedMob.includes(target.type) && wantedMob.includes(entities[0].type))
+                ) {
                     this.bot.target = entities[0].id
                     if(this.bot.smartMoving) this.bot.stopSmartMove().catch(debugLog)
                 }
-                return entities[0]
+                return this.bot.getTargetEntity() ?? entities[0]
             }
             else if (target && target.map != this.bot.map) {
                 entities = this.sortEntities(entities)
@@ -546,10 +562,7 @@ export class StateStrategy extends ManageItems implements IState {
         catch(ex) {
             console.warn(ex)
         }
-        finally {
-            return target
-        }
-        
+        return this.bot.getTargetEntity() ?? target
     }
 
     private sortEntities(entities: Entity[], filter?: MobsSortFilter): Entity[] {
@@ -564,9 +577,7 @@ export class StateStrategy extends ManageItems implements IState {
             (curr, next) => {
                 let dist_current = Tools.distance(this.bot, curr)
                 let dist_next = Tools.distance(this.bot, next)
-                let wantedMob
-                if(this.current_state?.wantedMob && typeof this.current_state.wantedMob === "string") wantedMob = [this.current_state.wantedMob]
-                else if(this.current_state?.wantedMob ) wantedMob = this.current_state.wantedMob
+                const wantedMob = this.getWantedMobList()
                 let targetingCurrent = this.bot.getPlayers({isPartyMember: true}).filter( e => e.target == curr.id).length
                 let targetingNext = this.bot.getPlayers({isPartyMember: true}).filter( e => e.target == next.id).length
                 // SPAWNS FIRST
@@ -597,4 +608,6 @@ export class StateStrategy extends ManageItems implements IState {
                 return 0;
         })
     }
+
+    
 }
