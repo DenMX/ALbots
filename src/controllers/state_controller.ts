@@ -10,6 +10,10 @@ import * as CF from "../common_functions/common_functions"
 export class StateController {
     private bots: IState[]
 
+    /** Не переключать ростер сразу после пропажи ивента в observer (фликер S). */
+    private lastWantedEventAt = 0
+    private static readonly EVENT_GRACE_MS = 30_000
+
     private serverObservers: Observer[] = []
 
     private serversToObserve: ServerData[] = [
@@ -151,8 +155,21 @@ export class StateController {
         return wantedEvents
     }
 
+    private isActiveEventState(char: IState): boolean {
+        if (!(char instanceof StateStrategy)) return false
+        const strat = char as StateStrategy
+        if (strat.currentState?.state_type === "event") return true
+        return strat.stateScheduler?.some((s) => s.state_type === "event") ?? false
+    }
+
     private async manageCharactersLoop() {
         let wantedEvents = this.getWantedEvents()
+        if (wantedEvents.length > 0) {
+            this.lastWantedEventAt = Date.now()
+        } else if (Date.now() - this.lastWantedEventAt < StateController.EVENT_GRACE_MS) {
+            console.debug("Event grace period — skip roster change")
+            return setTimeout(this.manageCharactersLoop, 10 * 1000)
+        }
         // GETTING WANTED BOTS
         let wantedBots = []
         if(wantedEvents.length == 0) {
@@ -180,7 +197,7 @@ export class StateController {
         // STOPPING UNWANTED BOTS
         for(const char of this.bots) {
             // if(char.getBot().ctype == "merchant") continue
-            if(char.getStateType() == "event") continue
+            if(this.isActiveEventState(char)) continue
             const bot = char.getBot()
             if(!wantedBots.some( e => e.id == bot.id && e.server.region == bot.serverData.region && e.server.name == bot.serverData.name)) 
             {
@@ -210,7 +227,7 @@ export class StateController {
     }
 
     private checkSendItems() {
-        let merchant = this.bots.filter( e => e.getBot().ctype == "merchant")[0]?.getBot()
+        let merchant = this.bots.filter( e => e && e?.getBot()?.ctype == "merchant")[0]?.getBot()
         if( !merchant ) return setTimeout( this.checkSendItems, 1000 )
         
         for(const i of this.bots) {

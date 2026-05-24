@@ -334,7 +334,7 @@ export class MerchantStrategy extends ManageItems implements IState {
 
     private async monitoringSpecialsLoop() {
         if(this.deactivate) return console.debug("Monitoring specials loop is deactivated")
-        const mageState = this.getMemoryStorage.getStateController?.getBots.filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "mage")[0]
+        const mageState = this.getMemoryStorage.getStateController?.getBots.filter( e => e && e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "mage")[0]
         if( !mageState ) {
             // console.debug("No mage on the server while monitoring specials loop is running")
             return setTimeout(this.monitoringSpecialsLoop, 10_000)

@@ -532,6 +532,7 @@ export class StateStrategy extends ManageItems implements IState {
             if(!target || (target && target.willBurnToDeath()) || target.map != this.bot.map || Tools.distance(this.bot, target) > this.bot.range * 1.5) {
                 // console.log("Searching target")
                 entities = this.sortEntities(entities)
+                if (!entities[0]) return target
                 this.bot.target = entities[0].id
                 // console.log(`Target found?: ${this.bot.target}`)
                 return entities[0]

@@ -271,7 +271,7 @@ export class ManageItems extends ResuplyStrategy {
             let offering: ItemName
             if( itemConfig.primlingAt && itemConfig.primlingAt <= item.level ) offering = "offeringp"
             if( itemConfig.offeringAt && itemConfig.offeringAt <= item.level ) offering = "offering"
-            if( offering && !this.bot.locateItem(offering) ) return false
+            if( offering && this.bot.locateItem(offering) == undefined ) return false
 
             return true
         }

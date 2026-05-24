@@ -201,6 +201,9 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     // --- UPGRADE SECTION --- \\
     ["staff", { level: 8 }],
     ["angelwings", { level: 8, scrollUpAt: 4, offeringAt: 6}],
+
+    ["coat", {level: 10, scrollUpAt: 5, primlingAt: 8, offeringAt: 9}],
+    ["pants", {level: 10, scrollUpAt: 5, primlingAt: 8, offeringAt: 9}],
     
     // Shields
     ["sshield", { level: 8 }],

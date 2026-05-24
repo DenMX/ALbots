@@ -30,7 +30,7 @@
         </div>
         <div v-else-if="error" class="error">
           <p>{{ error }}</p>
-          <button @click="load">Retry</button>
+          <button @click="load(true)">Retry</button>
         </div>
         <div v-else-if="bots.length === 0" class="empty">
           <p>No bots connected</p>
@@ -104,7 +104,7 @@
           </div>
           <div v-else-if="error" class="error">
             <p>{{ error }}</p>
-            <button @click="load">Retry</button>
+            <button @click="load(true)">Retry</button>
           </div>
           <div v-else class="content-row test-layout">
             <div v-memo="[playerUrl]" class="comm-panels-wrap">
@@ -130,7 +130,7 @@
           </div>
           <div v-else-if="error" class="error">
             <p>{{ error }}</p>
-            <button @click="load">Retry</button>
+            <button @click="load(true)">Retry</button>
           </div>
           <div v-else class="content-row test-layout">
             <div v-memo="[playerUrl]" class="comm-panels-wrap">
@@ -182,6 +182,7 @@ const loading = ref(true)
 const error = ref(null)
 const lastUpdate = ref(null)
 let poll = null
+let loadInFlight = false
 
 const aliveCount = computed(() => bots.value.filter(b => !b.rip).length)
 const totalGold = computed(() => bots.value.reduce((s, b) => s + (b.gold || 0), 0))
@@ -221,8 +222,10 @@ function formatTime(ts) {
   return new Date(ts).toLocaleTimeString()
 }
 
-async function load() {
-  loading.value = true
+async function load(isInitial = false) {
+  if (loadInFlight) return
+  loadInFlight = true
+  if (isInitial) loading.value = true
   error.value = null
   try {
     const r = await fetch(API)
@@ -235,14 +238,15 @@ async function load() {
   } catch (e) {
     error.value = e.message
   } finally {
-    loading.value = false
+    if (isInitial) loading.value = false
+    loadInFlight = false
   }
 }
 
 onMounted(() => {
-  load()
+  load(true)
   poll = setInterval(() => {
-    load()
+    load(false)
   }, POLL_MS)
 })
 
