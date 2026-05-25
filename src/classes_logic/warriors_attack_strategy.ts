@@ -84,11 +84,17 @@ export class WarriorsAttackStrategy extends StateStrategy {
 
     private buildEquipBatch(wanted: { item: WeaponItemRef; slot: SlotType }[]): EquipBatchEntry[] {
         const batch: EquipBatchEntry[] = []
-        for (const [num, inv] of this.bot.getItems()) {
-            const spec = wanted.find(w => w.item.name === inv.name && w.item.level === inv.level)
-            if (!spec) continue
+        const usedNums = new Set<number>()
+
+        for (const spec of wanted) {
             if (this.isSlotEquipped(spec.slot, spec.item)) continue
-            batch.push({ num, slot: spec.slot })
+            for (const [num, inv] of this.bot.getItems()) {
+                if (usedNums.has(num)) continue
+                if (inv.name !== spec.item.name || inv.level !== spec.item.level) continue
+                batch.push({ num, slot: spec.slot })
+                usedNums.add(num)
+                break
+            }
         }
         return batch
     }
