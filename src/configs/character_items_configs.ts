@@ -44,7 +44,7 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         solo_mainhand: { name: "firestaff", level: 9 },
         solo_offhand: { name: "wbook1", level: 3},
         mass_mainhand: { name: "gstaff", level: 6 },
-        fast_mainhand: { name: "wand", level: 7 },
+        fast_mainhand: { name: "pinkie", level: 8 },
         fast_offhand: { name: "wbookhs", level: 3 }
     },
     "aRanDonDon": {
@@ -113,19 +113,19 @@ export const SET_CONFIGS: {
         [T in string]: SetListConfig
     } = {
         "Archealer": {
-            // "luck": [
-            //     {name: 'oxhelmet'},
-            //     {name: 'tshirt88', level: 4},
-            //     {name: 'xmaspants', level: 9},
-            //     {name: 'eslippers', level: 8},
-            //     {name: 'mittens', level: 9},
-            //     {name: 'spookyamulet', level: 1},
-            //     {name: 'mshield', level: 9},
-            //     {name: 'rabbitsfoot', level: 2},
-            //     {name: 'mearring', level: 0, slot: "earring1"},
-            //     {name: 'mearring', level: 1, slot: "earring2"},
-            //     {name: 'ecape', level: 6}
-            // ],
+            "luck": [
+                {name: 'oxhelmet'},
+                {name: 'tshirt88', level: 4},
+                {name: 'xmaspants', level: 9},
+                {name: 'eslippers', level: 8},
+                {name: 'mittens', level: 9},
+                {name: 'spookyamulet', level: 1},
+                {name: 'mshield', level: 9},
+                {name: 'rabbitsfoot', level: 2},
+                {name: 'mearring', level: 0, slot: "earring1"},
+                {name: 'mearring', level: 1, slot: "earring2"},
+                {name: 'ecape', level: 6}
+            ],
             "gold": [
                 {name: 'wcap', level: 9},
                 {name: 'wattire', level: 8},
