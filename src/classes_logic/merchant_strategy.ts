@@ -29,6 +29,26 @@ export class MerchantStrategy extends ManageItems implements IState {
         return this.merch_state.state_type
     }
 
+    private getStateBot(state: IState | undefined | null): PingCompensatedCharacter | undefined {
+        try {
+            return state?.getBot?.()
+        } catch {
+            return undefined
+        }
+    }
+
+    private getPartyBotsOnServer(): IState[] {
+        const bots = this.getMemoryStorage?.getStateController?.getBots
+        if (!bots) return []
+        return bots.filter((s): s is IState => {
+            const b = this.getStateBot(s)
+            return !!b
+                && b.serverData.region === this.bot.serverData.region
+                && b.serverData.name === this.bot.serverData.name
+                && b.id !== this.bot.id
+        })
+    }
+
     constructor (bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
         super(bot,memoryStorage)
 
@@ -372,7 +392,10 @@ export class MerchantStrategy extends ManageItems implements IState {
 
         if(specials.length<1) return setTimeout(this.monitoringSpecialsLoop, 1000)
 
-        const stateBots = this.getMemoryStorage?.getStateController?.getBots.filter( botState => botState.getBot().serverData.region == this.bot.serverData.region && botState.getBot().serverData.name == this.bot.serverData.name && botState instanceof StateStrategy)
+        const stateBots = this.getMemoryStorage?.getStateController?.getBots.filter( botState => {
+            const b = this.getStateBot(botState)
+            return b && b.serverData.region == this.bot.serverData.region && b.serverData.name == this.bot.serverData.name && botState instanceof StateStrategy
+        })
         if(stateBots && stateBots.length>0 && stateBots.some( e => e.getStateType() == "quest")) {
             return setTimeout(this.monitoringSpecialsLoop, 1000)
         }
@@ -386,9 +409,13 @@ export class MerchantStrategy extends ManageItems implements IState {
                 console.debug(`${special.type} is already in scheduler`)
                 continue
             }
-            const priest = this.getMemoryStorage.getStateController?.getBots.filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "priest")[0] as StateStrategy
-            
-            if(!priest || CF.calculate_monster_dps(priest, special) > CF.calculate_hps(priest.getBot())) {
+            const priest = this.getMemoryStorage.getStateController?.getBots.find( e => {
+                const b = this.getStateBot(e)
+                return b && b.serverData.region == this.bot.serverData.region && b.serverData.name == this.bot.serverData.name && b.ctype == "priest"
+            }) as StateStrategy | undefined
+            const priestBot = priest ? this.getStateBot(priest) : undefined
+
+            if(!priestBot || CF.calculate_monster_dps(priest, special) > CF.calculate_hps(priestBot)) {
                 console.debug(`${special.type} is too OP for priest`)
                 continue
             }
@@ -410,19 +437,25 @@ export class MerchantStrategy extends ManageItems implements IState {
 
     private shouldCheckBossesLoop() {
         if(this.deactivate) return console.debug("Should check bosses loop is deactivated")
-        if( this.getMemoryStorage.getStateController?.getBots
-            .filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "mage" && e.getStateType() != "event")
+        const controllerBots = this.getMemoryStorage?.getStateController?.getBots
+        if(!controllerBots) return setTimeout(this.shouldCheckBossesLoop, 10_000)
+
+        if( controllerBots
+            .filter( e => {
+                const b = this.getStateBot(e)
+                return b && b.serverData.region == this.bot.serverData.region && b.serverData.name == this.bot.serverData.name && b.ctype == "mage" && e.getStateType?.() != "event"
+            })
             .length < 1
         ) 
         {
             // console.debug("No mage on the server while loop is running")
             return setTimeout(this.shouldCheckBossesLoop, 10_000)
         }
-        if(!this.getMemoryStorage?.getStateController?.getBots) return setTimeout(this.shouldCheckBossesLoop, 10_000)
-        for(const botState of this.getMemoryStorage?.getStateController?.getBots) {
-            const bot = botState.getBot()
-            if(bot.serverData.region != this.bot.serverData.region || bot.serverData.name != this.bot.serverData.name || bot.id == this.bot.id) continue
-            if((botState as StateStrategy).getStateType() == "quest") return setTimeout(this.shouldCheckBossesLoop, 60_000)
+        for(const botState of controllerBots) {
+            if(!botState) continue
+            const bot = this.getStateBot(botState)
+            if(!bot || bot.serverData.region != this.bot.serverData.region || bot.serverData.name != this.bot.serverData.name || bot.id == this.bot.id) continue
+            if((botState as StateStrategy).getStateType?.() == "quest") return setTimeout(this.shouldCheckBossesLoop, 60_000)
         }
         console.debug("Should check bosses loop is running")
         this.job_scheduler.push(this.checkBosses)        
@@ -430,10 +463,11 @@ export class MerchantStrategy extends ManageItems implements IState {
 
     private async checkBosses() {
         if( this.deactivate) return console.debug("Check bosses is deactivated")
-        if( this.getMemoryStorage.getStateController?.getBots
-            .filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name && e.getBot().ctype == "mage")
-            .length < 1
-        ) {
+        const magesOnServer = this.getMemoryStorage.getStateController?.getBots?.filter( e => {
+            const b = this.getStateBot(e)
+            return b && b.serverData.region == this.bot.serverData.region && b.serverData.name == this.bot.serverData.name && b.ctype == "mage"
+        }) ?? []
+        if (magesOnServer.length < 1) {
             // console.debug("No mage on the server")
             return setTimeout(this.shouldCheckBossesLoop, 10_000)
         }
@@ -476,14 +510,14 @@ export class MerchantStrategy extends ManageItems implements IState {
     private checkPartyInventory() {
         if(this.deactivate) return
         // console.debug("checking party")
-        let bots = super.getMemoryStorage.getStateController?.getBots.filter( e => e.getBot().serverData.region == this.bot.serverData.region && e.getBot().serverData.name == this.bot.serverData.name )
-        if(!bots) {
+        const bots = this.getPartyBotsOnServer()
+        if(!bots.length) {
             return setTimeout(() => {this.job_scheduler.push(this.checkPartyInventory)}, 10_000)
         }
         // console.debug(`Bots on the same server: ${bots?.length}`)
         for(const b of bots) {
-            let bot = b.getBot() 
-            if(bot.name == this.bot.name) continue
+            const bot = this.getStateBot(b)
+            if(!bot) continue
             // console.debug(`Checking ${bot.name} inventory`)
             // MAKING PERSONAL ITEMS LIST
             let hpot = MIC.HPOTS_CAP - bot.countItem("hpot1")

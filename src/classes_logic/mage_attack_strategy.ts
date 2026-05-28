@@ -1,4 +1,4 @@
-import {Tools, Game, Mage, Constants } from "alclient"
+import {Tools, Game, Mage, Constants, PingCompensatedCharacter } from "alclient"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
 import * as CF from "../common_functions/common_functions"
@@ -109,8 +109,14 @@ export class MageAttackStrategy extends StateStrategy {
         
     }
 
+    private safeStopSmartMove(bot: PingCompensatedCharacter) {
+        if (!bot.ready || !bot.smartMoving) return
+        bot.stopSmartMove().catch(debugLog)
+    }
+
     private async magiportCheckLoop() {
         if(this.deactivate) return
+        if(!this.mage.ready) return setTimeout(this.magiportCheckLoop, 2000)
         if(this.mage.isOnCooldown("magiport")) return setTimeout(this.magiportCheckLoop, Math.max(1, this.mage.getCooldown("magiport")))
         if(this.mage.mp < Game.G.skills["magiport"].mp) return setTimeout(this.magiportCheckLoop, 2000)
         if(!this.mage.canUse("magiport") || this.mage.smartMoving) {
@@ -120,34 +126,42 @@ export class MageAttackStrategy extends StateStrategy {
         const stateBots = this.getMemoryStorage?.getStateController?.getBots
         ?.filter( e => {
             const b = e?.getBot?.()
-            return b && b.serverData.region == this.bot.serverData.region && b.serverData.name == this.bot.serverData.name && b.name != this.bot.id && b.ctype != "merchant"
+            return b && b.ready
+                && b.serverData.region == this.bot.serverData.region
+                && b.serverData.name == this.bot.serverData.name
+                && b.name != this.bot.id
+                && b.ctype != "merchant"
         })
         if(!stateBots?.length) return setTimeout(this.magiportCheckLoop, 2000)
-        for(const botState of stateBots) {
-            if(this.mage.mp < Game.G.skills["magiport"].mp) break
-            const bot = botState.getBot?.()
-            if(!bot) continue
-            if(Tools.distance(this.bot, bot) < 400) continue
-            // SUMMON WHEN WE HAVE SPECIALS NEAR AND OTHER DOESN'T
-            if(this.bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type) && calculate_monster_dps(this,e)/calculate_hps(bot) < 1).length<1) {
-                await this.mage.magiport(bot.id).catch(debugLog)
-                if(bot.smartMoving) bot.stopSmartMove()
-                bot.acceptMagiport(this.bot.id).catch(debugLog)
-                if(this.currentState.state_type == "boss" || this.currentState.state_type == "event") (botState as StateStrategy).currentState = this.currentState
-                continue
-            }
-            // SUMMON IF WE HAVE SAME FARM STATE MONSTERTYPE AND WE ARE ON SPOT
-            if(this.currentState?.state_type == "farm" && (botState as StateStrategy).currentState?.state_type == "farm" && this.currentState.wantedMob == (botState as StateStrategy).currentState.wantedMob) {
-                let wantedMonsters = (typeof this.currentState.wantedMob === "string") ? [this.currentState.wantedMob] : this.currentState.wantedMob
-                if(this.bot.getEntities().filter( e => wantedMonsters.includes(e.type)).length>0 && bot.getEntities().filter( e => wantedMonsters.includes(e.type)).length<1) {
+        try {
+            for(const botState of stateBots) {
+                if(this.mage.mp < Game.G.skills["magiport"].mp) break
+                const bot = botState.getBot?.()
+                if(!bot?.ready) continue
+                if(Tools.distance(this.bot, bot) < 400) continue
+                // SUMMON WHEN WE HAVE SPECIALS NEAR AND OTHER DOESN'T
+                if(this.bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type) && calculate_monster_dps(this,e)/calculate_hps(bot) < 1).length<1) {
                     await this.mage.magiport(bot.id).catch(debugLog)
-                    if(bot.smartMoving) bot.stopSmartMove()
+                    this.safeStopSmartMove(bot)
                     bot.acceptMagiport(this.bot.id).catch(debugLog)
+                    if(this.currentState.state_type == "boss" || this.currentState.state_type == "event") (botState as StateStrategy).currentState = this.currentState
                     continue
                 }
+                // SUMMON IF WE HAVE SAME FARM STATE MONSTERTYPE AND WE ARE ON SPOT
+                if(this.currentState?.state_type == "farm" && (botState as StateStrategy).currentState?.state_type == "farm" && this.currentState.wantedMob == (botState as StateStrategy).currentState.wantedMob) {
+                    let wantedMonsters = (typeof this.currentState.wantedMob === "string") ? [this.currentState.wantedMob] : this.currentState.wantedMob
+                    if(this.bot.getEntities().filter( e => wantedMonsters.includes(e.type)).length>0 && bot.getEntities().filter( e => wantedMonsters.includes(e.type)).length<1) {
+                        await this.mage.magiport(bot.id).catch(debugLog)
+                        this.safeStopSmartMove(bot)
+                        bot.acceptMagiport(this.bot.id).catch(debugLog)
+                        continue
+                    }
+                }
             }
+        } catch (ex) {
+            console.warn(`magiportCheckLoop: ${ex}`)
         }
-        
+
         return setTimeout(this.magiportCheckLoop, 2000)
     }
 

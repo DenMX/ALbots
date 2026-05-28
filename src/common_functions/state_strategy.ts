@@ -549,7 +549,7 @@ export class StateStrategy extends ManageItems implements IState {
                     || (!wantedMob.includes(target.type) && wantedMob.includes(entities[0].type))
                 ) {
                     this.bot.target = entities[0].id
-                    if(this.bot.smartMoving) this.bot.stopSmartMove().catch(debugLog)
+                    if(this.bot.ready && this.bot.smartMoving) this.bot.stopSmartMove().catch(debugLog)
                 }
                 return this.bot.getTargetEntity() ?? entities[0]
             }
