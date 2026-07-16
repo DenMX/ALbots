@@ -179,7 +179,7 @@ export const ITEMS_TO_CRAFT: { [T in ItemName]?: {items?: {name: ItemName, quant
     "xbox": {},
     "fireblade": {items: [{name: "goldingot", quantity: 50}]},
     "wingedboots": {},
-    "cclaw": {},
+    // "cclaw": {},
     "carrotsword": {},
 }
 

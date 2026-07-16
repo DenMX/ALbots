@@ -9,6 +9,19 @@ import fs from "fs"
 
 const CURSOR_UI_PORT = Number(process.env.CURSOR_UI_PORT) || 3001
 
+function logFatal(kind: string, err: unknown) {
+    const msg = `${new Date().toISOString()} ${kind}:\n${err}\n`
+    console.error(msg)
+    try {
+        fs.appendFileSync("crush.log", msg)
+    } catch {
+        /* ignore log write errors */
+    }
+}
+
+process.on("unhandledRejection", (reason) => logFatal("Unhandled rejection", reason))
+process.on("uncaughtException", (err) => logFatal("Uncaught exception", err))
+
 run()
 async function run(){
     try {

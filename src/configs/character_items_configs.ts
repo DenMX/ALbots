@@ -32,7 +32,7 @@ export type RangerWeaponConfig = DefaultWeaponsConfig & {
 
 export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeaponsConfig|RangerWeaponConfig} = {
     "Warious": {
-        cleave: {name: "bataxe", level: 8 },
+        cleave: {name: "bataxe", level: 9 },
         stomp: {name: "basher", level: 8 },
         solo_mainhand: {name: 'fireblade', level: 9 },
         solo_offhand: { name: 'candycanesword', level: 9 },

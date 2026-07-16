@@ -1,4 +1,4 @@
-import { PingCompensatedCharacter, Game, Merchant, Tools, Database, EntityModel, Constants, MonsterName, Item, Pathfinder } from "alclient"
+import { PingCompensatedCharacter, Game, Merchant, Tools, Database, EntityModel, Constants, MonsterName, Item, Pathfinder, ItemName } from "alclient"
 import * as MIC from "../configs/manage_items_configs"
 import * as CF from "../common_functions/common_functions"
 import { ManageItems } from "../common_functions/manage_items_strategy"
@@ -24,6 +24,8 @@ export class MerchantStrategy extends ManageItems implements IState {
     private CYBERLAND_COOLDOWN: number = 1000 * 60 * 30
 
     private lastCyberLandCheck: number = 0
+    private readonly CRAFT_FROM_BANK_INTERVAL_MS = 10 * 60 * 1000
+    private readonly CRAFT_FROM_INVENTORY_INTERVAL_MS = 10 * 60 * 1000
 
     public getStateType(): string {
         return this.merch_state.state_type
@@ -70,6 +72,8 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.checkCyberLand = this.checkCyberLand.bind(this)
         this.switchTradeStandLoop = this.switchTradeStandLoop.bind(this)
         this.exchangeItemsFromBankLoop = this.exchangeItemsFromBankLoop.bind(this)
+        this.craftItemsFromBankLoop = this.craftItemsFromBankLoop.bind(this)
+        this.craftItemsFromInventoryLoop = this.craftItemsFromInventoryLoop.bind(this)
 
         this.checkInventory()
         this.job_scheduler.push(this.checkBankUpgrades)
@@ -91,6 +95,8 @@ export class MerchantStrategy extends ManageItems implements IState {
 
         this.checkWeapon()
         this.job_scheduler.push(this.exchangeItemsFromBankLoop)
+        this.job_scheduler.push(this.craftItemsFromBankLoop)
+        this.craftItemsFromInventoryLoop()
     }
 
     private async fishing() {
@@ -623,6 +629,245 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.exchangeItems()
         this.changeMerchState(this.DEFAULT_STATE)
         setTimeout(() => {this.job_scheduler.push(this.exchangeItemsFromBankLoop)}, 60_000)
+    }
+
+    private getCraftRecipe(itemName: ItemName): {name: ItemName, quantity: number}[] {
+        const recipe = new Map<ItemName, number>()
+
+        const gameRecipe = (Game.G.craft as Record<string, { items?: [number, ItemName][] }>)[itemName]?.items
+        if (gameRecipe?.length) {
+            for (const [quantity, name] of gameRecipe) {
+                recipe.set(name, (recipe.get(name) ?? 0) + quantity)
+            }
+        }
+
+        const extraItems = MIC.ITEMS_TO_CRAFT[itemName]?.items
+        if (extraItems?.length) {
+            for (const item of extraItems) {
+                recipe.set(item.name, (recipe.get(item.name) ?? 0) + item.quantity)
+            }
+        }
+
+        return Array.from(recipe, ([name, quantity]) => ({ name, quantity }))
+    }
+
+    private canBuyFromVendor(itemName: ItemName): boolean {
+        const npcs = Object.values(Game.G.npcs ?? {})
+        for (const npc of npcs as { items?: (ItemName | { name?: ItemName })[] }[]) {
+            const items = npc?.items
+            if (!items?.length) continue
+            if (items.some((i) => (typeof i === "string" ? i : i?.name) === itemName)) return true
+        }
+        return false
+    }
+
+    private getVendorNpcId(itemName: ItemName): string | undefined {
+        for (const [npcId, npc] of Object.entries(Game.G.npcs ?? {})) {
+            const items = (npc as { items?: (ItemName | { name?: ItemName })[] })?.items
+            if (!items?.length) continue
+            if (items.some((i) => (typeof i === "string" ? i : i?.name) === itemName)) return npcId
+        }
+        return undefined
+    }
+
+    private async moveToMainForCrafting() {
+        if (this.bot.map !== "main") {
+            await this.bot.smartMove("main").catch(console.warn)
+        }
+    }
+
+    private async moveToVendorIfNeeded(itemName: ItemName) {
+        if (this.bot.hasItem(["computer", "supercomputer"])) return
+        const npcId = this.getVendorNpcId(itemName)
+        if (!npcId) return
+        const loc = Pathfinder.locateNPC(npcId as never)?.[0]
+        if (!loc) return
+        if (Tools.squaredDistance(this.bot, loc) <= Constants.NPC_INTERACTION_DISTANCE_SQUARED) return
+        await this.bot.smartMove(loc, { getWithin: Constants.NPC_INTERACTION_DISTANCE - 5 }).catch(console.warn)
+    }
+
+    private countItemInBank(itemName: ItemName): number {
+        const packs = this.locateItemsInBank(this.bot, itemName)
+        if (!packs?.length) return 0
+        let total = 0
+        const bank = this.bot.bank ?? this.getMemoryStorage.getBank
+        if (!bank) return 0
+        for (const [packName, slots] of packs) {
+            for (const slot of slots) {
+                const itm = bank[packName]?.[slot]
+                if (!itm) continue
+                total += itm.q ?? 1
+            }
+        }
+        return total
+    }
+
+    private async withdrawItemFromBank(itemName: ItemName, quantity: number): Promise<void> {
+        if (quantity <= 0) return
+        const packs = this.locateItemsInBank(this.bot, itemName)
+        for (const [packName, slots] of packs) {
+            if (quantity <= 0) break
+            await this.bot.smartMove(packName, {getWithin: 9999}).catch(console.warn)
+            for (const slot of slots) {
+                if (quantity <= 0) break
+                const bankItem = (this.bot.bank ?? this.getMemoryStorage.getBank)?.[packName]?.[slot]
+                if (!bankItem) continue
+                await this.bot.withdrawItem(packName, slot).catch(console.warn)
+                quantity -= (bankItem.q ?? 1)
+            }
+        }
+    }
+
+    private getMaxCraftCount(recipe: {name: ItemName, quantity: number}[]): number {
+        if (!recipe.length) return 0
+        let maxCrafts = Number.MAX_SAFE_INTEGER
+        for (const ingredient of recipe) {
+            if (ingredient.quantity <= 0) continue
+            const available = this.bot.countItem(ingredient.name)
+            const possible = Math.floor(available / ingredient.quantity)
+            if (possible < maxCrafts) maxCrafts = possible
+        }
+        if (maxCrafts === Number.MAX_SAFE_INTEGER) return 0
+        return Math.max(0, maxCrafts)
+    }
+
+    private async craftItemsFromBankLoop() {
+        if(this.deactivate) return
+        if(this.bot.esize < 10) {
+            return setTimeout(() => { this.job_scheduler.push(this.craftItemsFromBankLoop) }, this.CRAFT_FROM_BANK_INTERVAL_MS)
+        }
+
+        const craftTargets = Object.keys(MIC.ITEMS_TO_CRAFT) as ItemName[]
+        if(craftTargets.length < 1) {
+            return setTimeout(() => { this.job_scheduler.push(this.craftItemsFromBankLoop) }, this.CRAFT_FROM_BANK_INTERVAL_MS)
+        }
+
+        try {
+            if(!this.bot.map.startsWith("bank")) await this.bot.smartMove("bank").catch(console.warn)
+            for (const target of craftTargets) {
+                let isCraftingStateSet = false
+                try {
+                if (this.bot.esize < 3) break
+                const recipe = this.getCraftRecipe(target)
+                if (!recipe.length) {
+                    this.addLog(`не найден рецепт крафта для ${target}`, false)
+                    continue
+                }
+
+                let canCraft = true
+                for (const ingredient of recipe) {
+                    const total = this.bot.countItem(ingredient.name) + this.countItemInBank(ingredient.name)
+                    if (total >= ingredient.quantity) continue
+                    if (!this.canBuyFromVendor(ingredient.name)) {
+                        canCraft = false
+                        this.addLog(`Skip craft ${target}: missing ${ingredient.name} x${ingredient.quantity - total}`, false)
+                        break
+                    }
+                }
+                if (!canCraft) continue
+
+                for (const ingredient of recipe) {
+                    const needInInventory = ingredient.quantity - this.bot.countItem(ingredient.name)
+                    if (needInInventory > 0) {
+                        await this.withdrawItemFromBank(ingredient.name, needInInventory)
+                    }
+                    const stillMissing = ingredient.quantity - this.bot.countItem(ingredient.name)
+                    if (stillMissing > 0 && this.canBuyFromVendor(ingredient.name)) {
+                        await this.moveToMainForCrafting()
+                        await this.moveToVendorIfNeeded(ingredient.name)
+                        await this.bot.buy(ingredient.name, stillMissing).catch(console.warn)
+                    }
+                }
+
+                const ready = recipe.every((ingredient) => this.bot.countItem(ingredient.name) >= ingredient.quantity)
+                if (!ready) continue
+
+                await this.moveToMainForCrafting()
+                if (this.bot.map !== "main") {
+                    this.addLog(`Skip craft ${target}: cannot reach main`, false)
+                    continue
+                }
+                this.changeMerchState("Crafting from bank")
+                isCraftingStateSet = true
+                let crafted = 0
+                const craftsToDo = this.getMaxCraftCount(recipe)
+                for (let i = 0; i < craftsToDo; i++) {
+                    try {
+                        await this.bot.craft(target)
+                        crafted++
+                    } catch (ex) {
+                        console.warn(`craft ${target} failed on #${i + 1}: ${ex}`)
+                        break
+                    }
+                }
+                if (crafted > 0) this.addLog(`Crafted ${target} x${crafted}`, false)
+                if(!this.bot.map.startsWith("bank")) await this.bot.smartMove("bank").catch(console.warn)
+                } finally {
+                    if (isCraftingStateSet) this.changeMerchState(this.DEFAULT_STATE)
+                }
+            }
+        } catch (ex) {
+            console.warn(`craftItemsFromBankLoop: ${ex}`)
+        } finally {
+            this.changeMerchState(this.DEFAULT_STATE)
+            setTimeout(() => { this.job_scheduler.push(this.craftItemsFromBankLoop) }, this.CRAFT_FROM_BANK_INTERVAL_MS)
+        }
+    }
+
+    private async craftItemsFromInventoryLoop() {
+        if(this.deactivate) return
+
+        const craftTargets = Object.keys(MIC.ITEMS_TO_CRAFT) as ItemName[]
+        if(craftTargets.length < 1) {
+            return setTimeout(this.craftItemsFromInventoryLoop, this.CRAFT_FROM_INVENTORY_INTERVAL_MS)
+        }
+
+        try {
+            for (const target of craftTargets) {
+                if (this.bot.esize < 2) break
+                const recipe = this.getCraftRecipe(target)
+                if (!recipe.length) continue
+
+                let canCraftOrBuy = true
+                for (const ingredient of recipe) {
+                    const have = this.bot.countItem(ingredient.name)
+                    if (have >= ingredient.quantity) continue
+                    if (!this.canBuyFromVendor(ingredient.name)) {
+                        canCraftOrBuy = false
+                        break
+                    }
+                }
+                if (!canCraftOrBuy) continue
+
+                for (const ingredient of recipe) {
+                    const missing = ingredient.quantity - this.bot.countItem(ingredient.name)
+                    if (missing <= 0) continue
+                    await this.moveToMainForCrafting()
+                    await this.moveToVendorIfNeeded(ingredient.name)
+                    await this.bot.buy(ingredient.name, missing).catch(console.warn)
+                }
+
+                const ready = recipe.every((ingredient) => this.bot.countItem(ingredient.name) >= ingredient.quantity)
+                if (!ready) continue
+
+                const craftsToDo = this.getMaxCraftCount(recipe)
+                if (craftsToDo < 1) continue
+
+                await this.moveToMainForCrafting()
+                for (let i = 0; i < craftsToDo; i++) {
+                    try {
+                        await this.bot.craft(target)
+                    } catch (ex) {
+                        console.warn(`inventory craft ${target} failed on #${i + 1}: ${ex}`)
+                        break
+                    }
+                }
+            }
+        } catch (ex) {
+            console.warn(`craftItemsFromInventoryLoop: ${ex}`)
+        } finally {
+            setTimeout(this.craftItemsFromInventoryLoop, this.CRAFT_FROM_INVENTORY_INTERVAL_MS)
+        }
     }
     
 }

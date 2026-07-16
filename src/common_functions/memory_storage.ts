@@ -44,6 +44,12 @@ export class MemoryStorage {
         this.loadBankFromMongo().catch(console.warn)
     }
 
+    private safeFetch(url: string, settings: RequestInit, label: string) {
+        fetch(url, settings)
+            .then((response) => console.log(`${label}: ${response.status}`))
+            .catch((ex) => console.warn(`${label} failed: ${ex}`))
+    }
+
     public addEventListners(bot: PingCompensatedCharacter) {
         if(this.secretKey == "") {
             return console.error("Add apiToken in credentials file!")
@@ -56,8 +62,7 @@ export class MemoryStorage {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ max: data.max, monsters: data.monsters }),
             };
-            // if response.status == 200, it was successfully updated
-            fetch(url, settings).then((response) => console.log(`Sending tracker info code: ${response.status}`));
+            this.safeFetch(url, settings, `Sending tracker info for ${bot.id}`)
             });
         bot.socket.emit("tracker");
     }
@@ -133,13 +138,7 @@ export class MemoryStorage {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(bot.bank),
             };
-            // if response.status == 200, it was successfully updated
-            try{
-                fetch(url, settings).then((response) => console.log(`Sending bank status code: ${response.status}`));
-            }
-            catch(ex) {
-                console.debug(`error while fetching bank in api:\n${ex}`)
-            }
+            this.safeFetch(url, settings, `Sending bank status for ${bot.id}`)
         }
         if(bot.gold > 1_800_000_000 && (!this.lastDepositGold || Date.now() - this.lastDepositGold > this.DEPOSIT_GOLD_THRESHOLD)) {
             bot.depositGold(bot.gold*0.05).catch(debugLog)

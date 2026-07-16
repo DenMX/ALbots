@@ -5,3 +5,4 @@ dist/
 *.log
 api_token.txt
 *_state.json
+logs/
