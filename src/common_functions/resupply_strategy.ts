@@ -1,9 +1,10 @@
-import { ItemName, PingCompensatedCharacter, Game, Tools, Constants, Pathfinder } from "alclient"
+import { ItemName, PingCompensatedCharacter, Game, Tools, Constants, Pathfinder, MonsterName } from "alclient"
 import * as CI from "../configs/character_items_configs"
 import * as MIC from "../configs/manage_items_configs"
 import * as CF from "./common_functions"
 import { PartyStrategy } from "./party_strategy"
 import { MemoryStorage } from "./memory_storage"
+import { CRYPT_BLACKLIST } from "../configs/events_and_spots"
 
 
 export class ResuplyStrategy extends PartyStrategy {
@@ -170,7 +171,9 @@ export class ResuplyStrategy extends PartyStrategy {
         if(this.bot.isOnCooldown("scare")) {
             return setTimeout( () => this.scareLoop(), Math.max(1, this.bot.getCooldown("scare")))
         }
-        if(this.bot.hp < this.bot.max_hp * 0.33 || this.bot.getEntities({targetingMe: true}).filter( e => e.abilities.stone).length>0) {
+        if(this.bot.hp < this.bot.max_hp * 0.33
+            || this.bot.getEntities({targetingMe: true}).filter( e => e.abilities.stone).length>0
+            || this.bot.getEntities({targetingMe: true}).some(e => CRYPT_BLACKLIST.includes(e.type as MonsterName))) {
             if(this.bot.slots.orb?.name != "jacko") {
                 let cur_orb = this.bot.slots.orb
                 let jacko_idx = this.bot.locateItem("jacko")

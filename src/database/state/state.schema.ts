@@ -12,7 +12,8 @@ const StateSchema = new Schema({
     wantedMob: {required: true, type: Schema.Types.Mixed },
     state_type: {required: true, type: String },
     location: {required: false, type: Object },
-    server: {required: true, type: Object }
+    server: {required: true, type: Object },
+    instanceId: {required: false, type: String },
 })
 
 export default StateSchema

@@ -1,6 +1,7 @@
 import { Constants, Game, MapName, MonsterName, Observer, PingCompensatedCharacter, ServerData, ServerIdentifier, ServerRegion, Tools } from "alclient";
 import { State, StateStrategy } from "../common_functions/state_strategy";
 import { PartyStrategy } from "../common_functions/party_strategy";
+import { MerchantStrategy } from "../classes_logic/merchant_strategy";
 import { WANTED_EVENTS } from "../configs/events_and_spots";
 import { DEFAULT_SERVER_REGION, DEFAULT_SERVER_NAME, MemoryStorage } from "../common_functions/memory_storage";
 import { IState } from "./state_interface";
@@ -235,15 +236,38 @@ export class StateController {
         }
         // STOPPING UNWANTED BOTS
         for(const char of this.bots) {
-            // if(char.getBot().ctype == "merchant") continue
-            if(this.isActiveEventState(char)) continue
             const bot = this.getBotFromState(char)
             if(!bot) continue
-            if(!wantedBots.some( e => e.id == bot.id && e.server.region == bot.serverData.region && e.server.name == bot.serverData.name)) 
-            {
-                console.debug(`Stopping ${bot.id} cause not in main setup and no events`)
+            const onWantedRoster = wantedBots.some(e =>
+                e.id == bot.id
+                && e.server.region == bot.serverData.region
+                && e.server.name == bot.serverData.name,
+            )
+            if (onWantedRoster) continue
+
+            // No live events: always bring home — don't let leftover event state block stop
+            if (wantedEvents.length === 0) {
+                if (char instanceof StateStrategy) {
+                    (char as StateStrategy).clearEventStates()
+                }
+                console.debug(`Stopping ${bot.id} — returning to ${DEFAULT_SERVER_REGION} ${DEFAULT_SERVER_NAME}`)
                 this.stopCharacter(bot.id)
+                continue
             }
+
+            // During events: keep bots finishing event only on the event's server
+            if (this.isActiveEventState(char)) {
+                const ev = wantedEvents[0]
+                if (
+                    bot.serverData.region === ev.serverRegion
+                    && bot.serverData.name === ev.serverName
+                ) {
+                    continue
+                }
+            }
+
+            console.debug(`Stopping ${bot.id} cause not in wanted roster`)
+            this.stopCharacter(bot.id)
         }
         // STARTING WANTED BOTS
         for(const bot of wantedBots) {
@@ -298,8 +322,9 @@ export class StateController {
     /*
     * @param start - start Warious ASIA I
     * @param stop - stop Warious
-    * @param farm - farm Warious dryad  
-    // commands farm quest start shutdown
+    * @param farm - farm Warious dryad
+    * @param skipcrypt - leave current crypt; merchant opens a new one and assigns party
+    // commands farm quest start shutdown skipcrypt
     */
     private async manageCommand(data: string, sourceBot: PingCompensatedCharacter) {
         if (!data) return
@@ -353,6 +378,12 @@ export class StateController {
                 if(!name || name == "") return console.error(`Cannot switch party leader without name: ${data}`)
                 this.memoryStorage.setCurrentPartyLeader = name
                 break
+            case "skipcrypt": {
+                const merchant = this.bots.find((s): s is MerchantStrategy => s instanceof MerchantStrategy)
+                if (!merchant) return console.error("skipcrypt: no merchant strategy online")
+                merchant.skipCurrentCryptAndOpenNew().catch(ex => console.warn(`skipcrypt failed: ${ex}`))
+                break
+            }
             // case "looter":
             //     if(data.split(' ').length<2) return console.error(`Cannot switch looter without name: ${data}`)
             //     this.memoryStorage.setCurrentLooter = data.split(' ')[1]
@@ -369,6 +400,7 @@ export class StateController {
         if(!botToStop) return
         botState.deactivateStrat()
         botToStop.socket.off("disconnect")
+        this.botStartBlockedUntil.delete(name)
         console.debug(`${name} shutdown. ${this.bots.length} bots left`)
         let newList = []
         for(let i=0; i<this.bots.length; i++) {

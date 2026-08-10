@@ -1,9 +1,10 @@
-import { Game, ItemName, Tools, Warrior, SlotType } from "alclient"
+import { Game, ItemName, Tools, Warrior, SlotType, MonsterName } from "alclient"
 import * as Items from "../configs/character_items_configs"
 import * as CF from "../../src/common_functions/common_functions"
 import { debugLog } from "../../src/common_functions/common_functions";
 import { MemoryStorage } from "../common_functions/memory_storage";
 import { StateStrategy } from "../common_functions/state_strategy";
+import { CRYPT_BLACKLIST, CRYPT_CLEAVE_BLACKLIST_RANGE } from "../configs/events_and_spots"
 
 type WeaponItemRef = { name: ItemName; level: number }
 type EquipBatchEntry = { num: number; slot: SlotType }
@@ -145,6 +146,10 @@ export class WarriorsAttackStrategy extends StateStrategy {
         if (this.warrior.isOnCooldown("cleave")) return false
         if (!this.warrior.canUse("cleave", { ignoreEquipped: true })) return false
         if (this.warrior.c.town) return false
+        if (this.warrior.getEntities().some(e =>
+            CRYPT_BLACKLIST.includes(e.type as MonsterName)
+            && Tools.distance(this.warrior, e) <= CRYPT_CLEAVE_BLACKLIST_RANGE
+        )) return false
         if (this.warrior.getEntities({ withinRange: "cleave" }).some(e => e?.dreturn >= 30)) return false
         if (!CF.shouldUseMassSkill(this, this.getMemoryStorage.getCurrentTank, "cleave")) return false
         if (this.warrior.getEntities({ withinRange: "cleave" }).length < 3) return false
@@ -266,6 +271,10 @@ export class WarriorsAttackStrategy extends StateStrategy {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
         if (this.warrior.getEntities({ hasTarget: false, withinRange: "agitate" }).length < 2) {
+            return setTimeout(this.useMassAggroLoop, 2000)
+        }
+        // Crypt: careful single-pulls — never mass-agitate a pack
+        if (this.currentState?.state_type === "crypt" || this.warrior.map === "crypt") {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
 

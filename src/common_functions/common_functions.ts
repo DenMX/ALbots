@@ -1,4 +1,4 @@
-import {Entity, PingCompensatedCharacter, Tools, SkillName, IPosition, Pathfinder, ItemData, Player, Game, CharacterType, ServerRegion, ServerIdentifier, GMonsterAbilities} from "alclient"
+import {Entity, PingCompensatedCharacter, Tools, SkillName, IPosition, Pathfinder, ItemData, Player, Game, CharacterType, ServerRegion, ServerIdentifier, GMonsterAbilities, MonsterName} from "alclient"
 import * as CharacterItems from "../configs/character_items_configs"
 import * as MIC from "../configs/manage_items_configs"
 import { WarriorsAttackStrategy } from "../classes_logic/warriors_attack_strategy"
@@ -11,6 +11,7 @@ import { MemoryStorage, DEFAULT_SERVER_NAME, DEFAULT_SERVER_REGION } from "./mem
 import { IState } from "../controllers/state_interface"
 import { PartyStrategy } from "./party_strategy"
 import { StateStrategy } from "./state_strategy"
+import { CRYPT_BLACKLIST, CRYPT_MASS_BLACKLIST_RANGE } from "../configs/events_and_spots"
 
 export const UPGRADE_POSITION: IPosition = {
     x: -208,
@@ -216,6 +217,19 @@ export function calculate_my_dps(bot: PingCompensatedCharacter) {
 }
 
 
+/** True if a CRYPT_BLACKLIST mob is within radius of the focus (default: current target). */
+export function hasCryptBlacklistNear(
+    bot: PingCompensatedCharacter,
+    focus?: Entity | null,
+    radius: number = CRYPT_MASS_BLACKLIST_RANGE,
+): boolean {
+    const center = focus ?? bot.getTargetEntity()
+    if (!center) return false
+    return bot.getEntities().some(e =>
+        CRYPT_BLACKLIST.includes(e.type as MonsterName) && Tools.distance(e, center) <= radius
+    )
+}
+
 /**
  * Decide could we or should we use weapon with explosion and blast effects
  */
@@ -223,6 +237,7 @@ export function shouldUseMassWeapon(bot: PartyStrategy, tank: string) {
 
     const target = bot.getBot().getTargetEntity()
     if(!target) return false
+    if(hasCryptBlacklistNear(bot.getBot(), target)) return false
     if((target.dreturn >= 30 || bot.getBot().getEntities().filter(e => Tools.distance(e, target) <=40 && e.dreturn >= 30).length>0) && bot.getBot().ctype == "warrior") return false
     if(bot.getBot().getEntities().filter( e => e.target == bot.getBot().id || bot.getBot().partyData?.list.includes(e.target) && bot.getBot().getEntities().filter( addentity => addentity.abilities.stone && Tools.distance(e, addentity)<40).length<1).length>1) return true
     
@@ -248,6 +263,8 @@ export function getActualTank(bot: PartyStrategy, tank: string): Player | PartyS
 }
 
 export function shouldUseMassSkill(bot: PartyStrategy, tank: string, skill: SkillName) {
+    if(hasCryptBlacklistNear(bot.getBot())) return false
+    if(bot.getBot().getEntities({withinRange: skill}).some(e => CRYPT_BLACKLIST.includes(e.type as MonsterName))) return false
     if(bot.getBot().getEntities({withinRange: skill, hasTarget: false}).length<1) return true
 
     if(bot.getBot().getEntities({hasTarget: false}).filter( e => e.abilities.stone).length>0) return false

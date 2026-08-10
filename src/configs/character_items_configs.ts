@@ -36,7 +36,7 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         stomp: {name: "basher", level: 8 },
         solo_mainhand: {name: 'fireblade', level: 9 },
         solo_offhand: { name: 'candycanesword', level: 9 },
-        mass_mainhand: {name: 'ololipop', level: 9},
+        mass_mainhand: {name: 'vhammer', level: 5},
         mass_offhand: {name: 'ololipop', level: 9},
         fast_mainhand: {name: "rapier", level: 7}
     },
@@ -117,14 +117,14 @@ export const SET_CONFIGS: {
                 {name: 'oxhelmet'},
                 {name: 'tshirt88', level: 4},
                 {name: 'xmaspants', level: 9},
-                {name: 'eslippers', level: 8},
+                {name: 'eslippers', level: 9},
                 {name: 'mittens', level: 9},
                 {name: 'spookyamulet', level: 1},
                 {name: 'mshield', level: 9},
                 {name: 'rabbitsfoot', level: 2},
                 {name: 'mearring', level: 0, slot: "earring1"},
                 {name: 'mearring', level: 1, slot: "earring2"},
-                {name: 'ecape', level: 6}
+                {name: 'ecape', level: 8}
             ],
             "gold": [
                 {name: 'wcap', level: 9},
@@ -142,7 +142,8 @@ export const SET_CONFIGS: {
                 {name: 'wingedboots', level: 8},
                 {name: 'mittens', level: 9},
                 {name: 't2intamulet', level: 3},
-                {name: 'intearring', level: 4, slot: "earring1"},
+                {name: 'сearring', level: 3, slot: "earring1"},
+                {name: 'cearring', level: 3, slot: "earring2"},
                 {name: 'sbelt', level: 1},
                 {name: 'bcape', level: 7}
             ]

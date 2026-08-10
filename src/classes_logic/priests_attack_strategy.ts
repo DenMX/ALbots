@@ -257,8 +257,14 @@ export class PriestsAttackStrategy extends StateStrategy {
         
         let dps = CF.calculate_monsters_dps(this, this, this.priest.getEntities({targetingMe: true, targetingPartyMember: true}))
         let hps = CF.calculate_hps(this.priest)
+
+        // In crypt, don't randomly zap trash — handleCryptSinglePull owns zap-pulls
+        if (this.currentState?.state_type === "crypt" || this.priest.map === "crypt") {
+            return setTimeout(this.useZap, 1000)
+        }
         
         let MobsWithoutTargetingParty = this.priest.getEntities({hasTarget: false, withinRange: "zapperzap"})
+            .filter(mob => this.shouldAttack(mob))
         
         if(MobsWithoutTargetingParty.length>0 && dps<hps) {
             for( let mob of MobsWithoutTargetingParty) {

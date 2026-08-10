@@ -5,9 +5,22 @@ import { ManageItems } from "../common_functions/manage_items_strategy"
 import { MemoryStorage } from "../common_functions/memory_storage"
 import { StateStrategy } from "../common_functions/state_strategy"
 import { IState } from "../controllers/state_interface"
+import { ActiveCryptModel } from "../database/active_crypt/active_crypt.model"
 import * as Items from "../configs/character_items_configs"
-import { BOSS_CHECK_ROUTE, SPECIAL_ALWAYS_WANTED } from "../configs/events_and_spots"
-import { SPECIAL_MONSTERS } from "../configs/events_and_spots"
+import {
+    BOSS_CHECK_ROUTE,
+    CRYPT_BLACKLIST,
+    CRYPT_DOOR,
+    CRYPT_ENTRANCE,
+    CRYPT_LEVEL_UP_WAIT_MS,
+    CRYPT_MOB_DETECT_RANGE,
+    CRYPT_ROUTE,
+    CRYPT_SEASON_MONTHS,
+    isCryptWantedMonster,
+    CRYPT_WAYPOINT_ARRIVE_RANGE,
+    SPECIAL_ALWAYS_WANTED,
+    SPECIAL_MONSTERS,
+} from "../configs/events_and_spots"
 
 
 export type State = {
@@ -26,6 +39,12 @@ export class MerchantStrategy extends ManageItems implements IState {
     private lastCyberLandCheck: number = 0
     private readonly CRAFT_FROM_BANK_INTERVAL_MS = 10 * 60 * 1000
     private readonly CRAFT_FROM_INVENTORY_INTERVAL_MS = 10 * 60 * 1000
+    /** Don't open crypt below this gold (character + bank). */
+    private readonly CRYPT_MIN_GOLD = 300_000_000
+
+    /** Bumped by skipcrypt so in-flight openCryptJob won't verify/reassign the old instance. */
+    private cryptAbortToken = 0
+    private skipCryptInProgress = false
 
     public getStateType(): string {
         return this.merch_state.state_type
@@ -74,6 +93,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.exchangeItemsFromBankLoop = this.exchangeItemsFromBankLoop.bind(this)
         this.craftItemsFromBankLoop = this.craftItemsFromBankLoop.bind(this)
         this.craftItemsFromInventoryLoop = this.craftItemsFromInventoryLoop.bind(this)
+        this.openCryptJob = this.openCryptJob.bind(this)
 
         this.checkInventory()
         this.job_scheduler.push(this.checkBankUpgrades)
@@ -97,11 +117,38 @@ export class MerchantStrategy extends ManageItems implements IState {
         this.job_scheduler.push(this.exchangeItemsFromBankLoop)
         this.job_scheduler.push(this.craftItemsFromBankLoop)
         this.craftItemsFromInventoryLoop()
+        // Delay first crypt open so combat bots can load state from DB
+        this.scheduleCryptOpen(30_000)
+        // If crypt was opened before restart, resume remaining level-up wait / assign
+        void this.resumeCryptLevelUpSchedule()
+    }
+
+    /**
+     * After restart: reload wait from DB and re-queue party assign when due.
+     */
+    private async resumeCryptLevelUpSchedule() {
+        try {
+            await this.getMemoryStorage.ensureActiveCryptLoaded()
+            const instanceId = this.getMemoryStorage.getActiveCryptInstance
+            if (!instanceId || !this.getMemoryStorage.isCryptPartyAssignPending) return
+            const delayMs = this.getMemoryStorage.getCryptLevelUpRemainingMs
+            const openedAt = this.getMemoryStorage.getCryptOpenedAt
+            console.debug(
+                `Resuming crypt ${instanceId} level-up`
+                + (openedAt ? ` (opened ${new Date(openedAt).toISOString()})` : "")
+                + ` — party in ${Math.round(delayMs / 60_000)}m`,
+            )
+            this.queueCryptPartyAfterLevelUp(instanceId, this.cryptAbortToken, delayMs)
+        } catch (ex) {
+            console.warn(`resumeCryptLevelUpSchedule: ${ex}`)
+        }
     }
 
     private async fishing() {
         if(this.deactivate) return
-        if(this.bot.esize < 2) return setTimeout(() => {this.job_scheduler.push(this.fishing)}, 1000)
+        if(this.bot.esize < 2) {
+            return setTimeout(() => {this.job_scheduler.push(this.fishing)}, 60_000)
+        }
         if(!this.bot.hasItem("rod") && this.bot.slots.mainhand?.name != "rod") {
             this.changeMerchState("Crafting rod")
             await this.craftTool("rod")
@@ -109,11 +156,12 @@ export class MerchantStrategy extends ManageItems implements IState {
         if(this.bot.hasItem("rod")) {
             this.changeMerchState("Fishing")
             try {
-                await this.bot.smartMove({x: -1132, y: -289, map:"main"})
+                if (this.bot.stand) await this.bot.closeMerchantStand().catch(CF.debugLog)
+                await this.bot.smartMove({x: -1132, y: -289, map:"main"}, { getWithin: 5, numAttempts: 5 })
                 while(!this.bot.isOnCooldown("fishing")) {
                     if(!this.bot.hasItem("rod")) {
                         this.changeMerchState(this.DEFAULT_STATE)
-                        return this.job_scheduler.push(this.fishing)
+                        return setTimeout(() => {this.job_scheduler.push(this.fishing)}, 60_000)
                     }
                     if(this.bot.slots.mainhand?.name != "rod") {
                         if(this.bot.slots.offhand) await this.bot.unequip("offhand").catch(CF.debugLog)
@@ -130,15 +178,19 @@ export class MerchantStrategy extends ManageItems implements IState {
             finally {
                 this.changeMerchState(this.DEFAULT_STATE)
             }
+        } else {
+            this.changeMerchState(this.DEFAULT_STATE)
         }
-        setTimeout(() => {this.job_scheduler.push(this.fishing)}, Math.max(1,this.bot.getCooldown("fishing")))
+        setTimeout(() => {this.job_scheduler.push(this.fishing)}, Math.max(60_000, this.bot.getCooldown("fishing")))
     }
 
 
 
     private async mining() {
         if(this.deactivate) return
-        if(this.bot.esize < 2) return setTimeout(() => {this.job_scheduler.push(this.mining)}, 1000)
+        if(this.bot.esize < 2) {
+            return setTimeout(() => {this.job_scheduler.push(this.mining)}, 60_000)
+        }
         if(!this.bot.hasItem("pickaxe") && this.bot.slots.mainhand?.name != "pickaxe") {
             this.changeMerchState("Crafting pickaxe")
             await this.craftTool("pickaxe")
@@ -150,7 +202,7 @@ export class MerchantStrategy extends ManageItems implements IState {
                 while(!this.bot.isOnCooldown("mining")) {
                     if(!this.bot.hasItem("pickaxe")) {
                         this.changeMerchState(this.DEFAULT_STATE)
-                        return this.job_scheduler.push(this.mining)
+                        return setTimeout(() => {this.job_scheduler.push(this.mining)}, 60_000)
                     }
                     if(this.bot.slots.mainhand?.name != "pickaxe") {
                         if(this.bot.slots.offhand) await this.bot.unequip("offhand").catch(CF.debugLog)
@@ -167,8 +219,10 @@ export class MerchantStrategy extends ManageItems implements IState {
             finally {
                 this.changeMerchState(this.DEFAULT_STATE)
             }
+        } else {
+            this.changeMerchState(this.DEFAULT_STATE)
         }
-        setTimeout(() => {this.job_scheduler.push(this.mining)}, Math.max(1,this.bot.getCooldown("mining")))
+        setTimeout(() => {this.job_scheduler.push(this.mining)}, Math.max(60_000, this.bot.getCooldown("mining")))
     }
 
 
@@ -222,22 +276,38 @@ export class MerchantStrategy extends ManageItems implements IState {
      */
     private async checkScheduler(setNextTimeout: boolean = true) {
         if(this.deactivate) return
-        // console.debug(`Scheduler loop. in queue ${this.job_scheduler.length} tasks`)
-        // console.debug(this.job_scheduler.toString())
         if(this.DEFAULT_STATE == this.merch_state.state_type && this.job_scheduler.length>0) {
             let fn = this.job_scheduler.shift()
             await fn()
         }
-        else if ( this.DEFAULT_STATE == this.merch_state.state_type 
-            && this.job_scheduler.length < 1
-            && !this.bot.smartMoving && this.bot.partyData?.list.length>0
-            && this.bot.getPlayers({isPartyMember: true, withinRange: 300}).length<1) {
-                await this.bot.smartMove(this.bot.partyData.party[Object.keys(this.bot.partyData.party).find( e => e != this.bot.id)]).catch(CF.debugLog)
-            }
+        // Idle follow must not depend on an empty queue — skip-jobs used to re-queue forever
+        if (this.DEFAULT_STATE == this.merch_state.state_type) {
+            await this.moveToPartyLeaderIfNeeded()
+        }
 
         if(setNextTimeout == true) {
             setTimeout(this.checkScheduler, 1000)
         }
+    }
+
+    /** Go to party leader when idle and too far / on another map. */
+    private async moveToPartyLeaderIfNeeded(minDistance = 300) {
+        if (this.bot.smartMoving || this.bot.moving) return
+        if (this.merch_state.state_type !== this.DEFAULT_STATE) return
+        const party = this.bot.partyData?.party
+        if (!party || !this.bot.partyData?.list?.length) return
+
+        const leaderId = this.getMemoryStorage.getCurrentPartyLeader
+        let target = (leaderId && leaderId !== this.bot.id && party[leaderId])
+            ? party[leaderId]
+            : undefined
+        if (!target) {
+            const otherId = this.bot.partyData.list.find(e => e !== this.bot.id)
+            if (otherId) target = party[otherId]
+        }
+        if (!target) return
+        if (target.map === this.bot.map && Tools.distance(this.bot, target) <= minDistance) return
+        await this.bot.smartMove(target, { getWithin: 100 }).catch(CF.debugLog)
     }
 
     
@@ -245,7 +315,7 @@ export class MerchantStrategy extends ManageItems implements IState {
     private async checkBankUpgrades() {
         if(this.deactivate) return
         if(this.bot.esize<10) {
-            return setTimeout(() => {this.job_scheduler.push(this.checkBankUpgrades)}, 5 * 1000) //10min cooldown
+            return setTimeout(() => {this.job_scheduler.push(this.checkBankUpgrades)}, 60_000)
         }
         if(  this.bot.gold > this.GOLD_AMOUNT_FOR_CHECK_BANK){
             this.changeMerchState("Upgrading bank")
@@ -253,7 +323,7 @@ export class MerchantStrategy extends ManageItems implements IState {
             this.changeMerchState(this.DEFAULT_STATE)
         }
 
-        setTimeout(() => {this.job_scheduler.push(this.checkBankUpgrades)}, 5 * 1000) //10min cooldown
+        setTimeout(() => {this.job_scheduler.push(this.checkBankUpgrades)}, 5 * 60_000)
     }
 
     /**
@@ -263,9 +333,8 @@ export class MerchantStrategy extends ManageItems implements IState {
     private changeMerchState(state: string) {
         this.merch_state.state_type = state
         this.addLog(`State was changed to ${state}`, false)
-        if(this.DEFAULT_STATE == state && this.job_scheduler.length<1) {
-            let partyMember = this.bot.partyData?.party[this.bot.partyData?.list.filter(e => e != this.bot.id)[0]]
-            if(partyMember && !this.bot.smartMoving && (Tools.distance(this.bot, partyMember) > 400 || partyMember.map != this.bot.map)) this.bot.smartMove(partyMember, {getWithin: 100}).catch(console.debug)
+        if(this.DEFAULT_STATE == state) {
+            void this.moveToPartyLeaderIfNeeded(400)
         }
         
     }
@@ -622,7 +691,11 @@ export class MerchantStrategy extends ManageItems implements IState {
 
     private async exchangeItemsFromBankLoop() {
         if(this.deactivate) return
-        if(this.bot.esize<5 || !this.hasItemsToExchange()) return this.job_scheduler.push(this.exchangeItemsFromBankLoop)
+        if(this.bot.esize<5 || !this.hasItemsToExchange()) {
+            // Delayed requeue — never sync-repush (blocked idle party follow)
+            setTimeout(() => {this.job_scheduler.push(this.exchangeItemsFromBankLoop)}, 60_000)
+            return
+        }
         this.changeMerchState("Exchanging items from bank")
         await this.exchangeItemsFromBank().catch(console.debug)
         await this.bot.smartMove("main").catch(console.debug)
@@ -690,7 +763,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         const packs = this.locateItemsInBank(this.bot, itemName)
         if (!packs?.length) return 0
         let total = 0
-        const bank = this.bot.bank ?? this.getMemoryStorage.getBank
+        const bank = this.getMergedBankInfo()
         if (!bank) return 0
         for (const [packName, slots] of packs) {
             for (const slot of slots) {
@@ -710,7 +783,7 @@ export class MerchantStrategy extends ManageItems implements IState {
             await this.bot.smartMove(packName, {getWithin: 9999}).catch(console.warn)
             for (const slot of slots) {
                 if (quantity <= 0) break
-                const bankItem = (this.bot.bank ?? this.getMemoryStorage.getBank)?.[packName]?.[slot]
+                const bankItem = this.getMergedBankInfo()?.[packName]?.[slot]
                 if (!bankItem) continue
                 await this.bot.withdrawItem(packName, slot).catch(console.warn)
                 quantity -= (bankItem.q ?? 1)
@@ -867,6 +940,532 @@ export class MerchantStrategy extends ManageItems implements IState {
             console.warn(`craftItemsFromInventoryLoop: ${ex}`)
         } finally {
             setTimeout(this.craftItemsFromInventoryLoop, this.CRAFT_FROM_INVENTORY_INTERVAL_MS)
+        }
+    }
+
+    private isCryptSeason(): boolean {
+        return CRYPT_SEASON_MONTHS.includes(new Date().getMonth())
+    }
+
+    private getCombatStateBots(): StateStrategy[] {
+        return this.getPartyBotsOnServer().filter((s): s is StateStrategy =>
+            s instanceof StateStrategy && this.getStateBot(s)?.ctype !== "merchant"
+        )
+    }
+
+    private getMerchantGoldTotal(): number {
+        // Pocket only — bank.gold in memory/Mongo is often stale and was bypassing the gate
+        return this.bot.gold ?? 0
+    }
+
+    private canAffordCrypt(): boolean {
+        return this.getMerchantGoldTotal() >= this.CRYPT_MIN_GOLD
+    }
+
+    private areCombatBotsFarming(): boolean {
+        const combat = this.getCombatStateBots()
+        if (combat.length < 1) return false
+        return combat.every(s => s.currentState?.state_type === "farm")
+    }
+
+    private scheduleCryptOpen(delayMs: number) {
+        setTimeout(() => {
+            if (!this.job_scheduler.includes(this.openCryptJob)) {
+                this.job_scheduler.push(this.openCryptJob)
+            }
+        }, delayMs)
+    }
+
+    private async waitForBankInfo(timeoutMs = 5000): Promise<boolean> {
+        const started = Date.now()
+        while (Date.now() - started < timeoutMs) {
+            if (this.bot.bank || this.getMemoryStorage.getBank) return true
+            await CF.sleep(100)
+        }
+        return !!(this.bot.bank || this.getMemoryStorage.getBank)
+    }
+
+    private async withdrawCryptKey(): Promise<boolean> {
+        if (this.bot.hasItem("cryptkey")) return true
+
+        // Live bot.bank is only the current floor. Visit all floors so keys in
+        // bank_b / bank_u are found; locateItemsInBank merges with MemoryStorage.
+        const bankMaps = ["bank", "bank_b", "bank_u"] as const
+        for (const map of bankMaps) {
+            if (this.bot.map !== map) {
+                await this.bot.smartMove(map).catch(CF.debugLog)
+            }
+            await this.waitForBankInfo()
+
+            let packs: ReturnType<typeof this.locateItemsInBank> = []
+            try {
+                packs = this.locateItemsInBank(this.bot, "cryptkey")
+            } catch (ex) {
+                console.warn(`locate cryptkey on ${map}: ${ex}`)
+                continue
+            }
+            if (!packs?.length) {
+                console.debug(`No cryptkey found while on ${this.bot.map}`)
+                continue
+            }
+
+            const [packName, slots] = packs[0]
+            console.debug(`Withdrawing cryptkey from ${packName}[${slots[0]}] (map=${this.bot.map})`)
+            await this.bot.smartMove(packName, { getWithin: 9999 }).catch(CF.debugLog)
+            await this.bot.withdrawItem(packName, slots[0]).catch(console.warn)
+            if (this.bot.hasItem("cryptkey")) return true
+        }
+
+        return this.bot.hasItem("cryptkey")
+    }
+
+    private assignCryptToParty(instanceId: string) {
+        // Force-reactivate even if party released/finished this id (merchant reclear)
+        this.getMemoryStorage.clearCryptLevelUpWait()
+        this.getMemoryStorage.reopenActiveCrypt(instanceId)
+        const cryptState = {
+            state_type: "crypt" as const,
+            wantedMob: [] as MonsterName[],
+            instanceId,
+            server: {
+                region: this.bot.serverData.region,
+                name: this.bot.serverData.name,
+            },
+        }
+        for (const botState of this.getCombatStateBots()) {
+            const cur = botState.currentState
+            // Already on this crypt — leave alone
+            if (cur?.state_type === "crypt" && cur.instanceId === instanceId) continue
+            // Farm/quest: switch immediately (scheduler-only left stragglers stuck farming)
+            if (cur?.state_type === "farm" || cur?.state_type === "quest") {
+                botState.currentState = cryptState
+                continue
+            }
+            botState.addStateToScheduler(cryptState)
+        }
+        console.debug(`Assigned crypt ${instanceId} to party`)
+    }
+
+    /** Prevents duplicate setTimeouts for the same instance across resume/open. */
+    private cryptLevelUpAssignScheduledId: string | undefined
+
+    /**
+     * After open: register level-up wait and queue party assign later (merchant stays free).
+     */
+    private scheduleCryptPartyAfterLevelUp(instanceId: string, abortToken: number) {
+        this.getMemoryStorage.beginCryptLevelUpWait(instanceId, CRYPT_LEVEL_UP_WAIT_MS)
+        console.debug(
+            `Crypt ${instanceId}: waiting ${Math.round(CRYPT_LEVEL_UP_WAIT_MS / 3_600_000)}h for mob level-up before party`,
+        )
+        this.queueCryptPartyAfterLevelUp(instanceId, abortToken, CRYPT_LEVEL_UP_WAIT_MS)
+    }
+
+    private queueCryptPartyAfterLevelUp(instanceId: string, abortToken: number, delayMs: number) {
+        if (this.cryptLevelUpAssignScheduledId === instanceId) return
+        this.cryptLevelUpAssignScheduledId = instanceId
+        setTimeout(() => {
+            this.cryptLevelUpAssignScheduledId = undefined
+            if (this.deactivate) return
+            if (abortToken !== this.cryptAbortToken) return
+            if (this.getMemoryStorage.getActiveCryptInstance !== instanceId) return
+            if (!this.getMemoryStorage.isCryptPartyAssignPending
+                && !this.getMemoryStorage.isCryptLevelUpWaiting) {
+                // Already assigned / cleared
+                return
+            }
+            this.job_scheduler.push(() => this.runCryptAfterLevelUp(instanceId, abortToken))
+        }, Math.max(0, delayMs))
+    }
+
+    /** Assign party → wait clear → verify → finish (runs after level-up wait). */
+    private async runCryptAfterLevelUp(instanceId: string, abortToken: number) {
+        if (this.deactivate) return
+        if (abortToken !== this.cryptAbortToken) return
+        if (this.getMemoryStorage.getActiveCryptInstance !== instanceId) {
+            console.debug(`runCryptAfterLevelUp: active crypt changed, skip ${instanceId}`)
+            return
+        }
+        try {
+            this.assignCryptToParty(instanceId)
+            this.changeMerchState("Waiting crypt clear")
+            const cleared = await this.waitUntilPartyLeftCrypt()
+            if (abortToken !== this.cryptAbortToken) return
+            if (!cleared) {
+                console.warn("Timed out waiting for party crypt clear")
+                this.scheduleCryptOpen(10 * 60_000)
+                return
+            }
+
+            let verifyResult = await this.verifyCrypt(instanceId)
+            while (verifyResult === "needs_clear") {
+                if (abortToken !== this.cryptAbortToken) return
+                this.changeMerchState("Waiting crypt reclear")
+                await this.waitUntilPartyLeftCrypt()
+                if (abortToken !== this.cryptAbortToken) return
+                verifyResult = await this.verifyCrypt(instanceId)
+            }
+
+            if (abortToken !== this.cryptAbortToken) return
+            this.getMemoryStorage.finishActiveCrypt(instanceId)
+            this.scheduleCryptOpen(verifyResult === "clean" ? 60_000 : 10 * 60_000)
+        } catch (ex) {
+            console.warn(`runCryptAfterLevelUp: ${ex}`)
+            this.scheduleCryptOpen(10 * 60_000)
+        } finally {
+            this.changeMerchState(this.DEFAULT_STATE)
+        }
+    }
+
+    /** Pull any combat bots that drifted to farm back into the active crypt. */
+    private recallCryptStragglers(instanceId: string): number {
+        this.getMemoryStorage.reopenActiveCrypt(instanceId)
+        let recalled = 0
+        const cryptState = {
+            state_type: "crypt" as const,
+            wantedMob: [] as MonsterName[],
+            instanceId,
+            server: {
+                region: this.bot.serverData.region,
+                name: this.bot.serverData.name,
+            },
+        }
+        for (const botState of this.getCombatStateBots()) {
+            const cur = botState.currentState
+            if (cur?.state_type === "crypt" && cur.instanceId === instanceId) continue
+            const queued = botState.stateScheduler?.some(
+                s => s.state_type === "crypt" && s.instanceId === instanceId,
+            )
+            if (queued && cur?.state_type !== "farm" && cur?.state_type !== "quest") continue
+            if (cur?.state_type === "farm" || cur?.state_type === "quest") {
+                botState.currentState = cryptState
+                recalled++
+            } else if (!queued) {
+                botState.addStateToScheduler(cryptState)
+                recalled++
+            }
+        }
+        if (recalled > 0) {
+            console.debug(`Recalled ${recalled} straggler(s) to crypt ${instanceId}`)
+        }
+        return recalled
+    }
+
+    private async waitUntilPartyLeftCrypt(timeoutMs = 45 * 60_000): Promise<boolean> {
+        const started = Date.now()
+        while (Date.now() - started < timeoutMs) {
+            if (this.deactivate) return false
+            const stillInCrypt = this.getCombatStateBots().some(s => {
+                const b = this.getStateBot(s)
+                if (!b) return false
+                return s.currentState?.state_type === "crypt" || b.map === "crypt"
+            })
+            if (!stillInCrypt) return true
+            await CF.sleep(2000)
+        }
+        return false
+    }
+
+    /**
+     * code_eval `skipcrypt`: party leaves current dungeon; merchant withdraws key,
+     * opens a fresh crypt, and assigns it to combat bots.
+     */
+    public async skipCurrentCryptAndOpenNew() {
+        if (this.deactivate) return
+        if (this.skipCryptInProgress) {
+            console.debug("skipcrypt already in progress")
+            return
+        }
+        this.skipCryptInProgress = true
+        const token = ++this.cryptAbortToken
+        try {
+            console.debug("skipcrypt: aborting current crypt and opening a new one")
+            this.getMemoryStorage.beginCryptSkip()
+
+            for (const botState of this.getCombatStateBots()) {
+                await botState.abortCryptRun()
+            }
+
+            this.changeMerchState("Skip crypt — waiting leave")
+            await this.waitUntilPartyLeftCrypt(90_000)
+            if (token !== this.cryptAbortToken) return
+
+            if (this.bot.map === "crypt") {
+                await this.bot.leaveMap().catch(CF.debugLog)
+            }
+
+            if (!this.isCryptSeason()) {
+                console.debug("skipcrypt: crypt season inactive")
+                this.getMemoryStorage.endCryptSkip()
+                return
+            }
+
+            if (!this.canAffordCrypt()) {
+                console.warn(
+                    `skipcrypt: not enough pocket gold (${this.getMerchantGoldTotal()} < ${this.CRYPT_MIN_GOLD})`,
+                )
+                this.getMemoryStorage.endCryptSkip()
+                this.scheduleCryptOpen(10 * 60_000)
+                return
+            }
+
+            this.changeMerchState("Skip crypt — getting key")
+            const hasKey = await this.withdrawCryptKey()
+            if (token !== this.cryptAbortToken) return
+            if (!hasKey) {
+                console.warn("skipcrypt: no cryptkey in bank/inventory")
+                this.getMemoryStorage.endCryptSkip()
+                this.scheduleCryptOpen(0)
+                return
+            }
+            if (!this.canAffordCrypt()) {
+                console.warn(
+                    `skipcrypt: not enough pocket gold after bank (${this.getMerchantGoldTotal()} < ${this.CRYPT_MIN_GOLD})`,
+                )
+                this.getMemoryStorage.endCryptSkip()
+                this.scheduleCryptOpen(10 * 60_000)
+                return
+            }
+
+            this.changeMerchState("Skip crypt — opening")
+            if (!(await this.enterCrypt())) {
+                console.warn("skipcrypt: failed to open crypt")
+                this.getMemoryStorage.endCryptSkip()
+                this.scheduleCryptOpen(5 * 60_000)
+                return
+            }
+            if (token !== this.cryptAbortToken) return
+
+            const instanceId = this.bot.in
+            if (!instanceId || this.bot.map !== "crypt") {
+                console.warn("skipcrypt: opened but instance id missing")
+                this.getMemoryStorage.endCryptSkip()
+                this.scheduleCryptOpen(5 * 60_000)
+                return
+            }
+
+            console.debug(`skipcrypt: opened new crypt ${instanceId}`)
+            this.getMemoryStorage.endCryptSkip()
+            if (this.bot.map === "crypt") await this.bot.leaveMap().catch(CF.debugLog)
+            this.scheduleCryptPartyAfterLevelUp(instanceId, token)
+            // Clear/verify continue in runCryptAfterLevelUp after 3h
+        } catch (ex) {
+            console.warn(`skipcrypt: ${ex}`)
+            this.scheduleCryptOpen(10 * 60_000)
+        } finally {
+            this.getMemoryStorage.endCryptSkip()
+            this.skipCryptInProgress = false
+            this.changeMerchState(this.DEFAULT_STATE)
+        }
+    }
+
+    private cryptHasWantedMobs(): boolean {
+        return this.bot.getEntities({ withinRange: CRYPT_MOB_DETECT_RANGE }).some(e =>
+            e.map === "crypt"
+            && isCryptWantedMonster(e)
+            && e.xp > 0
+        )
+    }
+
+    private async enterCrypt(instanceId?: string): Promise<boolean> {
+        if (this.bot.map === "crypt" && (!instanceId || this.bot.in === instanceId)) return true
+
+        if (this.bot.map === "crypt" && instanceId && this.bot.in !== instanceId) {
+            await this.bot.leaveMap().catch(CF.debugLog)
+        }
+
+        // Open/join only via cave door — never enter from main/bank
+        let atDoor = false
+        for (let attempt = 0; attempt < 3; attempt++) {
+            await this.bot.smartMove(CRYPT_DOOR, { getWithin: Constants.DOOR_REACH_DISTANCE }).catch(CF.debugLog)
+            atDoor = this.bot.map === "cave"
+                && Tools.distance(this.bot, CRYPT_DOOR) <= Constants.DOOR_REACH_DISTANCE * 2
+            if (atDoor) break
+            console.warn(`enterCrypt: not at cave door (map=${this.bot.map}), retry ${attempt + 1}`)
+        }
+        if (!atDoor) {
+            console.warn(`enterCrypt: failed to reach crypt door from ${this.bot.map}`)
+            return false
+        }
+
+        try {
+            if (instanceId) await this.bot.enter("crypt", instanceId)
+            else await this.bot.enter("crypt")
+        } catch (ex) {
+            console.warn(`enter crypt failed: ${ex}`)
+            return false
+        }
+        // map narrowed to "cave" before enter — read fresh after transition
+        const mapNow = this.bot.map as string
+        return mapNow === "crypt" && (!instanceId || this.bot.in === instanceId)
+    }
+
+    private async verifyCrypt(instanceId: string): Promise<"clean" | "needs_clear" | "failed"> {
+        this.changeMerchState("Verifying crypt")
+        try {
+            if (!(await this.enterCrypt(instanceId))) {
+                console.warn(`Merchant crypt verify enter failed`)
+                return "failed"
+            }
+
+            for (const waypoint of [CRYPT_ENTRANCE, ...CRYPT_ROUTE]) {
+                if (this.deactivate) return "failed"
+                // Move inside instance without `in` (avoids leave+re-enter)
+                await this.bot.smartMove(
+                    { map: "crypt", x: waypoint.x, y: waypoint.y },
+                    {
+                        getWithin: CRYPT_WAYPOINT_ARRIVE_RANGE,
+                        avoidTownWarps: true,
+                        avoidMaps: ["main", "cave"],
+                    },
+                ).catch(CF.debugLog)
+                if (this.cryptHasWantedMobs()) {
+                    console.debug("Merchant found wanted crypt bosses, recalling party")
+                    this.assignCryptToParty(instanceId)
+                    if (this.bot.map === "crypt") await this.bot.leaveMap().catch(CF.debugLog)
+                    return "needs_clear"
+                }
+            }
+
+            if (this.bot.map === "crypt") await this.bot.leaveMap().catch(CF.debugLog)
+            return "clean"
+        } catch (ex) {
+            console.warn(`verifyCrypt error: ${ex}`)
+            return "failed"
+        }
+    }
+
+    /** True if a crypt run is still in progress (memory, DB flag, state, or bots). */
+    private async hasActiveCrypt(): Promise<boolean> {
+        await this.getMemoryStorage.ensureActiveCryptLoaded()
+        const activeId = this.getMemoryStorage.getActiveCryptInstance
+        if (activeId) return true
+        if (this.getCombatStateBots().some(s => {
+            const b = this.getStateBot(s)
+            if (!b) return false
+            if (s.currentState?.state_type === "crypt") return true
+            if (s.stateScheduler?.some(st => st.state_type === "crypt")) return true
+            if (b.map === "crypt") return true
+            return false
+        })) return true
+
+        // Fallback: read active_crypt collection directly
+        if (Database.connection) {
+            try {
+                const doc = await ActiveCryptModel.findOne({ key: "crypt", active: true }).lean<{
+                    instanceId?: string
+                }>()
+                if (doc?.instanceId) {
+                    this.getMemoryStorage.restoreActiveCrypt(doc.instanceId)
+                    console.debug(`Restored active crypt from DB flag: ${doc.instanceId}`)
+                    return true
+                }
+            } catch (ex) {
+                console.warn(`hasActiveCrypt DB check: ${ex}`)
+            }
+        }
+        return false
+    }
+
+    private async openCryptJob() {
+        if (this.deactivate) return
+        if (this.skipCryptInProgress) {
+            this.scheduleCryptOpen(5_000)
+            return
+        }
+        const runToken = this.cryptAbortToken
+        try {
+            if (!this.isCryptSeason()) {
+                console.debug("Crypt season inactive, retry in 12h")
+                this.scheduleCryptOpen(12 * 60 * 60_000)
+                return
+            }
+
+            if (!this.canAffordCrypt()) {
+                console.warn(
+                    `Crypt skipped — pocket gold ${this.getMerchantGoldTotal()} < ${this.CRYPT_MIN_GOLD}`,
+                )
+                this.scheduleCryptOpen(10 * 60_000)
+                return
+            }
+
+            // Don't spend another key while a crypt is already open / assigned
+            if (await this.hasActiveCrypt()) {
+                const activeId = this.getMemoryStorage.getActiveCryptInstance
+                if (activeId && this.getMemoryStorage.isCryptLevelUpWaiting) {
+                    console.debug(
+                        `Crypt ${activeId} leveling up (${Math.round(this.getMemoryStorage.getCryptLevelUpRemainingMs / 60_000)}m left)`,
+                    )
+                    // Ensure assign is scheduled after restart (idempotent)
+                    this.queueCryptPartyAfterLevelUp(activeId, this.cryptAbortToken, this.getMemoryStorage.getCryptLevelUpRemainingMs)
+                } else if (activeId && this.getMemoryStorage.isCryptPartyAssignPending) {
+                    console.debug(`Crypt ${activeId} level-up done — queueing party assign`)
+                    this.queueCryptPartyAfterLevelUp(activeId, this.cryptAbortToken, 0)
+                } else if (activeId) {
+                    // Always pull farm stragglers back — don't wait for the whole party to farm
+                    this.recallCryptStragglers(activeId)
+                } else {
+                    console.debug("Active crypt exists (in party/state/DB), skip open; retry in 60s")
+                }
+                this.scheduleCryptOpen(60_000)
+                return
+            }
+
+            if (!this.areCombatBotsFarming()) {
+                console.debug("Combat bots not farming, retry crypt in 60s")
+                this.scheduleCryptOpen(60_000)
+                return
+            }
+
+            this.changeMerchState("Getting crypt key")
+            const hasKey = await this.withdrawCryptKey()
+            if (!hasKey) {
+                console.debug("No cryptkey in bank/inventory, requeue openCrypt immediately")
+                this.scheduleCryptOpen(0)
+                return
+            }
+
+            // Re-check after bank trip — gold may have been deposited
+            if (!this.canAffordCrypt()) {
+                console.warn(
+                    `Crypt aborted after bank — pocket gold ${this.getMerchantGoldTotal()} < ${this.CRYPT_MIN_GOLD}`,
+                )
+                this.scheduleCryptOpen(10 * 60_000)
+                return
+            }
+
+            // Re-check after bank trip — party may have resumed crypt meanwhile
+            if (await this.hasActiveCrypt()) {
+                console.debug("Active crypt appeared while withdrawing key, skip open")
+                this.scheduleCryptOpen(60_000)
+                return
+            }
+            if (runToken !== this.cryptAbortToken) return
+
+            this.changeMerchState("Opening crypt")
+            // Entering without instance consumes cryptkey and creates a new dungeon
+            if (!(await this.enterCrypt())) {
+                console.warn("Failed to open crypt")
+                this.scheduleCryptOpen(5 * 60_000)
+                return
+            }
+            if (runToken !== this.cryptAbortToken) return
+
+            const instanceId = this.bot.in
+            if (!instanceId || this.bot.map !== "crypt") {
+                console.warn("Crypt opened but instance id missing")
+                this.scheduleCryptOpen(5 * 60_000)
+                return
+            }
+
+            console.debug(`Opened crypt instance: ${instanceId}`)
+            if (this.bot.map === "crypt") await this.bot.leaveMap().catch(CF.debugLog)
+            this.scheduleCryptPartyAfterLevelUp(instanceId, runToken)
+            // Assign / clear / verify happen in runCryptAfterLevelUp after 3h
+        } catch (ex) {
+            console.warn(`openCryptJob: ${ex}`)
+            this.scheduleCryptOpen(10 * 60_000)
+        } finally {
+            this.changeMerchState(this.DEFAULT_STATE)
         }
     }
     

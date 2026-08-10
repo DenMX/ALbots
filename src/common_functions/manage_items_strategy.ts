@@ -24,9 +24,9 @@ export type UpgradeItems = {
 
 const sortByPackNumberAsc = (a: PackItems, b: PackItems) => {
         const matchA = /^items(\d+)$/.exec(a[0])
-        const numA = Number.parseInt(matchA[1])
         const matchB = /^items(\d+)$/.exec(b[0])
-        const numB = Number.parseInt(matchB[1])
+        const numA = matchA ? Number.parseInt(matchA[1]) : Number.MAX_SAFE_INTEGER
+        const numB = matchB ? Number.parseInt(matchB[1]) : Number.MAX_SAFE_INTEGER
 
         // Sort packs by lower indexes first
         return numA - numB
@@ -72,6 +72,11 @@ export class ManageItems extends ResuplyStrategy {
             
             if( this.bot.esize>0 ) {
                 return setTimeout( this.startManageLogic, 30 * this.bot.esize * 1000 ) //setTimeout to 30sec for each empty slot
+            }
+
+            // Don't abandon crypt/dungeons for bank runs
+            if (this.bot.map === "crypt") {
+                return setTimeout(this.startManageLogic, 30 * 1000)
             }
 
             if( !this.bot.smartMoving && !this.bot.map.startsWith("bank") && (!this.memoryStorage.getBank || this.locateEmptyBankSlots().length>0) ) {
@@ -341,19 +346,30 @@ export class ManageItems extends ResuplyStrategy {
         
     }
 
+    /** Live bank is only the current floor; merge with MemoryStorage for full pack list (items0–47). */
+    protected getMergedBankInfo(bot: PingCompensatedCharacter = this.bot): BankInfo | undefined {
+        const stored = this.memoryStorage.getBank
+        const live = bot.bank
+        if (!stored && !live) return undefined
+        if (!stored) return live
+        if (!live) return stored
+        return { ...stored, ...live } as BankInfo
+    }
+
     protected locateItemsInBank(bot: PingCompensatedCharacter, item: ItemName, filters?: LocateItemFilters): BankItems {
-        if (!bot.map.startsWith("bank") && !super.getMemoryStorage.getBank) throw new Error("We aren't in the bank")
-        if (!bot.bank && !super.getMemoryStorage.getBank) throw new Error("We don't have bank information")
+        const bank = this.getMergedBankInfo(bot)
+        if (!bot.map.startsWith("bank") && !bank) throw new Error("We aren't in the bank")
+        if (!bank) throw new Error("We don't have bank information")
 
         const items: BankItems = []
-
-        let bank = (bot.bank) ? bot.bank : super.getMemoryStorage.getBank
 
         let bankPackName: keyof BankInfo
         for (bankPackName in bank) {
             if(bankPackName == "gold" || bankPackName == "owner" as BankPackName || bankPackName == "_id" as BankPackName) continue
+            const pack = bank[bankPackName]
+            if (!Array.isArray(pack)) continue
 
-            const itemsInSlot = bot.locateItems(item, bank[bankPackName], filters)
+            const itemsInSlot = bot.locateItems(item, pack, filters)
 
             if (itemsInSlot.length) items.push([bankPackName, itemsInSlot])
         }
@@ -363,23 +379,24 @@ export class ManageItems extends ResuplyStrategy {
 
     private locateEmptyBankSlots() {
         let bot = this.bot
-        if (!bot.map.startsWith("bank") && !super.getMemoryStorage.getBank) console.error("We aren't in the bank")
-        if (!bot.bank && !super.getMemoryStorage.getBank) {
+        const bank = this.getMergedBankInfo(bot)
+        if (!bot.map.startsWith("bank") && !bank) console.error("We aren't in the bank")
+        if (!bank) {
             console.error("We don't have bank information")
             return []
         }
 
         const empty: BankItems = []
 
-        let bank = (bot.bank) ? bot.bank : this.memoryStorage.getBank
-
         let bankPackName: keyof BankInfo
         for (bankPackName in bank) {
             if(bankPackName == "gold" || bankPackName == "owner" as BankPackName || bankPackName == "_id" as BankPackName) continue
+            const pack = bank[bankPackName]
+            if (!Array.isArray(pack)) continue
 
             const emptyInSlot = []
-            for (let i = 0; i < bank[bankPackName].length; i++) {
-                const bankItem = bank[bankPackName][i]
+            for (let i = 0; i < pack.length; i++) {
+                const bankItem = pack[i]
                 if (bankItem) continue // There's an item here
                 emptyInSlot.push(i)
             }
@@ -475,10 +492,8 @@ export class ManageItems extends ResuplyStrategy {
 
     protected getUpgradeListFromBank() : UpgradeItems {
         const bot = this.bot
-        if(!bot.bank && !super.getMemoryStorage.getBank) return { upgrade: [], compound: [] }
-
-
-        let bank = (bot.map.startsWith("bank")) ? bot.bank : super.getMemoryStorage.getBank;
+        let bank = this.getMergedBankInfo(bot)
+        if (!bank) return { upgrade: [], compound: [] }
 
 
         let upgradeItems : UpgradeItems = {
@@ -492,9 +507,11 @@ export class ManageItems extends ResuplyStrategy {
         for(bankPackName in bank) {
             // console.debug(`${bankPackName} = \n${bank[bankPackName]}`)
             if(bankPackName == "gold" || bankPackName == "owner" as BankPackName || bankPackName == "_id" as BankPackName) continue
+            const pack = bank[bankPackName]
+            if (!Array.isArray(pack)) continue
             
-            itemsFor: for(let i = 0; i < bank[bankPackName].length; i++) {
-                let item = bank[bankPackName][i]
+            itemsFor: for(let i = 0; i < pack.length; i++) {
+                let item = pack[i]
                 if(!item) continue
                 // console.debug(`Check item - ${item.name} level: ${item.level ?? "none"}`)
                 if(ItemsConfig.MERCHANT_UPGRADE.has(item.name)) {
@@ -646,7 +663,7 @@ export class ManageItems extends ResuplyStrategy {
         let bot = this.bot
         if(!Game.G.items[item].s) return 0
 
-        let bank = (bot.bank) ? bot.bank : super.getMemoryStorage.getBank
+        let bank = this.getMergedBankInfo(bot)
         
         let count = 0
         for(const [, itm] of bot.getItems()) {
@@ -660,9 +677,11 @@ export class ManageItems extends ResuplyStrategy {
 
         for(bankPackName in bank) {
             if(bankPackName == "gold") continue
+            const pack = bank[bankPackName]
+            if (!Array.isArray(pack)) continue
 
-            for(let i =0; i<bank[bankPackName].length; i++) {
-                let itm = bank[bankPackName][i]
+            for(let i =0; i<pack.length; i++) {
+                let itm = pack[i]
                 if(!itm) continue
                 if(itm.name == item) count += itm.q
             }

@@ -204,6 +204,11 @@ export class PartyStrategy {
     private async checkEquippedSetLoop() {
         if(this.deactivate) return
         if(Date.now() - Math.max(1,this.LastEquippedSet.datetime) < 500 ) return setTimeout(this.checkEquippedSetLoop, Math.max(1, this.LastEquippedSet.datetime - Date.now() + 500))
+        // Crypt: always tank set
+        if (this.isCryptCombatState() && SET_CONFIGS[this.bot.id]?.tank) {
+            await this.equipSet("tank", SET_CONFIGS[this.bot.id]?.tank)
+            return setTimeout(this.checkEquippedSetLoop, 500)
+        }
         let burstDamage = 0
         this.bot.getEntities({targetingMe: true}).forEach( e => burstDamage+= e.attack)
         if(this.bot.hp < this.bot.max_hp * 0.55 && this.bot.getEntities({targetingMe: true}).length > 0 && SET_CONFIGS[this.bot.id]?.tank) {
@@ -227,6 +232,11 @@ export class PartyStrategy {
             return setTimeout(this.checkEquippedSetLoop, 500)
         }
         return setTimeout(this.checkEquippedSetLoop, 500)
+    }
+
+    /** Override in StateStrategy — force tank gear while clearing crypt. */
+    protected isCryptCombatState(): boolean {
+        return false
     }
 
     private async equipSet(name: string, set: SetConfig[]) {
@@ -378,13 +388,26 @@ export class PartyStrategy {
 
     private async equipOrbLoop() {
         if(this.deactivate) return
-        if(!ORB_CONFIGS[this.bot.id]) return
+        // Crypt overheal: keep Orb of Testing while near unkillable healers
+        if (this.wantsTestOrb()) {
+            if (this.bot.slots.orb?.name !== ("test_orb" as ItemName)) {
+                const idx = this.bot.locateItem("test_orb" as ItemName)
+                if (idx >= 0) await this.bot.equip(idx).catch(debugLog)
+            }
+            return setTimeout(this.equipOrbLoop, 1000)
+        }
+        if(!ORB_CONFIGS[this.bot.id]) return setTimeout(this.equipOrbLoop, 5000)
         let currentOrb = this.bot.slots.orb
         let desiredOrb = ORB_CONFIGS[this.bot.id]
         if(currentOrb?.name == desiredOrb?.name && currentOrb?.level == desiredOrb?.level) return setTimeout(this.equipOrbLoop, 5000)
         if(!this.bot.hasItem(desiredOrb?.name, undefined, {level: desiredOrb?.level})) return setTimeout(this.equipOrbLoop, 5000)
         await this.bot.equip(this.bot.locateItem(desiredOrb?.name, undefined, {level: desiredOrb?.level})).catch(debugLog)
         setTimeout(this.equipOrbLoop, 5000)
+    }
+
+    /** Override in StateStrategy when crypt overhealers need test_orb. */
+    protected wantsTestOrb(): boolean {
+        return false
     }
 
 }

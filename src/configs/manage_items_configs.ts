@@ -51,6 +51,7 @@ export const DO_NOT_EXCHANGE: ItemName[] = [
 
 export const ITEMS_TO_SELL: ItemName[] = [
     //materials
+    'fieldgen0',
 	'frogt', 
 	'xmashat',
 	'pstem', 
@@ -140,6 +141,8 @@ export const ITEMS_TO_SELL: ItemName[] = [
 	"sword",
 	'sstinger',
 	'hammer',
+    'oozingterror',
+    'harbringer',
 
 	//halloween
 	'gphelmet',
@@ -225,14 +228,17 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["xpants", { level: 3, primlingAt: 0 }],
 
     ["starkillers", { level: 7, primlingAt: 3, offeringAt: 5}],
+    ["vhammer", {level: 7, primlingAt: 2, offeringAt: 3}],
+    ["vboots", {level: 9, offeringAt: 7}],
+    ["vgloves", {level: 9, offeringAt: 7}],
 
     // Weapons
     ["firestaff", { level: 9, primlingAt: 7, scrollUpAt: 5, offeringAt: 8}],
     ["fireblade", { level: 9, primlingAt: 7, scrollUpAt: 5, offeringAt: 8}],
     ["firebow", { level: 9, primlingAt: 7, scrollUpAt: 5, offeringAt: 8}],
     ["crossbow", { level: 8, primlingAt: 4, scrollUpAt: 4, offeringAt: 5 }],
-    ["harbringer", { level: 7 }],
-    ["oozingterror", { level: 7 }],
+    // ["harbringer", { level: 7 }],
+    // ["oozingterror", { level: 7 }],
     ["basher", {level: 7, primlingAt: 7}],
     ["cclaw", {level: 9, scrollUpAt: 5, offeringAt: 8}],
     ["cupid", {level: 8, scrollUpAt: 4, primlingAt: 5, offeringAt: 7}],
@@ -279,11 +285,13 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["intearring", { level: 4, primlingAt: 2, scrollUpAt: 1 }],
     ["dexearring", { level: 4, primlingAt: 2, scrollUpAt: 1 }],
     ["lostearring", { level: 2 }],
+    ["cearring", { level: 4, offeringAt: 3, scrollUpAt: 3 }],
 
     // Rings
     ["strring", { level: 4, primlingAt: 3 }],
     ["intring", { level: 4, primlingAt: 3 }],
     ["dexring", { level: 4, primlingAt: 3 }],
+    ["cring", { level: 4, offeringAt: 3, scrollUpAt: 3 }],
 
     // Amulets
     ["intamulet", { level: 4, primlingAt: 3 }],
@@ -309,6 +317,7 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["orbofstr", { level: 4, scrollUpAt: 2, offeringAt: 3 }],
     ["orboftemporal", {level: 3, primlingAt: 1, offeringAt: 3}],
     ["talkingskull", {level: 3, primlingAt: 2, scrollUpAt: 2}],
+    ["rabbitsfoot", {level: 3, primlingAt: 0, offeringAt: 1}]
 
 ]);
 
