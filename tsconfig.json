@@ -6,17 +6,26 @@
             "ES2020",
             "DOM"
         ],
-        "alwaysStrict": true,
+        "strict": false,
         "esModuleInterop": true,
         "incremental": false,
         "target": "ES2020",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "noImplicitAny": false,
+        "skipLibCheck": true,
         "outDir": "dist",
         "removeComments": true,
         "rootDir": "src",
         "sourceMap": true
     },
     "include": ["./src/**/*.ts"],
-    "exclude": ["node_modules", "dist"]
+    "exclude": [
+        "node_modules",
+        "**/node_modules",
+        "src/cursor-ui/node_modules",
+        "src/cursor-ui/dist",
+        "src/cursor-ui/vite.config.ts",
+        "src/cursor-ui/src",
+        "dist"
+    ]
 }
