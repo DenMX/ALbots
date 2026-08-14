@@ -117,6 +117,10 @@ export class ResuplyStrategy extends PartyStrategy {
         if(!this.bot.items) {
             return setTimeout( () => this.resupplyPots(), 5000)
         }
+        // Don't cancel crypt door travel for potion runs
+        if (this.isCryptCombatState() && this.bot.map !== "crypt") {
+            return setTimeout( () => this.resupplyPots(), 5000)
+        }
         if(this.bot.gold<100_000) {
             return setTimeout(this.resupplyPots, 50000)
         }

@@ -138,6 +138,9 @@ export class MageAttackStrategy extends StateStrategy {
                 if(this.mage.mp < Game.G.skills["magiport"].mp) break
                 const bot = botState.getBot?.()
                 if(!bot?.ready) continue
+                // Never pull crypt runners back to farm (cancels door smartMove / teleports them back)
+                const otherState = (botState as StateStrategy).currentState?.state_type
+                if (otherState === "crypt" || bot.map === "crypt" || bot.map === "cave") continue
                 if(Tools.distance(this.bot, bot) < 400) continue
                 // SUMMON WHEN WE HAVE SPECIALS NEAR AND OTHER DOESN'T
                 if(this.bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type) && calculate_monster_dps(this,e)/calculate_hps(bot) < 1).length<1) {

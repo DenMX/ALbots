@@ -11,6 +11,7 @@ import {
     BOSS_CHECK_ROUTE,
     CRYPT_BLACKLIST,
     CRYPT_DOOR,
+    CRYPT_DOOR_APPROACH,
     CRYPT_ENTRANCE,
     CRYPT_LEVEL_UP_WAIT_MS,
     CRYPT_MOB_DETECT_RANGE,
@@ -1276,7 +1277,7 @@ export class MerchantStrategy extends ManageItems implements IState {
         // Open/join only via cave door — never enter from main/bank
         let atDoor = false
         for (let attempt = 0; attempt < 3; attempt++) {
-            await this.bot.smartMove(CRYPT_DOOR, { getWithin: Constants.DOOR_REACH_DISTANCE }).catch(CF.debugLog)
+            await this.bot.smartMove(CRYPT_DOOR_APPROACH, { getWithin: 20, numAttempts: 5 }).catch(CF.debugLog)
             atDoor = this.bot.map === "cave"
                 && Tools.distance(this.bot, CRYPT_DOOR) <= Constants.DOOR_REACH_DISTANCE * 2
             if (atDoor) break

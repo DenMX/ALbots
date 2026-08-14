@@ -53,6 +53,10 @@ export class PriestsAttackStrategy extends StateStrategy {
         let healEntity = healTarget ? this.priest.getPlayers().filter( e => e.id == healTarget)[0] || undefined : undefined
         if(healTarget !== undefined && healEntity !== undefined) {
             if( Tools.distance(this.priest, healEntity) > this.priest.range && this.priest.partyData?.list.includes(healTarget)) {
+                // Don't interrupt crypt door pathing
+                if (this.isCryptCombatState() && this.priest.map !== "crypt") {
+                    return setTimeout(this.attackOrHealLoop, 500)
+                }
                 if(!this.priest.smartMoving && Tools.distance(healEntity,this.priest)> this.priest.range) {
                     await this.priest.move( 
                         this.priest.x + (healEntity.x - this.priest.x)/2,
@@ -72,6 +76,9 @@ export class PriestsAttackStrategy extends StateStrategy {
         let target = this.getTarget()
         if(!target) {
             return setTimeout(this.attackOrHealLoop, 300)
+        }
+        if (this.isCryptCombatState() && this.priest.map !== "crypt") {
+            return setTimeout(this.attackOrHealLoop, 500)
         }
         if(!target.target && CF.calculate_monster_dps(this, target, true)/CF.calculate_hps(this.priest) >=0.95) {
             return setTimeout(this.attackOrHealLoop, 500)
@@ -282,6 +289,8 @@ export class PriestsAttackStrategy extends StateStrategy {
     private async checkOffhandLoop() {
         if(this.deactivate) return
         if(!PRIEST_OFFHAND_CONFIGS[this.priest.id]) return
+        // Tank set owns gear in crypt — don't swap offhand to luck/heal books
+        if (this.shouldForceCryptTankSet()) return setTimeout(this.checkOffhandLoop, 1000)
         if(this.priest.c.town || this.priest.rip) return setTimeout(this.checkOffhandLoop, 2000)
         if(CF.calculate_hps(this.priest) > CF.calculate_monsters_dps(this, this, this.priest.getEntities({targetingMe: true}))) return setTimeout(this.checkOffhandLoop, 1000)
         const physicalMobs = (this.priest.getEntities({targetingMe: true}).filter( e => e.damage_type == "physical").length > 0)

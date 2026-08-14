@@ -8,6 +8,7 @@ import { ManageItems } from "./manage_items_strategy"
 import {
     CRYPT_BLACKLIST,
     CRYPT_DOOR,
+    CRYPT_DOOR_APPROACH,
     CRYPT_ENTRANCE,
     CRYPT_ALLY_NEAR_RANGE,
     CRYPT_FOLLOW_RANGE,
@@ -67,6 +68,9 @@ export class StateStrategy extends ManageItems implements IState {
 
     /** Snapshot of MemoryStorage.cryptGeneration when this crypt run was accepted. */
     private cryptRunGeneration = -1
+
+    /** Prevent overlapping enterCryptInstance / smartMove cancels. */
+    private cryptEnterBusy = false
 
     constructor (bot: PingCompensatedCharacter, memoryStorage: MemoryStorage) {
         super(bot as PingCompensatedCharacter, memoryStorage)
@@ -183,7 +187,11 @@ export class StateStrategy extends ManageItems implements IState {
     private async kiteLoop() {
         if(this.deactivate) return
         if(this.bot.isDisabled() || this.bot.rip) return setTimeout(this.kiteLoop, 1000)
-        if(this.bot.moving || this.bot.smartMoving) return setTimeout(this.kiteLoop, 1000)
+        if(this.bot.moving || this.bot.smartMoving || this.cryptEnterBusy) return setTimeout(this.kiteLoop, 1000)
+        // Don't kite-fight on the way to crypt door
+        if (this.current_state?.state_type === "crypt" && this.bot.map !== "crypt") {
+            return setTimeout(this.kiteLoop, 1000)
+        }
 
         // Always kite monsters with dismissal / dangerous auras (portal, weakness, etc.)
         const kiteThreat = this.bot.getEntities({
@@ -847,6 +855,10 @@ export class StateStrategy extends ManageItems implements IState {
         return this.current_state?.state_type === "crypt"
     }
 
+    protected shouldForceCryptTankSet(): boolean {
+        return this.isCryptCombatState() || this.bot.map === "crypt"
+    }
+
     /**
      * Non-priest: stay with priest when farther than CRYPT_FOLLOW_RANGE.
      * @returns true if this tick was spent catching up
@@ -881,7 +893,7 @@ export class StateStrategy extends ManageItems implements IState {
      * Falls back to in-game party so a missing strategy entry can't freeze the priest forever.
      */
     private getCryptCombatAlliesInInstance(instanceId: string) {
-        const byId = new Map<string, { id: string; ctype?: string; x: number; y: number; map: string; in?: string; rip?: boolean }>()
+        const byId = new Map<string, { id: string; ctype?: string; x: number; y: number; map: MapName; in?: string; rip?: boolean }>()
         if (this.bot.map === "crypt" && this.bot.in === instanceId && !this.bot.rip) {
             byId.set(this.bot.id, this.bot)
         }
@@ -1120,18 +1132,69 @@ export class StateStrategy extends ManageItems implements IState {
             return
         }
 
-        // Wrong instance — leave first
-        if (this.bot.map === "crypt" && this.bot.in !== instanceId) {
-            await this.bot.leaveMap().catch(debugLog)
-        }
-
-        // Door to crypt is on cave
+        // Already walking to the door — don't start a second smartMove (cancels the first)
+        if (this.cryptEnterBusy || this.bot.smartMoving) return
+        this.cryptEnterBusy = true
         try {
-            await this.bot.smartMove(CRYPT_DOOR, { getWithin: Constants.DOOR_REACH_DISTANCE })
-            if (!this.bot.ready) return
-            await this.bot.enter("crypt", instanceId)
-        } catch (ex) {
-            console.warn(`${this.bot.name} crypt enter failed: ${ex}`)
+            // Wrong instance — leave first
+            if (this.bot.map === "crypt" && this.bot.in !== instanceId) {
+                await this.bot.leaveMap().catch(debugLog)
+            }
+
+            // Stuck channel (town cast etc.) blocks all moves
+            if (this.bot.c?.town) {
+                await this.bot.stopWarpToTown().catch(debugLog)
+            }
+
+            // Door center is unwalkable — path to standable approach tile
+            const approach = CRYPT_DOOR_APPROACH
+            let atDoor = this.bot.map === "cave"
+                && Tools.distance(this.bot, CRYPT_DOOR) <= Constants.DOOR_REACH_DISTANCE * 2
+
+            for (let attempt = 0; attempt < 3 && !atDoor; attempt++) {
+                // Soft reset if we're stuck mid-path from a cancelled move
+                if (this.bot.smartMoving) await this.bot.stopSmartMove().catch(debugLog)
+
+                // Long multi-map path: more attempts + real error logs
+                try {
+                    await this.bot.smartMove(approach, {
+                        getWithin: 20,
+                        numAttempts: 8,
+                        avoidTownWarps: true,
+                    })
+                } catch (ex) {
+                    console.warn(`${this.bot.name} crypt approach smartMove failed: ${ex}`)
+                    // Fallback: hard town warp then retry (clears bad local pathing / pullbacks)
+                    if (this.bot.map !== "cave") {
+                        try {
+                            await this.bot.stopSmartMove().catch(debugLog)
+                            await this.bot.warpToTown()
+                        } catch (e) {
+                            console.warn(`${this.bot.name} town reset failed: ${e}`)
+                        }
+                    }
+                }
+
+                atDoor = this.bot.map === "cave"
+                    && Tools.distance(this.bot, CRYPT_DOOR) <= Constants.DOOR_REACH_DISTANCE * 2
+                if (!atDoor) {
+                    console.warn(
+                        `${this.bot.name} crypt door not reached (map=${this.bot.map} in=${this.bot.in} x=${Math.round(this.bot.x)} y=${Math.round(this.bot.y)} c=${JSON.stringify(this.bot.c)}), retry ${attempt + 1}`,
+                    )
+                }
+            }
+
+            if (!atDoor || !this.bot.ready) {
+                console.warn(`${this.bot.name} crypt enter failed: not at cave door`)
+                return
+            }
+            try {
+                await this.bot.enter("crypt", instanceId)
+            } catch (ex) {
+                console.warn(`${this.bot.name} crypt enter failed: ${ex}`)
+            }
+        } finally {
+            this.cryptEnterBusy = false
         }
     }
 
@@ -1665,8 +1728,12 @@ export class StateStrategy extends ManageItems implements IState {
 
         // Crypt: interrupt smartMove on mobs / party fight / stale destination
         if (this.current_state.state_type === "crypt") {
-            if (this.bot.smartMoving) {
+            if (this.bot.smartMoving || this.cryptEnterBusy) {
                 const dest = this.bot.smartMoving
+                // Still entering via cave door — do NOT cancel that path as "wrong crypt WP"
+                if (this.bot.map !== "crypt") {
+                    return setTimeout(this.checkState, 500)
+                }
                 // Arrived but smartMoving flag stuck — unblock route (common hang until restart)
                 if (dest?.map === "crypt" && Tools.distance(this.bot, dest) <= CRYPT_WAYPOINT_ARRIVE_RANGE) {
                     await this.stopCryptSmartMove()
@@ -2017,6 +2084,8 @@ export class StateStrategy extends ManageItems implements IState {
     protected shouldAttack(entity: Entity): boolean {
         if (!entity) return false
         if (this.current_state?.state_type === "crypt") {
+            // While traveling to the door, ignore farm targets (they cancel smartMove)
+            if (this.bot.map !== "crypt") return false
             if (CRYPT_BLACKLIST.includes(entity.type)) return false
             if (entity.xp < 1) return false
             // Unkillable healers — never DPS them (blocks route / endless fights)

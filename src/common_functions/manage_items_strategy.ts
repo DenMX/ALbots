@@ -74,8 +74,8 @@ export class ManageItems extends ResuplyStrategy {
                 return setTimeout( this.startManageLogic, 30 * this.bot.esize * 1000 ) //setTimeout to 30sec for each empty slot
             }
 
-            // Don't abandon crypt/dungeons for bank runs
-            if (this.bot.map === "crypt") {
+            // Don't abandon crypt travel / dungeons for bank runs
+            if (this.bot.map === "crypt" || this.isCryptCombatState()) {
                 return setTimeout(this.startManageLogic, 30 * 1000)
             }
 

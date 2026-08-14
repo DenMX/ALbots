@@ -43,8 +43,10 @@ export function isCryptWantedMonster(entity: { type?: string; level?: number } |
 /** Walkable rally near crypt entrance (old 200,-885 is unwalkable). */
 export const CRYPT_ENTRANCE: IPosition = { map: "crypt", x: 200, y: -1080 }
 
-/** Door to crypt is on cave (requires cryptkey). From G.maps.cave.doors */
+/** Door to crypt is on cave (requires cryptkey). From G.maps.cave.doors — center is unwalkable. */
 export const CRYPT_DOOR: IPosition = { map: "cave", x: -192, y: -1308 }
+/** Nearest standable tile south of the door (within DOOR_REACH). */
+export const CRYPT_DOOR_APPROACH: IPosition = { map: "cave", x: -192, y: -1303 }
 
 /** Route after rally at CRYPT_ENTRANCE (entrance is not a route step). */
 export const CRYPT_ROUTE: IPosition[] = [

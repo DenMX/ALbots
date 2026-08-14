@@ -107,34 +107,8 @@
             <button @click="load(true)">Retry</button>
           </div>
           <div v-else class="content-row test-layout">
-            <div v-memo="[playerUrl]" class="comm-panels-wrap">
-              <AdventurePanels :player-url="playerUrl" :player-name="primaryBot?.name" />
-            </div>
-            <aside class="test-bots-panel">
-              <div class="test-bots-panel-header">
-                <h3 class="test-bots-panel-title">Bots</h3>
-                <span class="test-bots-panel-count">{{ sortedBots.length }} active</span>
-              </div>
-              <div class="test-bots-grid test-bots-grid-auto">
-                <BotCard v-for="b in sortedBots" :key="'test-' + b.name" :bot="b" :default-effects-open="false" :default-min-mode="true" :show-combat="false" :show-effects="false" :show-effects-inline="true" />
-              </div>
-            </aside>
-          </div>
-        </div>
-      </template>
-      <template v-else-if="activeTab === 'comm'">
-        <div class="tab-pane" :class="{ 'tab-pane--fill': !loading && !error && bots.length > 0 }">
-          <div v-if="loading && bots.length === 0" class="loading">
-            <div class="spinner" />
-            <p>Loading…</p>
-          </div>
-          <div v-else-if="error" class="error">
-            <p>{{ error }}</p>
-            <button @click="load(true)">Retry</button>
-          </div>
-          <div v-else class="content-row test-layout">
-            <div v-memo="[playerUrl]" class="comm-panels-wrap">
-              <AdventurePanels :player-url="playerUrl" :player-name="primaryBot?.name" />
+            <div class="comm-panels-wrap">
+              <AdventurePanels />
             </div>
             <aside class="test-bots-panel">
               <div class="test-bots-panel-header">
@@ -849,12 +823,11 @@ body {
   pointer-events: auto;
 }
 
-/* Comm: Фиксированные размеры в px вместо flex + contain: strict */
+/* Comm: full width beside bots sidebar */
 .comm-panels-wrap {
-  width: calc(75vw - 280px);
+  width: 100%;
+  min-width: 0;
   height: calc(100vh - 240px);
-  min-width: 720px;
-  max-width: calc(75vw - 280px);
   min-height: 400px;
   max-height: calc(100vh - 240px);
   position: relative;

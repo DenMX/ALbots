@@ -232,6 +232,8 @@ export const MERCHANT_UPGRADE: Map<ItemName, UpgradeConfig> = new Map<ItemName, 
     ["vboots", {level: 9, offeringAt: 7}],
     ["vgloves", {level: 9, offeringAt: 7}],
 
+    ["vattire", {level: 7, offeringAt: 4}],
+
     // Weapons
     ["firestaff", { level: 9, primlingAt: 7, scrollUpAt: 5, offeringAt: 8}],
     ["fireblade", { level: 9, primlingAt: 7, scrollUpAt: 5, offeringAt: 8}],

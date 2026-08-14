@@ -170,7 +170,7 @@ export class PartyStrategy {
                 let burstDamage = 0
                 this.bot.getEntities({targetingMe: true}).forEach( e => burstDamage+= e.attack)
                 if(active_booster && this.bot.items[active_booster].name !== "goldbooster") await this.bot.shiftBooster(active_booster, "goldbooster").catch(debugLog)
-                if(SET_CONFIGS[this.bot.id]?.gold && burstDamage<this.bot.max_hp*0.5 && !this.bot.smartMoving) await this.equipSet("gold", SET_CONFIGS[this.bot.id]?.gold)
+                if(!this.shouldForceCryptTankSet() && SET_CONFIGS[this.bot.id]?.gold && burstDamage<this.bot.max_hp*0.5 && !this.bot.smartMoving) await this.equipSet("gold", SET_CONFIGS[this.bot.id]?.gold)
                 this.bot.chests.forEach( (e) => this.bot.openChest(e.id).catch(console.warn))
                 if(this.memoryStorage.getCurrentLooter != this.bot.id || this.memoryStorage.getDefaultLooter != this.bot.id 
                     && (this.bot.getPlayer({id: this.memoryStorage.getCurrentLooter, withinRange: 400}) || this.bot.getPlayer({id: this.memoryStorage.getDefaultLooter, withinRange: 400}))) this.bot.shiftBooster(active_booster, "xpbooster").catch(debugLog)
@@ -204,9 +204,12 @@ export class PartyStrategy {
     private async checkEquippedSetLoop() {
         if(this.deactivate) return
         if(Date.now() - Math.max(1,this.LastEquippedSet.datetime) < 500 ) return setTimeout(this.checkEquippedSetLoop, Math.max(1, this.LastEquippedSet.datetime - Date.now() + 500))
-        // Crypt: always tank set
-        if (this.isCryptCombatState() && SET_CONFIGS[this.bot.id]?.tank) {
-            await this.equipSet("tank", SET_CONFIGS[this.bot.id]?.tank)
+        // Crypt: always tank set (by state or already inside instance)
+        if (this.shouldForceCryptTankSet() && SET_CONFIGS[this.bot.id]?.tank) {
+            const tankSet = SET_CONFIGS[this.bot.id].tank
+            if (!this.isSetFullyEquipped(tankSet)) {
+                await this.equipSet("tank", tankSet)
+            }
             return setTimeout(this.checkEquippedSetLoop, 500)
         }
         let burstDamage = 0
@@ -239,31 +242,78 @@ export class PartyStrategy {
         return false
     }
 
+    /** Override in StateStrategy — also when bot is already on crypt map. */
+    protected shouldForceCryptTankSet(): boolean {
+        return this.isCryptCombatState()
+    }
+
+    private getSetPieceSlot(cfg: SetConfig): SlotType {
+        return cfg.slot ?? this.getSlotType(cfg.name as ItemName)
+    }
+
+    /** Exact level first, then any same-name piece at or above config level. */
+    private findSetPieceIndex(cfg: SetConfig): number {
+        const name = cfg.name as ItemName
+        if (cfg.level !== undefined) {
+            const exact = this.bot.locateItem(name, undefined, { level: cfg.level })
+            if (exact >= 0) return exact
+            const atLeast = this.bot.locateItem(name, undefined, { levelGreaterThan: cfg.level - 1 })
+            if (atLeast >= 0) return atLeast
+        }
+        return this.bot.locateItem(name)
+    }
+
+    private isSetPieceEquipped(cfg: SetConfig): boolean {
+        const slot = this.getSetPieceSlot(cfg)
+        if (!slot) return false
+        const equipped = this.bot.slots[slot]
+        if (!equipped || equipped.name !== cfg.name) return false
+        if (cfg.level !== undefined && equipped.level < cfg.level) return false
+        return true
+    }
+
+    private isSetFullyEquipped(set: SetConfig[]): boolean {
+        return set.every(cfg => this.isSetPieceEquipped(cfg))
+    }
+
     private async equipSet(name: string, set: SetConfig[]) {
         // console.debug(`${this.bot.id} Equipping ${name} set`)
         if(!set) return console.debug(`${this.bot.id} No set ${name} found`)
         if(Date.now() - Math.max(1,this.LastEquippedSet.datetime) < 300 ) return //console.debug(`${this.bot.id} Already equipped ${name} set in last 300ms`)
-        if(Object.keys(set).length == this.LastEquippedSet.itemsCount && this.LastEquippedSet.name == name) return //console.debug(`${this.bot.id} Already equipped ${name} set`)
+        if (this.isSetFullyEquipped(set)) {
+            this.LastEquippedSet.name = name
+            this.LastEquippedSet.itemsCount = set.length
+            return
+        }
         let equipBatchList: {num: number, slot: SlotType}[] = []
-        for(const [idx, item] of this.bot.getItems()) {
-            const setItem = set.find(e => e.name == item.name && e?.level == item?.level)
-            if(!setItem) continue
-            equipBatchList.push({num: idx, slot: setItem.slot ?? this.getSlotType(item.name as ItemName)})
-            // console.debug(`${this.bot.id} Equipping ${item.name} - ${setItem.slot ?? this.getSlotType(item.name as ItemName)}`)
+        for (const cfg of set) {
+            if (this.isSetPieceEquipped(cfg)) continue
+            const idx = this.findSetPieceIndex(cfg)
+            if (idx < 0) continue
+            const item = this.bot.items[idx]
+            if (!item) continue
+            equipBatchList.push({ num: idx, slot: this.getSetPieceSlot(cfg) })
         }
 
         equipBatchList.sort((curr, next) => {
-            let currPriority = set.find( e => e.name == this.bot.items[curr.num].name).priority ?? 0
-            let nextPriority = set.find( e => e.name == this.bot.items[next.num].name).priority ?? 0
-            if(currPriority != nextPriority) return (currPriority > 0) ? 1 : -1
-            return 0
+            const findCfg = (entry: { num: number }) =>
+                set.find(c => c.name === this.bot.items[entry.num]?.name
+                    && (c.level === undefined || c.level === this.bot.items[entry.num]?.level
+                        || this.bot.items[entry.num]?.level >= c.level))
+            const currPriority = findCfg(curr)?.priority ?? 0
+            const nextPriority = findCfg(next)?.priority ?? 0
+            return nextPriority - currPriority
         })
 
         const msToNextAttack = this.bot.getCooldown("attack")
         const timeToNextAttack = ( msToNextAttack === 0 ) ? 1000 / this.bot.frequency : msToNextAttack
-        const maxItemsCanEquip = Math.max(1, Math.floor(timeToNextAttack - (this.bot.s.penalty_cd?.ms ?? 0) / 120))
-        equipBatchList.splice(maxItemsCanEquip)
-        await this.bot.equipBatch(equipBatchList).catch(console.warn)
+        const perTick = this.shouldForceCryptTankSet()
+            ? 4
+            : Math.max(1, Math.floor(timeToNextAttack - (this.bot.s.penalty_cd?.ms ?? 0) / 120))
+        equipBatchList.splice(perTick)
+        if (equipBatchList.length > 0) {
+            await this.bot.equipBatch(equipBatchList).catch(console.warn)
+        }
         this.LastEquippedSet.itemsCount = (this.LastEquippedSet.name == name) ? this.LastEquippedSet.itemsCount+equipBatchList.length : equipBatchList.length
         this.LastEquippedSet.datetime = Date.now()
         this.LastEquippedSet.name = name
@@ -305,6 +355,7 @@ export class PartyStrategy {
 
     private async becomeHandsomeLoop() {
         if(!["priest", "mage"].includes(this.bot.ctype)) return
+        if (this.shouldForceCryptTankSet()) return setTimeout(this.becomeHandsomeLoop, 1000)
         if(!this.bot.hasItem("angelwings", undefined, {levelGreaterThan: 7}) && (this.bot.slots.cape?.name != "angelwings" || this.bot.slots.cape?.level < 8)) return console.debug("No angelwings level 8")
         if(this.bot.skin == "snow_angel") return setTimeout(this.becomeHandsomeLoop, 1000)
         
@@ -337,6 +388,7 @@ export class PartyStrategy {
 
     private async reduceSpotCDLoop() {
         if(this.deactivate || !this.bot.hasItem("orboftemporal")) return
+        if (this.shouldForceCryptTankSet() || this.bot.map === "crypt") return setTimeout(this.reduceSpotCDLoop, 5000)
         if(this.bot.smartMoving) return setTimeout(this.reduceSpotCDLoop, 1000)
         if(this.bot.isOnCooldown("temporalsurge")) return setTimeout(this.reduceSpotCDLoop, Math.max(1, this.bot.getCooldown("temporalsurge")))
         if(!this.bot.canUse("temporalsurge", {ignoreEquipped: true})) return setTimeout(this.reduceSpotCDLoop, 500)

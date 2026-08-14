@@ -36,7 +36,7 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         stomp: {name: "basher", level: 8 },
         solo_mainhand: {name: 'fireblade', level: 9 },
         solo_offhand: { name: 'candycanesword', level: 9 },
-        mass_mainhand: {name: 'vhammer', level: 5},
+        mass_mainhand: {name: 'vhammer', level: 6},
         mass_offhand: {name: 'ololipop', level: 9},
         fast_mainhand: {name: "rapier", level: 7}
     },
@@ -70,6 +70,15 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
     "frostyMerch": {
         fast_mainhand: { name: "staff", level: 3},
         fast_offhand: { name: "wbook0", level: 2}
+    },
+    "DonWar": {
+        solo_mainhand: { name: "candycanesword", level: 9},
+        solo_offhand: { name: "fireblade", level: 8},
+        mass_mainhand: { name: "ololipop", level: 9},
+        mass_offhand: { name: "ololipop", level: 9},
+        stomp: { name: "basher", level: 7},
+        cleave: { name: "bataxe", level: 9},
+        fast_mainhand: { name: "rapier", level: 8}
     }
 }
 
@@ -136,16 +145,28 @@ export const SET_CONFIGS: {
                 {name: 'horsecapeg', level: 7}
             ],
             "tank": [
-                {name: 'xhelmet', level: 7},
-                {name: 'xarmor', level: 6},
-                {name: 'starkillers', level: 8},
-                {name: 'wingedboots', level: 8},
-                {name: 'mittens', level: 9},
-                {name: 't2intamulet', level: 3},
-                {name: 'сearring', level: 3, slot: "earring1"},
+                {name: 'xhelmet', level: 7, slot: "helmet", priority: 10},
+                {name: 'xarmor', level: 6, slot: "chest", priority: 9},
+                {name: 'starkillers', level: 8, slot: "pants", priority: 5},
+                {name: 'wingedboots', level: 8, slot: "shoes", priority: 4},
+                {name: 'mittens', level: 9, slot: "gloves", priority: 3},
+                {name: 't2intamulet', level: 3, slot: "amulet", priority: 2},
+                {name: 'cearring', level: 4, slot: "earring1"},
                 {name: 'cearring', level: 3, slot: "earring2"},
-                {name: 'sbelt', level: 1},
-                {name: 'bcape', level: 7}
+                {name: 'sbelt', level: 1, slot: "belt", priority: 1},
+                {name: 'bcape', level: 7, slot: "cape", priority: 1}
+            ]
+        },
+        "Warious": {
+            "tank": [
+                {name: "xhelmet", level: 8},
+                {name: "xarmor", level: 6},
+                {name: "xgloves", level: 7}
+            ],
+            "dd": [
+                {name: "coat", level: 10},
+                {name: "fury", level: 7},
+                {name: "supermittens", level: 8}
             ]
         }
     }
