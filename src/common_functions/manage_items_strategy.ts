@@ -6,6 +6,7 @@ import * as CharacterItems from "../configs/character_items_configs"
 import * as CF from "./common_functions"
 import { debugLog } from "./common_functions"
 import { DO_NOT_EXCHANGE } from "../configs/manage_items_configs"
+import { getMetricsRuntime } from "../metrics"
 
 
 export type PackItems = [BankPackName, number[]]
@@ -156,7 +157,14 @@ export class ManageItems extends ResuplyStrategy {
                     
                 }
                 console.debug(`Upgrading ${item.name} to ${item.level+1}`)
-                await this.bot.upgrade(slot, scroll_idx, primling).catch(console.warn)
+                getMetricsRuntime()?.noteCraftInput(this.bot, "upgrade", item.name, item.level)
+                const upgraded = await this.bot.upgrade(slot, scroll_idx, primling).catch((err) => {
+                    console.warn(err)
+                    return undefined
+                })
+                if (upgraded === true || upgraded === false) {
+                    getMetricsRuntime()?.noteCraftResult(this.bot, "upgrade", upgraded)
+                }
             }
         }
     }
@@ -217,7 +225,14 @@ export class ManageItems extends ResuplyStrategy {
                         debugLog()
                     }
                 }
-                await this.bot.compound(items[0],items[1],items[2], scroll_idx, primling).catch(console.warn)
+                getMetricsRuntime()?.noteCraftInput(this.bot, "compound", item.name, item.level)
+                const compounded = await this.bot.compound(items[0],items[1],items[2], scroll_idx, primling).catch((err) => {
+                    console.warn(err)
+                    return undefined
+                })
+                if (compounded === true || compounded === false) {
+                    getMetricsRuntime()?.noteCraftResult(this.bot, "compound", compounded)
+                }
                 
             }
         }
@@ -243,6 +258,7 @@ export class ManageItems extends ResuplyStrategy {
                     if(this.bot.canUse("massexchangepp")) await this.bot.massExchangePP().catch(console.debug)
                 }
                 // console.debug(`exchanging ${item.name}`)
+                getMetricsRuntime()?.noteExchangeInput(this.bot, item.name)
                 await this.bot.exchange(idx).catch(console.warn)
             }
         }

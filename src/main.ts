@@ -3,6 +3,7 @@ import { MemoryStorage } from "./common_functions/memory_storage"
 import { startBotWithStrategy } from "./common_functions/common_functions"
 import { StateController } from "./controllers/state_controller"
 import { startCursorUI } from "./cursor-ui/server"
+import { startMetrics } from "./metrics/index"
 import fs from "fs"
 
 
@@ -34,6 +35,7 @@ async function run(){
             // await startBotWithStrategy("merchant", "MerchanDiser", "ASIA", "I", memoryStorage),
         ], memoryStorage)
         memoryStorage.setStateController = stateController
+        startMetrics(stateController, memoryStorage)
         startCursorUI(stateController, CURSOR_UI_PORT);
     }
     catch(ex) {

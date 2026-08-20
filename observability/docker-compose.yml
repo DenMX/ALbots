@@ -1,0 +1,79 @@
+# Compose (`docker compose up -d`) and Swarm (`docker stack deploy -c docker-compose.yml albots-obs`).
+#
+# VictoriaMetrics official image runs as root (UID 0) for volume compatibility.
+# Do NOT set user: "1000:1000" unless the data volume is owned by UID 1000
+# (see README: permission denied on flock.lock).
+#
+# Named volume victoriametrics-data: no chown needed.
+# Host bind-mount: chown is only required if you force a non-root user.
+# Prometheus runs as nobody (65534). Bind-mounts from $HOME often fail with
+# "permission denied" even at 644 because of SELinux (user_home_t) — use :z.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: albots-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    depends_on:
+      - victoriametrics
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.114.0
+    container_name: albots-victoriametrics
+    restart: unless-stopped
+    ports:
+      - "8428:8428"
+    volumes:
+      - victoriametrics-data:/victoria-metrics-data
+    command:
+      - -storageDataPath=/victoria-metrics-data
+      - -retentionPeriod=24
+      - -httpListenAddr=:8428
+      - -search.maxPointsPerTimeseries=300000
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: albots-grafana
+    restart: unless-stopped
+    depends_on:
+      - victoriametrics
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro,z
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  victoriametrics-data:

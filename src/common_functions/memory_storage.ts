@@ -1,9 +1,10 @@
-import { BankInfo, BankModel, Database, PingCompensatedCharacter, ServerIdentifier, ServerRegion, MonsterName } from "alclient";
+import { BankInfo, BankModel, Database, PingCompensatedCharacter, ServerIdentifier, ServerRegion, MonsterName, ItemName } from "alclient";
 import fs from "fs"
 import { StateController } from "../controllers/state_controller";
 import { ActiveCryptModel } from "../database/active_crypt/active_crypt.model";
 import { isCryptWantedMonster } from "../configs/events_and_spots";
 import { debugLog } from "./common_functions";
+import { recordCryptOpened } from "../metrics/crypt";
 
 export const DEFAULT_SERVER_REGION: ServerRegion = "ASIA"
 export const DEFAULT_SERVER_NAME: ServerIdentifier = "I"
@@ -65,6 +66,13 @@ export class MemoryStorage {
     private cryptWantedSeenIds = new Set<string>()
     /** Wanted crypt boss entity ids confirmed dead this run */
     private cryptWantedKilledIds = new Set<string>()
+
+    /** firehazard run: character applying burn + weapon being titled */
+    private hazardRunner: string | undefined
+    private hazardWeapon: ItemName | undefined
+    /** Latest firehazard progress for the runner (equip title weapon before last kill). */
+    private hazardCount = 0
+    private hazardNeeded = 20_000
 
     constructor() {
         this.loadBankFromMongo = this.loadBankFromMongo.bind(this)
@@ -352,6 +360,7 @@ export class MemoryStorage {
         this.reopenActiveCrypt(instanceId)
         this.cryptOpenedAt = Date.now()
         this.cryptLevelUpUntil = this.cryptOpenedAt + Math.max(0, durationMs)
+        recordCryptOpened()
         this.persistActiveCryptToMongo().catch(console.warn)
     }
 
@@ -420,13 +429,58 @@ export class MemoryStorage {
         this.cryptWaypointIndex = Math.max(0, index)
     }
 
+    public get isHazardActive() {
+        return !!this.hazardRunner && !!this.hazardWeapon
+    }
+
+    public get getHazardRunner() {
+        return this.hazardRunner
+    }
+
+    public get getHazardWeapon() {
+        return this.hazardWeapon
+    }
+
+    public startHazard(runner: string, weapon: ItemName) {
+        this.hazardRunner = runner
+        this.hazardWeapon = weapon
+        this.hazardCount = 0
+        this.hazardNeeded = 20_000
+    }
+
+    public stopHazard() {
+        this.hazardRunner = undefined
+        this.hazardWeapon = undefined
+        this.hazardCount = 0
+        this.hazardNeeded = 20_000
+    }
+
+    public noteHazardProgress(count: number, needed: number) {
+        if (typeof count === "number") this.hazardCount = count
+        if (typeof needed === "number" && needed > 0) this.hazardNeeded = needed
+    }
+
+    public get getHazardCount() {
+        return this.hazardCount
+    }
+
+    public get getHazardNeeded() {
+        return this.hazardNeeded
+    }
+
+    /** True when next burn kill may complete the achievement — lock title weapon. */
+    public get isHazardTitleWeaponCritical() {
+        if (!this.isHazardActive) return false
+        return this.hazardNeeded - this.hazardCount <= 1
+    }
+
     /** Restore active instance from DB; route always starts at waypoint 0. */
+    /** Merchant DB fallback only — must not mark crypt DB as loaded (would skip levelUpUntil). */
     public restoreActiveCrypt(instanceId: string) {
         if (this.cryptSkipInProgress) return
         if (instanceId === this.finishedCryptInstanceId) return
         this.activeCryptInstance = instanceId
         this.cryptWaypointIndex = 0
-        this.cryptDbReady = true
     }
 
     /** Strip Mongo/meta fields — ALData does `...bank` after `lastUpdated: Date.now()`, so a stale lastUpdated freezes the API. */

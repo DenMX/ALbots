@@ -14,6 +14,8 @@ const StateSchema = new Schema({
     location: {required: false, type: Object },
     server: {required: true, type: Object },
     instanceId: {required: false, type: String },
+    hazardRunner: { required: false, type: String },
+    hazardWeapon: { required: false, type: String },
 })
 
 export default StateSchema

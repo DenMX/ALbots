@@ -68,6 +68,9 @@ export class RogueAttackStrategy extends StateStrategy {
         if(!target) {
             return setTimeout(this.stubLoop, 500)
         }
+        if (!this.shouldAttack(target)) {
+            return setTimeout(this.stubLoop, 500)
+        }
         
         if(!target.target && this.bot.max_hp/CF.calculate_monster_dps(this, target, true) < 10) {
             return setTimeout(this.stubLoop, 500)

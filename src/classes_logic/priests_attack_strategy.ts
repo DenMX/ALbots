@@ -77,6 +77,10 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(!target) {
             return setTimeout(this.attackOrHealLoop, 300)
         }
+        if (!this.shouldAttack(target)) {
+            this.bot.target = undefined
+            return setTimeout(this.attackOrHealLoop, 300)
+        }
         if (this.isCryptCombatState() && this.priest.map !== "crypt") {
             return setTimeout(this.attackOrHealLoop, 500)
         }
@@ -125,19 +129,23 @@ export class PriestsAttackStrategy extends StateStrategy {
     private async useCurseLoop() {
         if(this.deactivate) return
         if(this.priest.c.town) return setTimeout(this.useCurseLoop, 2000)
-        if(!this.priest.getTargetEntity() || this.priest.smartMoving) {
+        const curseTarget = this.priest.getTargetEntity()
+        if(!curseTarget || this.priest.smartMoving) {
             return setTimeout(this.useCurseLoop, 2000)
+        }
+        if (!this.shouldAttack(curseTarget)) {
+            return setTimeout(this.useCurseLoop, 500)
         }
         if(this.priest.getCooldown("curse") || !this.priest.canUse("curse")) {
             return setTimeout(this.useCurseLoop, Math.max(100, this.priest.getCooldown("curse")))
         }
-        if(this.priest.getTargetEntity().hp<5000) {
+        if(curseTarget.hp<5000) {
             return setTimeout(this.useCurseLoop, 1000)
         }
-        if(!this.priest.getTargetEntity().target && CF.calculate_monster_dps(this, this.priest.getTargetEntity())/CF.calculate_hps(this.priest) >=0.95) {
+        if(!curseTarget.target && CF.calculate_monster_dps(this, curseTarget)/CF.calculate_hps(this.priest) >=0.95) {
             return setTimeout(this.useCurseLoop, 500)
         }
-        if(Tools.distance(this.priest, this.priest.getTargetEntity()) <= Game.G.skills.curse.range) await this.priest.curse(this.priest.target).catch(debugLog)
+        if(Tools.distance(this.priest, curseTarget) <= Game.G.skills.curse.range) await this.priest.curse(this.priest.target).catch(debugLog)
         return setTimeout(this.useCurseLoop, this.priest.getCooldown("curse"))
     }
 
@@ -291,6 +299,7 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(!PRIEST_OFFHAND_CONFIGS[this.priest.id]) return
         // Tank set owns gear in crypt — don't swap offhand to luck/heal books
         if (this.shouldForceCryptTankSet()) return setTimeout(this.checkOffhandLoop, 1000)
+        if (this.isHazardState()) return setTimeout(this.checkOffhandLoop, 2000)
         if(this.priest.c.town || this.priest.rip) return setTimeout(this.checkOffhandLoop, 2000)
         if(CF.calculate_hps(this.priest) > CF.calculate_monsters_dps(this, this, this.priest.getEntities({targetingMe: true}))) return setTimeout(this.checkOffhandLoop, 1000)
         const physicalMobs = (this.priest.getEntities({targetingMe: true}).filter( e => e.damage_type == "physical").length > 0)

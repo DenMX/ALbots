@@ -66,6 +66,24 @@ export class WarriorsAttackStrategy extends StateStrategy {
     private getAttackWeaponPair(): { mainhand: WeaponItemRef; offhand?: WeaponItemRef } | null {
         const botWC = this.getWeaponConfig()
         if (!botWC?.solo_mainhand) return null
+        if (this.isHazardState()) {
+            // Title weapon only on the final burn kill; otherwise farm with hazard_mainhand
+            if (this.shouldEquipHazardTitleWeapon() && this.memoryStorage.getHazardWeapon) {
+                const name = this.memoryStorage.getHazardWeapon
+                const idx = this.bot.locateItem(name, undefined, { returnHighestLevel: true })
+                const level = idx >= 0 ? (this.bot.items[idx]?.level ?? 0) : (this.bot.slots.mainhand?.level ?? 0)
+                const wtype = Game.G.items[name]?.wtype
+                const offhand = (wtype === "bow" || wtype === "crossbow")
+                    ? (botWC.hazard_offhand && Game.G.items[botWC.hazard_offhand.name]?.type === "quiver"
+                        ? botWC.hazard_offhand
+                        : undefined)
+                    : botWC.hazard_offhand
+                return { mainhand: { name, level }, offhand }
+            }
+            if (botWC.hazard_mainhand) {
+                return { mainhand: botWC.hazard_mainhand, offhand: botWC.hazard_offhand }
+            }
+        }
         if (this.bot.getTargetEntity()?.["1hp"] && botWC.fast_mainhand) {
             return { mainhand: botWC.fast_mainhand, offhand: botWC.fast_offhand }
         }
@@ -127,6 +145,13 @@ export class WarriorsAttackStrategy extends StateStrategy {
         if (this.isAttackWeaponsEquipped()) return
         const pair = this.getAttackWeaponPair()
         if (!pair) return
+        const wtype = Game.G.items[pair.mainhand.name]?.wtype
+        if ((wtype === "bow" || wtype === "crossbow")) {
+            const oh = this.warrior.slots?.offhand
+            if (oh && Game.G.items[oh.name]?.type !== "quiver") {
+                await this.unequipOffhandIfNeeded()
+            }
+        }
         const wanted: { item: WeaponItemRef; slot: SlotType }[] = [
             { item: pair.mainhand, slot: "mainhand" },
         ]
@@ -227,10 +252,18 @@ export class WarriorsAttackStrategy extends StateStrategy {
 
         try {
             if (Tools.distance(this.warrior, target) < this.warrior.range) {
-                const usedCleave = await this.tryCleaveSequence()
-                if (!usedCleave) await this.tryStomp()
+                if (!this.isHazardState()) {
+                    const usedCleave = await this.tryCleaveSequence()
+                    if (!usedCleave) await this.tryStomp()
+                }
                 if (!this.isAttackWeaponsEquipped()) await this.equipAttackWeapons()
-                await this.warrior.basicAttack(target.id).catch(debugLog)
+                // Re-check after equip — hazard burn may have become lethal
+                const live = this.bot.entities[target.id] ?? target
+                if (!this.shouldAttack(live)) {
+                    this.bot.target = undefined
+                    return
+                }
+                await this.warrior.basicAttack(live.id).catch(debugLog)
             } else if (!this.warrior.moving && !this.warrior.smartMoving) {
                 const location = CF.getHalfWay(this.warrior, target)
                 CF.moveHalfWay(this.warrior, location)
@@ -275,6 +308,9 @@ export class WarriorsAttackStrategy extends StateStrategy {
         }
         // Crypt: careful single-pulls — never mass-agitate a pack
         if (this.currentState?.state_type === "crypt" || this.warrior.map === "crypt") {
+            return setTimeout(this.useMassAggroLoop, 2000)
+        }
+        if (this.isHazardState()) {
             return setTimeout(this.useMassAggroLoop, 2000)
         }
 

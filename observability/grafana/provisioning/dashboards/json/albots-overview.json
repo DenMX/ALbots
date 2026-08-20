@@ -1,0 +1,1113 @@
+{
+  "annotations": { "list": [] },
+  "description": "Live fleet, combat, crypt and merchant craft metrics",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 2,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "semi-dark-green", "mode": "fixed" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#f43f5e", "value": null }, { "color": "#22c55e", "value": 1 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [{ "expr": "sum(albots_up)", "legendFormat": "online", "refId": "A" }],
+      "title": "Bots online",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "semi-dark-blue", "mode": "fixed" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#f43f5e", "value": null }, { "color": "#38bdf8", "value": 1 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [{ "expr": "sum(albots_up) - sum(albots_rip)", "legendFormat": "alive", "refId": "A" }],
+      "title": "Alive",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "purple", "mode": "fixed" },
+          "mappings": [
+            { "options": { "0": { "color": "#334155", "index": 0, "text": "Idle" }, "1": { "color": "#8b5cf6", "index": 1, "text": "Active" } }, "type": "value" }
+          ],
+          "max": 1,
+          "min": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#334155", "value": null }, { "color": "#8b5cf6", "value": 1 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [{ "expr": "albots_crypt_active", "legendFormat": "crypt", "refId": "A" }],
+      "title": "Crypt",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "super-light-purple", "mode": "fixed" },
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#64748b", "value": null }, { "color": "#a78bfa", "value": 1 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [{ "expr": "sum_over_time(increase(albots_crypts_opened_total[5m])[24h:5m])", "legendFormat": "opened", "refId": "A" }],
+      "title": "Crypts opened · 24h",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "semi-dark-orange", "mode": "fixed" },
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#64748b", "value": null }, { "color": "#f59e0b", "value": 1 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [{ "expr": "sum(sum_over_time(increase(albots_crypts_completed_total[5m])[24h:5m]))", "legendFormat": "done", "refId": "A" }],
+      "title": "Crypts done · 24h",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "yellow", "mode": "thresholds" },
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#22c55e", "value": null }, { "color": "#f59e0b", "value": 3 }, { "color": "#f43f5e", "value": 8 }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "id": 6,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [{ "expr": "sum(albots_chests_pending)", "legendFormat": "chests", "refId": "A" }],
+      "title": "Chests pending",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "center", "cellOptions": { "type": "auto" }, "filterable": true, "inspect": false },
+          "decimals": 1,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Up" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
+              { "id": "mappings", "value": [{ "options": { "0": { "color": "#f43f5e", "index": 0, "text": "down" }, "1": { "color": "#22c55e", "index": 1, "text": "up" } }, "type": "value" }] },
+              { "id": "custom.width", "value": 80 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Rip" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
+              { "id": "mappings", "value": [{ "options": { "0": { "color": "#14532d", "index": 0, "text": "ok" }, "1": { "color": "#f43f5e", "index": 1, "text": "rip" } }, "type": "value" }] },
+              { "id": "custom.width", "value": 72 }
+            ]
+          },
+          { "matcher": { "id": "byName", "options": "Ping" }, "properties": [{ "id": "unit", "value": "ms" }, { "id": "decimals", "value": 0 }, { "id": "custom.width", "value": 90 }] },
+          { "matcher": { "id": "byName", "options": "Gold/h" }, "properties": [{ "id": "decimals", "value": 0 }, { "id": "custom.cellOptions", "value": { "type": "color-text" } }, { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "XP/h" }, "properties": [{ "id": "decimals", "value": 0 }] },
+          { "matcher": { "id": "byName", "options": "Level" }, "properties": [{ "id": "decimals", "value": 0 }, { "id": "custom.width", "value": 64 }] },
+          {
+            "matcher": { "id": "byName", "options": "XP" },
+            "properties": [
+              { "id": "unit", "value": "percentunit" },
+              { "id": "min", "value": 0 },
+              { "id": "max", "value": 1 },
+              { "id": "decimals", "value": 0 },
+              { "id": "custom.width", "value": 110 },
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge", "valueDisplayMode": "text" } },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "#334155", "value": null }, { "color": "#a78bfa", "value": 0.35 }, { "color": "#22c55e", "value": 0.85 }] } }
+            ]
+          },
+          { "matcher": { "id": "byName", "options": "Character" }, "properties": [{ "id": "custom.align", "value": "left" }, { "id": "custom.width", "value": 140 }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "id": 10,
+      "options": {
+        "cellHeight": "md",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": false, "displayName": "Character" }]
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        { "expr": "sum by (character, ctype, server) (albots_up)", "format": "table", "instant": true, "refId": "up" },
+        { "expr": "sum by (character) (albots_rip)", "format": "table", "instant": true, "refId": "rip" },
+        { "expr": "sum by (character) (albots_ping_ms)", "format": "table", "instant": true, "refId": "ping" },
+        { "expr": "sum by (character) (albots_gold_per_hour)", "format": "table", "instant": true, "refId": "gph" },
+        { "expr": "sum by (character) (albots_xp_per_hour)", "format": "table", "instant": true, "refId": "xph" },
+        { "expr": "sum by (character) (albots_level)", "format": "table", "instant": true, "refId": "lvl" },
+        { "expr": "sum by (character) (albots_xp_ratio)", "format": "table", "instant": true, "refId": "xpr" },
+        { "expr": "sum by (character) (albots_inventory_empty)", "format": "table", "instant": true, "refId": "inv" }
+      ],
+      "title": "Fleet",
+      "transformations": [
+        { "id": "seriesToColumns", "options": { "byField": "character" } },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": ["character", "ctype", "server", "Value #up", "Value #rip", "Value #ping", "Value #gph", "Value #xph", "Value #lvl", "Value #xpr", "Value #inv"]
+            }
+          }
+        },
+        { "id": "organize", "options": {
+          "indexByName": {
+            "character": 0,
+            "ctype": 1,
+            "server": 2,
+            "Value #up": 3,
+            "Value #rip": 4,
+            "Value #ping": 5,
+            "Value #gph": 6,
+            "Value #xph": 7,
+            "Value #lvl": 8,
+            "Value #xpr": 9,
+            "Value #inv": 10
+          },
+          "renameByName": {
+            "character": "Character",
+            "ctype": "Class",
+            "server": "Server",
+            "Value #up": "Up",
+            "Value #rip": "Rip",
+            "Value #ping": "Ping",
+            "Value #gph": "Gold/h",
+            "Value #xph": "XP/h",
+            "Value #lvl": "Level",
+            "Value #xpr": "XP",
+            "Value #inv": "Empty inv"
+          }
+        }}
+      ],
+      "transparent": true,
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 101,
+      "title": "Combat & economy",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 32,
+            "gradientMode": "hue",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 15 },
+      "id": 20,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        { "expr": "sum by (character) (rate(albots_damage_dealt_total[5m]))", "legendFormat": "{{character}} dealt", "refId": "A" },
+        { "expr": "sum by (character) (rate(albots_damage_taken_total[5m]))", "legendFormat": "{{character}} taken", "refId": "B" }
+      ],
+      "title": "Damage rate",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawStyle": "line",
+            "fillOpacity": 28,
+            "gradientMode": "hue",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 15 },
+      "id": 21,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        { "expr": "sum by (character) (rate(albots_kills_total[5m]) * 60)", "legendFormat": "{{character}} kills/min", "refId": "A" },
+        { "expr": "sum by (character) (rate(albots_heal_done_total[5m]))", "legendFormat": "{{character}} heal/s", "refId": "B" }
+      ],
+      "title": "Kills & healing",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-YlRd" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawStyle": "line",
+            "fillOpacity": 36,
+            "gradientMode": "scheme",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "id": 22,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [{ "expr": "sum by (character) (albots_gold_per_hour)", "legendFormat": "{{character}}", "refId": "A" }],
+      "title": "Gold per hour",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawStyle": "line",
+            "fillOpacity": 28,
+            "gradientMode": "hue",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "id": 23,
+      "options": {
+        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        { "expr": "sum by (character) (rate(albots_loot_gold_total[5m]) * 3600)", "legendFormat": "{{character}} gold/h", "refId": "A" },
+        { "expr": "sum by (character) (rate(albots_chests_opened_total[5m]) * 3600)", "legendFormat": "{{character}} chests/h", "refId": "B" }
+      ],
+      "title": "Chest loot",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "id": 106,
+      "title": "Deaths",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-YlRd" },
+          "decimals": 0,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#22c55e", "value": null },
+              { "color": "#f59e0b", "value": 3 },
+              { "color": "#f43f5e", "value": 8 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 8, "x": 0, "y": 33 },
+      "id": 24,
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 32,
+        "minVizHeight": 16,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "targets": [{
+        "expr": "sum by (character) (increase(albots_character_deaths_total[${__range_s}s]))",
+        "instant": true,
+        "legendFormat": "{{character}}",
+        "refId": "A"
+      }],
+      "title": "Deaths by character · range",
+      "transparent": true,
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true, "inspect": false },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Deaths" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge", "valueDisplayMode": "color" } },
+              { "id": "color", "value": { "mode": "continuous-YlRd" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 16, "x": 8, "y": 33 },
+      "id": 25,
+      "options": { "cellHeight": "sm", "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Deaths" }] },
+      "targets": [{
+        "expr": "sum by (character, cause, map) (increase(albots_character_deaths_total[${__range_s}s]))",
+        "format": "table",
+        "instant": true,
+        "refId": "A"
+      }],
+      "title": "Deaths by cause & map · range",
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "Time": true },
+          "indexByName": { "character": 0, "cause": 1, "map": 2, "Value": 3 },
+          "renameByName": { "Value": "Deaths", "character": "Character", "cause": "Cause", "map": "Map" }
+        }},
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              { "config": { "id": "greater", "options": { "value": 0 } }, "fieldName": "Deaths" },
+              { "config": { "id": "regex", "options": { "value": ".+" } }, "fieldName": "Character" }
+            ],
+            "match": "all",
+            "type": "include"
+          }
+        }
+      ],
+      "transparent": true,
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 },
+      "id": 102,
+      "title": "Crypt",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawStyle": "line",
+            "fillOpacity": 40,
+            "gradientMode": "hue",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 44 },
+      "id": 30,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "expr": "albots_crypt_bosses_seen", "legendFormat": "seen", "refId": "A" },
+        { "expr": "albots_crypt_bosses_killed", "legendFormat": "killed", "refId": "B" }
+      ],
+      "title": "Bosses this run",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-BlPu" },
+          "min": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#22c55e", "value": null }, { "color": "#f59e0b", "value": 1800 }, { "color": "#8b5cf6", "value": 3600 }] },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 44 },
+      "id": 31,
+      "options": {
+        "minVizHeight": 80,
+        "minVizWidth": 80,
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "targets": [
+        { "expr": "albots_crypt_level_up_wait_seconds", "legendFormat": "level-up wait", "refId": "A" }
+      ],
+      "title": "Level-up wait",
+      "transparent": true,
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "gradientMode": "hue",
+            "lineWidth": 0,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 44 },
+      "id": 32,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "expr": "sum_over_time(increase(albots_crypts_opened_total[5m])[6h:5m])", "legendFormat": "opened", "refId": "A" },
+        { "expr": "sum by (result) (sum_over_time(increase(albots_crypts_completed_total[5m])[6h:5m]))", "legendFormat": "done {{result}}", "refId": "B" }
+      ],
+      "title": "Opened / completed · 6h",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
+      "id": 103,
+      "title": "Reliability",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic-by-name" },
+              "custom": {
+                "axisBorderShow": false,
+                "drawStyle": "line",
+                "fillOpacity": 24,
+                "gradientMode": "hue",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": true
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 53 },
+          "id": 40,
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            { "expr": "rate(albots_disconnects_total[15m]) * 3600", "legendFormat": "{{character}} {{reason}}", "refId": "A" },
+            { "expr": "rate(albots_reconnects_total[15m]) * 3600", "legendFormat": "{{character}} reconnects/h", "refId": "B" }
+          ],
+          "title": "Disconnects & reconnects",
+          "transparent": true,
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "continuous-BlPu" },
+              "custom": {
+                "axisBorderShow": false,
+                "drawStyle": "line",
+                "fillOpacity": 24,
+                "gradientMode": "scheme",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "showPoints": "never",
+                "spanNulls": true
+              },
+              "unit": "ms"
+            },
+            "overrides": [
+              { "matcher": { "id": "byRegexp", "options": "limitdc" }, "properties": [{ "id": "unit", "value": "percentunit" }] }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 53 },
+          "id": 41,
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            { "expr": "albots_ping_ms", "legendFormat": "{{character}} ping", "refId": "A" },
+            { "expr": "albots_limitdc_total / albots_limitdc_limit", "legendFormat": "{{character}} limitdc", "refId": "B" }
+          ],
+          "title": "Ping & limitdc",
+          "transparent": true,
+          "type": "timeseries"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 },
+      "id": 104,
+      "title": "Monster kills",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true, "inspect": false },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Kills" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge", "valueDisplayMode": "color" } },
+              { "id": "color", "value": { "mode": "continuous-BlYlRd" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 54 },
+      "id": 50,
+      "options": { "cellHeight": "sm", "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Kills" }] },
+      "targets": [{
+        "expr": "sum by (character, monster) (increase(albots_monster_kills_total[${__range_s}s]))",
+        "format": "table",
+        "instant": true,
+        "refId": "A"
+      }],
+      "title": "Kills by character & monster · range",
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "Time": true },
+          "renameByName": { "Value": "Kills", "character": "Character", "monster": "Monster" }
+        }}
+      ],
+      "transparent": true,
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "hue",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 54 },
+      "id": 51,
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [{
+        "expr": "sum by (character) (rate(albots_monster_kills_total{monster=~\"$monster\"}[5m])) * 3600",
+        "legendFormat": "{{character}}",
+        "refId": "A"
+      }],
+      "title": "Kill rate · $monster",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 64 },
+      "id": 105,
+      "title": "Items looted",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true, "inspect": false },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Count" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge", "valueDisplayMode": "color" } },
+              { "id": "color", "value": { "mode": "continuous-BlYlRd" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 65 },
+      "id": 60,
+      "options": { "cellHeight": "sm", "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Count" }] },
+      "targets": [{
+        "expr": "topk(30, sum by (item, source) (increase(albots_items_looted_total{item=~\"$item\"}[${__range_s}s])))",
+        "format": "table",
+        "instant": true,
+        "refId": "A"
+      }],
+      "title": "Top loot · $item · range",
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "Time": true },
+          "renameByName": { "Value": "Count", "item": "Item", "source": "Source" }
+        }}
+      ],
+      "transparent": true,
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawStyle": "line",
+            "fillOpacity": 28,
+            "gradientMode": "hue",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 65 },
+      "id": 61,
+      "options": {
+        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [{
+        "expr": "sum by (character, source) (rate(albots_items_looted_total{item=~\"$item\"}[5m])) * 3600",
+        "legendFormat": "{{character}} · {{source}}",
+        "refId": "A"
+      }],
+      "title": "Loot rate · $item",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 75 },
+      "id": 106,
+      "title": "Merchant",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true, "inspect": false },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Count" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge", "valueDisplayMode": "color" } },
+              { "id": "color", "value": { "mode": "continuous-YlRd" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 10, "x": 0, "y": 76 },
+      "id": 70,
+      "options": { "cellHeight": "sm", "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Count" }] },
+      "targets": [{
+        "expr": "sum by (item, received) (increase(albots_merchant_operations_total{operation=\"exchange\",result=\"success\",received!=\"none\",item=~\"$item\"}[${__range_s}s]))",
+        "format": "table",
+        "instant": true,
+        "refId": "A"
+      }],
+      "title": "Exchanges · $item · range",
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "Time": true },
+          "renameByName": { "Value": "Count", "item": "Exchanged", "received": "Received" }
+        }}
+      ],
+      "transparent": true,
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "center", "cellOptions": { "type": "auto" }, "filterable": true, "inspect": false },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Success" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge", "valueDisplayMode": "color" } },
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Fail" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge", "valueDisplayMode": "color" } },
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+            ]
+          },
+          { "matcher": { "id": "byName", "options": "Item" }, "properties": [{ "id": "custom.align", "value": "left" }] }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 14, "x": 10, "y": 76 },
+      "id": 71,
+      "options": { "cellHeight": "sm", "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Fail" }] },
+      "targets": [{
+        "expr": "sum by (item, level, operation, result) (increase(albots_merchant_operations_total{operation=~\"upgrade|compound\",item=~\"$item\",result=~\"success|fail\"}[${__range_s}s]))",
+        "format": "table",
+        "instant": true,
+        "refId": "A"
+      }],
+      "title": "Upgrade / compound by item & level · $item · range",
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "Time": true },
+          "indexByName": { "item": 0, "level": 1, "operation": 2, "result": 3, "Value": 4 },
+          "renameByName": {
+            "Value": "Count",
+            "item": "Item",
+            "level": "Level",
+            "operation": "Operation",
+            "result": "Result"
+          }
+        }},
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              { "config": { "id": "greater", "options": { "value": 0 } }, "fieldName": "Count" },
+              { "config": { "id": "regex", "options": { "value": "^(?!unknown$|placeholder$).+" } }, "fieldName": "Item" },
+              { "config": { "id": "regex", "options": { "value": "^(?!none$).+" } }, "fieldName": "Level" }
+            ],
+            "match": "all",
+            "type": "include"
+          }
+        }
+      ],
+      "transparent": true,
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic-by-name" },
+          "custom": {
+            "axisBorderShow": false,
+            "drawStyle": "bars",
+            "fillOpacity": 75,
+            "gradientMode": "hue",
+            "lineWidth": 0,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "fail" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "ok" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 94 },
+      "id": 72,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        { "expr": "sum by (received) (rate(albots_merchant_operations_total{operation=\"exchange\",result=\"success\",received!=\"none\",item=~\"$item\"}[15m])) * 3600", "legendFormat": "ex {{received}}", "refId": "A" },
+        { "expr": "sum by (item, level, operation) (rate(albots_merchant_operations_total{operation=~\"upgrade|compound\",result=\"success\",item=~\"$item\",item!=\"unknown\"}[15m])) * 3600", "legendFormat": "{{item}} +{{level}} {{operation}} ok", "refId": "B" },
+        { "expr": "sum by (item, level, operation) (rate(albots_merchant_operations_total{operation=~\"upgrade|compound\",result=\"fail\",item=~\"$item\",item!=\"unknown\"}[15m])) * 3600", "legendFormat": "{{item}} +{{level}} {{operation}} fail", "refId": "C" }
+      ],
+      "title": "Merchant rate · $item",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true, "inspect": false },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Count" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge", "valueDisplayMode": "color" } },
+              { "id": "color", "value": { "mode": "continuous-BlPu" } }
+            ]
+          },
+          { "matcher": { "id": "byName", "options": "Item" }, "properties": [{ "id": "custom.align", "value": "left" }] },
+          {
+            "matcher": { "id": "byName", "options": "Operation" },
+            "properties": [
+              { "id": "custom.width", "value": 110 },
+              {
+                "id": "mappings",
+                "value": [
+                  { "options": { "compound": { "color": "purple", "index": 2, "text": "compound" }, "exchange": { "color": "blue", "index": 0, "text": "exchange" }, "upgrade": { "color": "orange", "index": 1, "text": "upgrade" } }, "type": "value" }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 86 },
+      "id": 73,
+      "options": { "cellHeight": "sm", "showHeader": true, "sortBy": [{ "desc": true, "displayName": "Count" }] },
+      "targets": [{
+        "expr": "sum by (item, operation) (increase(albots_merchant_operations_total{operation=~\"exchange|upgrade|compound\",item=~\"$item\",item!~\"unknown|placeholder\"}[${__range_s}s]))",
+        "format": "table",
+        "instant": true,
+        "refId": "A"
+      }],
+      "title": "Operations by item · $item · range",
+      "transformations": [
+        { "id": "organize", "options": {
+          "excludeByName": { "Time": true },
+          "indexByName": { "item": 0, "operation": 1, "Value": 2 },
+          "renameByName": { "Value": "Count", "item": "Item", "operation": "Operation" }
+        }},
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [{ "config": { "id": "greater", "options": { "value": 0 } }, "fieldName": "Count" }],
+            "match": "all",
+            "type": "include"
+          }
+        }
+      ],
+      "transparent": true,
+      "type": "table"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["albots", "fleet"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(albots_monster_kills_total, monster)",
+        "includeAll": true,
+        "label": "Monster",
+        "multi": true,
+        "name": "monster",
+        "options": [],
+        "query": { "query": "label_values(albots_monster_kills_total, monster)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values({__name__=~\"albots_items_looted_total|albots_merchant_operations_total\"}, item)",
+        "includeAll": true,
+        "label": "Item",
+        "multi": true,
+        "name": "item",
+        "options": [],
+        "query": { "query": "label_values({__name__=~\"albots_items_looted_total|albots_merchant_operations_total\"}, item)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
+  },
+  "timezone": "browser",
+  "title": "ALbots Overview",
+  "uid": "albots-overview",
+  "version": 16,
+  "weekStart": ""
+}

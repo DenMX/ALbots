@@ -170,7 +170,7 @@ export class PartyStrategy {
                 let burstDamage = 0
                 this.bot.getEntities({targetingMe: true}).forEach( e => burstDamage+= e.attack)
                 if(active_booster && this.bot.items[active_booster].name !== "goldbooster") await this.bot.shiftBooster(active_booster, "goldbooster").catch(debugLog)
-                if(!this.shouldForceCryptTankSet() && SET_CONFIGS[this.bot.id]?.gold && burstDamage<this.bot.max_hp*0.5 && !this.bot.smartMoving) await this.equipSet("gold", SET_CONFIGS[this.bot.id]?.gold)
+                if(!this.shouldForceCryptTankSet() && !this.isHazardState() && SET_CONFIGS[this.bot.id]?.gold && burstDamage<this.bot.max_hp*0.5 && !this.bot.smartMoving) await this.equipSet("gold", SET_CONFIGS[this.bot.id]?.gold)
                 this.bot.chests.forEach( (e) => this.bot.openChest(e.id).catch(console.warn))
                 if(this.memoryStorage.getCurrentLooter != this.bot.id || this.memoryStorage.getDefaultLooter != this.bot.id 
                     && (this.bot.getPlayer({id: this.memoryStorage.getCurrentLooter, withinRange: 400}) || this.bot.getPlayer({id: this.memoryStorage.getDefaultLooter, withinRange: 400}))) this.bot.shiftBooster(active_booster, "xpbooster").catch(debugLog)
@@ -212,6 +212,10 @@ export class PartyStrategy {
             }
             return setTimeout(this.checkEquippedSetLoop, 500)
         }
+        // Hazard: keep weapons/sets alone — don't swap luck/tank/gold mid-run
+        if (this.isHazardState()) {
+            return setTimeout(this.checkEquippedSetLoop, 2000)
+        }
         let burstDamage = 0
         this.bot.getEntities({targetingMe: true}).forEach( e => burstDamage+= e.attack)
         if(this.bot.hp < this.bot.max_hp * 0.55 && this.bot.getEntities({targetingMe: true}).length > 0 && SET_CONFIGS[this.bot.id]?.tank) {
@@ -239,6 +243,11 @@ export class PartyStrategy {
 
     /** Override in StateStrategy — force tank gear while clearing crypt. */
     protected isCryptCombatState(): boolean {
+        return false
+    }
+
+    /** Override in StateStrategy — firehazard dryad farm. */
+    protected isHazardState(): boolean {
         return false
     }
 

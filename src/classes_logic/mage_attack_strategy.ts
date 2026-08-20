@@ -48,6 +48,10 @@ export class MageAttackStrategy extends StateStrategy {
         if( !target ) {
             return setTimeout(this.attackLoop, 1000)
         }
+        if (!this.shouldAttack(target)) {
+            this.bot.target = undefined
+            return setTimeout(this.attackLoop, 300)
+        }
 
         if( !target.target && this.mage.isOnCooldown("scare") ) {
             return setTimeout(this.attackLoop, this.mage.getCooldown("scare"))
@@ -122,6 +126,9 @@ export class MageAttackStrategy extends StateStrategy {
         if(!this.mage.canUse("magiport") || this.mage.smartMoving) {
             return setTimeout(this.magiportCheckLoop, 2000)
         }
+        if (this.isHazardState()) {
+            return setTimeout(this.magiportCheckLoop, 2000)
+        }
 
         const stateBots = this.getMemoryStorage?.getStateController?.getBots
         ?.filter( e => {
@@ -138,9 +145,9 @@ export class MageAttackStrategy extends StateStrategy {
                 if(this.mage.mp < Game.G.skills["magiport"].mp) break
                 const bot = botState.getBot?.()
                 if(!bot?.ready) continue
-                // Never pull crypt runners back to farm (cancels door smartMove / teleports them back)
+                // Never pull crypt/hazard runners back to farm
                 const otherState = (botState as StateStrategy).currentState?.state_type
-                if (otherState === "crypt" || bot.map === "crypt" || bot.map === "cave") continue
+                if (otherState === "crypt" || otherState === "hazard" || bot.map === "crypt" || bot.map === "cave") continue
                 if(Tools.distance(this.bot, bot) < 400) continue
                 // SUMMON WHEN WE HAVE SPECIALS NEAR AND OTHER DOESN'T
                 if(this.bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type)).length>0 && bot.getEntities().filter( e => SPECIAL_MONSTERS.includes(e.type) && calculate_monster_dps(this,e)/calculate_hps(bot) < 1).length<1) {
@@ -172,7 +179,46 @@ export class MageAttackStrategy extends StateStrategy {
         if(this.deactivate) return
         let wanted_mainhand
         let wanted_offhand
-        if(CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank) && WEAPON_CONFIGS[this.bot.id]?.mass_mainhand) {
+        if (this.isHazardState()) {
+            if (this.shouldEquipHazardTitleWeapon() && this.memoryStorage.getHazardWeapon) {
+                const weapon = this.memoryStorage.getHazardWeapon
+                const wtype = Game.G.items[weapon]?.wtype
+                const needsQuiver = wtype === "bow" || wtype === "crossbow"
+                const idx = this.bot.locateItem(weapon, undefined, { returnHighestLevel: true })
+                if (needsQuiver) {
+                    const oh = this.bot.slots.offhand
+                    if (oh && Game.G.items[oh.name]?.type !== "quiver") {
+                        await this.mage.unequip("offhand").catch(debugLog)
+                    }
+                    if (!this.bot.slots.offhand || Game.G.items[this.bot.slots.offhand.name]?.type !== "quiver") {
+                        const cfgOh = WEAPON_CONFIGS[this.bot.id]?.hazard_offhand
+                        let q = -1
+                        if (cfgOh && Game.G.items[cfgOh.name]?.type === "quiver") {
+                            q = this.bot.locateItem(cfgOh.name, undefined, { level: cfgOh.level })
+                            if (q < 0) q = this.bot.locateItem(cfgOh.name, undefined, { returnHighestLevel: true })
+                        }
+                        if (q < 0) {
+                            for (const [i, item] of this.bot.getItems()) {
+                                if (item && Game.G.items[item.name]?.type === "quiver") { q = i; break }
+                            }
+                        }
+                        if (q >= 0) await this.mage.equip(q, "offhand").catch(debugLog)
+                    }
+                    if (idx >= 0 && this.bot.slots.mainhand?.name !== weapon) {
+                        await this.mage.equip(idx, "mainhand").catch(debugLog)
+                    }
+                    return setTimeout(this.switchWeaponsLoop, 1000)
+                }
+                if (idx >= 0 && this.bot.slots.mainhand?.name !== weapon) {
+                    await this.mage.equip(idx, "mainhand").catch(debugLog)
+                }
+                wanted_offhand = WEAPON_CONFIGS[this.bot.id]?.hazard_offhand
+            } else {
+                wanted_mainhand = WEAPON_CONFIGS[this.bot.id]?.hazard_mainhand
+                wanted_offhand = WEAPON_CONFIGS[this.bot.id]?.hazard_offhand
+            }
+        }
+        else if(CF.shouldUseMassWeapon(this, this.memoryStorage.getCurrentTank) && WEAPON_CONFIGS[this.bot.id]?.mass_mainhand) {
             wanted_mainhand = WEAPON_CONFIGS[this.bot.id].mass_mainhand
         }
         else if(this.bot.getTargetEntity()?.["1hp"] && WEAPON_CONFIGS[this.bot.id]?.fast_mainhand) {

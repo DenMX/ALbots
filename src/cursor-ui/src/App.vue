@@ -8,6 +8,7 @@
           <button class="tab" :class="{ active: activeTab === 'main' }" @click="activeTab = 'main'">Main</button>
           <button class="tab" :class="{ active: activeTab === 'docs' }" @click="activeTab = 'docs'">Docs</button>
           <button class="tab" :class="{ active: activeTab === 'comm' }" @click="activeTab = 'comm'">Comm</button>
+          <button class="tab" :class="{ active: activeTab === 'metrics' }" @click="activeTab = 'metrics'">Metrics</button>
         </nav>
       </div>
       <div class="header-center">
@@ -134,9 +135,14 @@
           </div>
         </div>
       </template>
+      <template v-else-if="activeTab === 'metrics'">
+        <div class="tab-pane tab-pane--fill metrics-tab">
+          <MetricsPanel :dashboard-url="grafanaDashboardUrl" />
+        </div>
+      </template>
     </main>
 
-    <footer v-if="activeTab !== 'comm'" class="footer">
+    <footer v-if="activeTab !== 'comm' && activeTab !== 'metrics'" class="footer">
       <span>Auto-refresh · Cursor UI</span>
     </footer>
   </div>
@@ -146,15 +152,18 @@
 import { ref, computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
 import BotCard from './components/BotCard.vue'
 import AdventurePanels from './components/AdventurePanels.vue'
+import MetricsPanel from './components/MetricsPanel.vue'
 
 const POLL_MS = 600
 const API = '/api/bots'
+const UI_CONFIG_API = '/api/ui-config'
 
 const activeTab = ref('main')
 const bots = ref([])
 const loading = ref(true)
 const error = ref(null)
 const lastUpdate = ref(null)
+const grafanaDashboardUrl = ref(null)
 let poll = null
 let loadInFlight = false
 
@@ -217,8 +226,22 @@ async function load(isInitial = false) {
   }
 }
 
+async function loadUiConfig() {
+  try {
+    const r = await fetch(UI_CONFIG_API)
+    if (!r.ok) return
+    const data = await r.json()
+    if (data.success && data.grafanaDashboardUrl) {
+      grafanaDashboardUrl.value = data.grafanaDashboardUrl
+    }
+  } catch {
+    /* optional */
+  }
+}
+
 onMounted(() => {
   load(true)
+  loadUiConfig()
   poll = setInterval(() => {
     load(false)
   }, POLL_MS)
@@ -714,14 +737,22 @@ body {
   border-radius: 6px;
 }
 
+.test-layout .test-bots-panel {
+  width: 700px;
+  min-width: 700px;
+  max-width: 700px;
+  flex-shrink: 0;
+}
+
 .test-bots-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto;
   gap: 12px;
   min-height: 0;
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   align-content: start;
 }
 
@@ -733,6 +764,28 @@ body {
   font-size: 0.8rem;
   padding: 8px 10px;
   gap: 6px;
+  overflow: hidden;
+}
+
+.test-bots-grid .effect-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.test-bots-grid .effect-group {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.test-bots-grid .section-effects-inline .effect-blocks {
+  flex-wrap: nowrap;
+}
+
+.test-bots-grid .compact-right {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .test-bots-grid .card .card-header { margin-bottom: 4px; }
@@ -752,16 +805,20 @@ body {
 .test-bots-grid .card .k .l { font-size: 0.6rem; }
 .test-bots-grid .card .compact-right { min-width: 0; }
 
-/* Автозаполнение по ширине для Test вкладки */
+/* Автозаполнение по ширине для Comm вкладки — фиксированная сетка 2×N */
 .test-bots-grid-auto {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-rows: min-content;
 }
 
-.test-layout .test-bots-panel {
-  width: fit-content;
-  min-width: fit-content;
-  max-width: fit-content;
+.metrics-tab {
+  min-height: 0;
+  height: calc(100vh - 240px);
+  max-height: calc(100vh - 240px);
+}
+
+.metrics-tab .metrics-panel {
+  height: 100%;
 }
 
 .comm-panel {

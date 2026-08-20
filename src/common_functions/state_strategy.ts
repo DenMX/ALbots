@@ -28,6 +28,7 @@ import {
     SPECIAL_MONSTERS,
     WANTED_EVENTS,
 } from "../configs/events_and_spots"
+import { WEAPON_CONFIGS } from "../configs/character_items_configs"
 
 /** Present in G.items; may be missing from older alclient ItemName unions */
 const TEST_ORB = "test_orb" as ItemName
@@ -40,12 +41,15 @@ export type MobsSortFilter = {
 
 export type State = {
     wantedMob: MonsterName | MonsterName[],
-    state_type: "farm" | "event" | "boss" | "quest" | "crypt",
+    state_type: "farm" | "event" | "boss" | "quest" | "crypt" | "hazard",
     location?: IPosition
     eventName?: MonsterName | MapName
     server?: {region: ServerRegion, name: ServerIdentifier}
     /** Crypt instance id from alclient `character.in` */
     instanceId?: string
+    /** firehazard runner + title weapon (persisted for restart) */
+    hazardRunner?: string
+    hazardWeapon?: ItemName
 }
 
 export type RawState = Partial<State> | null | undefined
@@ -59,7 +63,7 @@ export class StateStrategy extends ManageItems implements IState {
     private state_scheduler: State[] = []
 
     private default_state: State = {
-        wantedMob: "dryad",
+        wantedMob: "spider",
         state_type: "farm",
         server: {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME}
     }
@@ -82,17 +86,95 @@ export class StateStrategy extends ManageItems implements IState {
         this.kiteLoop = this.kiteLoop.bind(this)
         this.switchState = this.switchState.bind(this)
         this.onEntityDeath = this.onEntityDeath.bind(this)
+        this.onAchievementProgress = this.onAchievementProgress.bind(this)
+        this.equipHazardWeaponsLoop = this.equipHazardWeaponsLoop.bind(this)
 
         this.bot.socket.on("death", this.onEntityDeath)
+        this.bot.socket.on("achievement_progress", this.onAchievementProgress)
 
         //trigger started functions
         this.runLoops()
         this.kiteLoop()
+        this.equipHazardWeaponsLoop()
+    }
+
+    private onAchievementProgress(data: { name?: string; count?: number; needed?: number }) {
+        if (!data || data.name !== "firehazard") return
+        if (!this.isHazardState()) return
+        // Only the runner's progress matters for the title weapon
+        if (this.memoryStorage.getHazardRunner !== this.bot.id) return
+        const count = data.count ?? 0
+        const needed = data.needed ?? 20_000
+        this.memoryStorage.noteHazardProgress(count, needed)
+        this.addLog(`firehazard ${count}/${needed}`)
+        // Lock title weapon while the final burn kill is finishing
+        if (this.shouldEquipHazardTitleWeapon()) {
+            this.equipHazardTitleWeapon().catch(debugLog)
+        }
+        if (count >= needed) {
+            // Ensure titled weapon is equipped when achievement completes
+            this.equipHazardTitleWeapon()
+                .catch(debugLog)
+                .finally(() => {
+                    this.addLog(`${this.bot.name} firehazard complete — stopping hazard`)
+                    this.memoryStorage.getStateController?.stopHazardActivity?.()
+                })
+        }
     }
 
     private onEntityDeath(data: { id?: string } | string) {
         const id = typeof data === "string" ? data : data?.id
         if (id) this.memoryStorage.noteCryptWantedKilled(id)
+    }
+
+    /** Locate hazard gear: exact level, then >= configured, then highest. */
+    private locateHazardGear(name: ItemName, level?: number): number {
+        if (level != null) {
+            let idx = this.bot.locateItem(name, undefined, { level })
+            if (idx >= 0) return idx
+            idx = this.bot.locateItem(name, undefined, { levelGreaterThan: level - 1, returnHighestLevel: true })
+            if (idx >= 0) return idx
+        }
+        return this.bot.locateItem(name, undefined, { returnHighestLevel: true })
+    }
+
+    /** Equip the weapon that should receive the hazardous title (runner mainhand). */
+    private async equipHazardTitleWeapon(): Promise<boolean> {
+        const weapon = this.memoryStorage.getHazardWeapon
+        if (!weapon || !this.isHazardRunner()) return false
+        // Bows/crossbows need a quiver even if the title weapon is already on
+        const wtype = Game.G.items[weapon]?.wtype
+        const needsQuiver = wtype === "bow" || wtype === "crossbow"
+        if (needsQuiver) {
+            const oh = this.bot.slots.offhand
+            if (oh && Game.G.items[oh.name]?.type !== "quiver") {
+                await this.bot.unequip("offhand").catch(debugLog)
+            }
+            if (!this.bot.slots.offhand || Game.G.items[this.bot.slots.offhand.name]?.type !== "quiver") {
+                let quiverIdx = -1
+                const cfgOh = this.getWeaponConfigForBot()?.hazard_offhand
+                if (cfgOh && Game.G.items[cfgOh.name]?.type === "quiver") {
+                    quiverIdx = this.locateHazardGear(cfgOh.name, cfgOh.level)
+                }
+                if (quiverIdx < 0) {
+                    for (const [i, item] of this.bot.getItems()) {
+                        if (item && Game.G.items[item.name]?.type === "quiver") {
+                            quiverIdx = i
+                            break
+                        }
+                    }
+                }
+                if (quiverIdx >= 0) await this.bot.equip(quiverIdx, "offhand").catch(debugLog)
+            }
+        }
+        if (this.bot.slots.mainhand?.name === weapon) return true
+        const idx = this.bot.locateItem(weapon, undefined, { returnHighestLevel: true })
+        if (idx < 0) {
+            this.addLog(`${this.bot.name} hazard title weapon missing: ${weapon}`)
+            return false
+        }
+        await this.bot.equip(idx, "mainhand").catch(debugLog)
+        return this.bot.slots.mainhand?.name === weapon
     }
 
     public getStateType() : string {
@@ -108,6 +190,9 @@ export class StateStrategy extends ManageItems implements IState {
     }
 
     public addStateToScheduler(state: State) {
+        if (this.memoryStorage.isHazardActive && state.state_type === "crypt") {
+            return
+        }
         if (state.state_type === "crypt") {
             // Only skip if already queued — current crypt must still be re-queued on event interrupt
             if (this.state_scheduler.some(e => e.state_type === "crypt" && e.instanceId === state.instanceId)) {
@@ -149,6 +234,21 @@ export class StateStrategy extends ManageItems implements IState {
     }
 
     public set currentState(state: State) {
+        // Hazard overrides everything when commanded
+        if (state.state_type === "hazard") {
+            if (this.current_state?.state_type !== "hazard") {
+                this.last_state = this.current_state
+            }
+            this.current_state = state
+            return
+        }
+        // Never interrupt an active hazard run
+        if (this.current_state?.state_type === "hazard" || this.memoryStorage.isHazardActive) {
+            if (!this.state_scheduler.some(e => e.state_type == state.state_type && e.wantedMob == state.wantedMob)) {
+                this.state_scheduler.push(state)
+            }
+            return
+        }
         if(this.current_state.state_type == "farm" || this.current_state.state_type == "quest") {
             this.last_state = this.current_state
             this.current_state = state
@@ -166,6 +266,48 @@ export class StateStrategy extends ManageItems implements IState {
         }
     }
 
+    /** Force all combat bots into hazard spider farm (called from controller). */
+    public enterHazardState() {
+        const hazardState: State = {
+            state_type: "hazard",
+            wantedMob: "spider",
+            server: { region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME },
+            hazardRunner: this.memoryStorage.getHazardRunner,
+            hazardWeapon: this.memoryStorage.getHazardWeapon,
+        }
+        if (this.current_state?.state_type !== "hazard") {
+            this.last_state = this.current_state
+        }
+        this.current_state = hazardState
+        this.state_scheduler = this.state_scheduler.filter(s => s.state_type !== "crypt")
+        this.cryptPartyReady = false
+        this.addLog(
+            `${this.bot.name} hazard → spider (runner=${this.memoryStorage.getHazardRunner} weapon=${this.memoryStorage.getHazardWeapon})`,
+        )
+    }
+
+    /** Leave crypt travel / crypt map when hazard takes over. */
+    private async prepareHazardTravel(): Promise<void> {
+        const dest = this.bot.smartMoving
+        const destMap = dest?.map
+        if (destMap === "crypt" || destMap === "cave") {
+            await this.stopCryptSmartMove()
+        }
+        if (this.bot.map === "crypt" || this.bot.map === "cave") {
+            await this.stopCryptSmartMove()
+            await this.bot.leaveMap().catch(debugLog)
+        }
+    }
+
+    public leaveHazardState() {
+        if (this.current_state?.state_type !== "hazard") return
+        const fallback = this.last_state?.state_type !== "hazard"
+            ? this.last_state
+            : this.default_state
+        this.current_state = fallback ?? this.default_state
+        this.addLog(`${this.bot.name} left hazard → ${this.current_state.state_type}`)
+    }
+
     public get stateScheduler() {
         return this.state_scheduler
     }
@@ -177,6 +319,7 @@ export class StateStrategy extends ManageItems implements IState {
     private async checkEventBuff() {
         // Never leave crypt / interrupt crypt run for holiday spirit
         if (this.current_state?.state_type === "crypt" || this.bot.map === "crypt") return
+        if (this.current_state?.state_type === "hazard") return
 
         if (this.bot.S.holidayseason && !this.bot.s.holidayspirit) {
             await this.bot.smartMove("main", {useBlink: this.bot.ctype == "mage", avoidTownWarps: this.bot.ctype == "mage"}).catch(console.warn)
@@ -403,7 +546,8 @@ export class StateStrategy extends ManageItems implements IState {
             raw?.state_type === "event" ||
             raw?.state_type === "boss" ||
             raw?.state_type === "quest" ||
-            raw?.state_type === "crypt"
+            raw?.state_type === "crypt" ||
+            raw?.state_type === "hazard"
                 ? raw.state_type
                 : base.state_type
         // location: только если есть map/x/y нужных типов
@@ -426,6 +570,10 @@ export class StateStrategy extends ManageItems implements IState {
                 : base.server
         const instanceId =
             typeof raw?.instanceId === "string" ? raw.instanceId : undefined
+        const hazardRunner =
+            typeof (raw as State)?.hazardRunner === "string" ? (raw as State).hazardRunner : undefined
+        const hazardWeapon =
+            typeof (raw as State)?.hazardWeapon === "string" ? (raw as State).hazardWeapon as ItemName : undefined
         // Crypt should not fall back to default farm mob list
         if (state_type === "crypt") {
             return {
@@ -437,13 +585,26 @@ export class StateStrategy extends ManageItems implements IState {
                 instanceId,
             }
         }
+        if (state_type === "hazard") {
+            return {
+                wantedMob: typeof raw?.wantedMob === "string" || Array.isArray(raw?.wantedMob)
+                    ? wantedMob
+                    : "spider",
+                state_type,
+                location,
+                eventName,
+                server,
+                hazardRunner,
+                hazardWeapon,
+            }
+        }
         return { wantedMob, state_type, location, eventName, server, instanceId }
     }
 
     private async loadState() {
 
         // return this.current_state = {
-        //     wantedMob: "dryad",
+        //     wantedMob: "spider",
         //     state_type: "farm",
         //     server: {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME}
         // }
@@ -457,17 +618,26 @@ export class StateStrategy extends ManageItems implements IState {
                     botId: this.bot.id
                 }).lean<State>() ?? this.default_state
                 this.current_state = this.normalizeState(savedState)
-                if (this.current_state.state_type === "crypt") {
-                    this.cryptPartyReady = false
-                    // Don't use setter — it resets shared waypoint; only seed memory if empty
-                    if (this.current_state.instanceId && !this.memoryStorage.getActiveCryptInstance) {
-                        this.memoryStorage.restoreActiveCrypt(this.current_state.instanceId)
-                    }
-                    if (!this.canResumeCrypt()) {
-                        // Keep crypt pending until back on home main setup
-                        this.addStateToScheduler({ ...this.current_state })
+                if (this.current_state.state_type === "hazard") {
+                    const runner = this.current_state.hazardRunner
+                    const weapon = this.current_state.hazardWeapon
+                    if (runner && weapon) {
+                        if (!this.memoryStorage.isHazardActive) {
+                            this.memoryStorage.startHazard(runner, weapon)
+                        }
+                        // Refresh fields from shared memory (other bots may have loaded first)
+                        this.current_state.hazardRunner = this.memoryStorage.getHazardRunner
+                        this.current_state.hazardWeapon = this.memoryStorage.getHazardWeapon
+                        this.addLog(
+                            `${this.bot.name} resumed hazard (runner=${runner} weapon=${weapon})`,
+                        )
+                    } else {
+                        this.addLog(`${this.bot.name} hazard state missing runner/weapon — falling back`)
                         this.current_state = this.default_state
                     }
+                } else if (this.current_state.state_type === "crypt") {
+                    this.cryptPartyReady = false
+                    this.current_state = this.normalizeLoadedCryptState(this.current_state)
                 }
                 this.resumeActiveCryptOnStartup()
                 return console.warn(`${this.bot.name} loaded state from MONGO`)
@@ -481,9 +651,19 @@ export class StateStrategy extends ManageItems implements IState {
             try {
                 let fileData = fs.readFileSync(`../${this.bot.name}_state.json`, 'utf-8')
                 this.current_state = this.normalizeState(JSON.parse(fileData))
-                if (this.current_state.state_type === "crypt" && this.current_state.instanceId
-                    && !this.memoryStorage.getActiveCryptInstance) {
-                    this.memoryStorage.restoreActiveCrypt(this.current_state.instanceId)
+                if (this.current_state.state_type === "hazard") {
+                    const runner = this.current_state.hazardRunner
+                    const weapon = this.current_state.hazardWeapon
+                    if (runner && weapon) {
+                        if (!this.memoryStorage.isHazardActive) {
+                            this.memoryStorage.startHazard(runner, weapon)
+                        }
+                    } else {
+                        this.current_state = this.default_state
+                    }
+                } else if (this.current_state.state_type === "crypt") {
+                    this.cryptPartyReady = false
+                    this.current_state = this.normalizeLoadedCryptState(this.current_state)
                 }
             }
             catch(ex) {
@@ -494,13 +674,35 @@ export class StateStrategy extends ManageItems implements IState {
         this.resumeActiveCryptOnStartup()
     }
 
+    /** If hazard is active in shared memory (DB resume / command), force combat bots onto it. */
+    private ensureHazardState() {
+        if (this.bot.ctype === "merchant") return
+        if (!this.memoryStorage.isHazardActive) return
+        if (this.current_state?.state_type === "hazard") return
+        this.enterHazardState()
+    }
+
     /** If an active crypt exists, don't stay on farm — rejoin (event/boss still take priority). */
     private ensureActiveCryptState() {
         if (this.bot.ctype === "merchant") return
+        if (this.current_state?.state_type === "hazard") return
+        if (this.memoryStorage.isHazardActive) return
+        if (
+            this.current_state?.state_type === "farm"
+            && !this.hasRunnableSchedulerTask()
+            && !this.bot.getEntities().some(e => {
+                const wm = typeof this.current_state!.wantedMob === "string"
+                    ? [this.current_state!.wantedMob]
+                    : (this.current_state!.wantedMob as MonsterName[])
+                return wm.includes(e.type)
+            })
+        ) {
+            return
+        }
         if (!this.canResumeCrypt()) return
         if (this.memoryStorage.isCryptSkipInProgress) return
-        // Merchant holding party out while crypt mobs level up
-        if (this.memoryStorage.isCryptLevelUpWaiting) return
+        // Merchant holding party out (3h level-up or until party assign)
+        if (this.memoryStorage.isCryptPartyAssignPending) return
         const activeId = this.memoryStorage.getActiveCryptInstance
         if (!activeId) return
         if (this.current_state?.state_type === "crypt" && this.current_state.instanceId === activeId) return
@@ -530,8 +732,9 @@ export class StateStrategy extends ManageItems implements IState {
     /** If active_crypt flag exists in DB/memory, force combat bots back into that instance. */
     private resumeActiveCryptOnStartup() {
         if (this.bot.ctype === "merchant") return
+        if (this.current_state?.state_type === "hazard" || this.memoryStorage.isHazardActive) return
         if (!this.canResumeCrypt()) return
-        if (this.memoryStorage.isCryptLevelUpWaiting) return
+        if (this.memoryStorage.isCryptPartyAssignPending) return
 
         const activeId = this.memoryStorage.getActiveCryptInstance
         if (!activeId) return
@@ -569,12 +772,36 @@ export class StateStrategy extends ManageItems implements IState {
     private async saveState() {
         if(this.deactivate) return
         // Persist crypt (with instanceId) so restart can resume; skip transient event/boss
+        // Hazard is persisted so client restart resumes the firehazard run
         if(this.current_state.state_type == "event" || this.current_state.state_type == "boss") {
             return setTimeout(this.saveState, Constants.MONGO_UPDATE_MS)
         }
         if(Database.connection) {
             try {
                 // Prefer active/pending crypt over farm so event→farm never wipes crypt from DB
+                // But never overwrite an active hazard with crypt
+                if (this.current_state.state_type === "hazard") {
+                    const stateData = {
+                        botId: this.bot.id,
+                        wantedMob: this.current_state.wantedMob,
+                        state_type: "hazard" as const,
+                        location: this.current_state.location,
+                        server: this.current_state.server ?? {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME},
+                        instanceId: undefined,
+                        hazardRunner: this.memoryStorage.getHazardRunner ?? this.current_state.hazardRunner,
+                        hazardWeapon: this.memoryStorage.getHazardWeapon ?? this.current_state.hazardWeapon,
+                    }
+                    await StateModel.findOneAndUpdate(
+                        { botId: this.bot.id},
+                        stateData,
+                        {
+                            upsert: true,
+                            new: true,
+                            runValidators: true,
+                            setDefaultsOnInsert: true
+                        }
+                    ).exec()
+                } else {
                 const pendingCrypt = this.state_scheduler.find(s => s.state_type === "crypt" && s.instanceId)
                 const activeId = this.memoryStorage.getActiveCryptInstance
                 const saveCrypt = this.current_state.state_type === "crypt"
@@ -595,6 +822,8 @@ export class StateStrategy extends ManageItems implements IState {
                 location: stateToPersist.location,
                 server: stateToPersist.server ?? {region: DEFAULT_SERVER_REGION, name: DEFAULT_SERVER_NAME},
                 instanceId: stateToPersist.state_type === "crypt" ? stateToPersist.instanceId : undefined,
+                hazardRunner: undefined,
+                hazardWeapon: undefined,
                 }
                 const result = await StateModel.findOneAndUpdate(
                     { botId: this.bot.id},
@@ -606,6 +835,7 @@ export class StateStrategy extends ManageItems implements IState {
                         setDefaultsOnInsert: true
                     }
                 ).exec()
+                }
             }
             catch(ex) {
                 console.error("Error while saving state in DB")
@@ -688,6 +918,10 @@ export class StateStrategy extends ManageItems implements IState {
     }
 
     private switchState() {
+        if (this.memoryStorage.isHazardActive) {
+            this.ensureHazardState()
+            return
+        }
         this.dropInactiveCryptResumes()
         this.sortScheduler()
         let next = (this.state_scheduler.length > 0)
@@ -697,6 +931,10 @@ export class StateStrategy extends ManageItems implements IState {
         // Never resume a released crypt (was looping: leave → last_state crypt → leave)
         if (next?.state_type === "crypt" && (!activeId || next.instanceId !== activeId)) {
             next = this.default_state
+        }
+        if (next?.state_type === "crypt" && this.memoryStorage.isCryptPartyAssignPending) {
+            this.addStateToScheduler(next)
+            next = this.last_state?.state_type !== "crypt" ? this.last_state : this.default_state
         }
         this.current_state = next
         if (next?.state_type === "crypt") {
@@ -857,6 +1095,149 @@ export class StateStrategy extends ManageItems implements IState {
 
     protected shouldForceCryptTankSet(): boolean {
         return this.isCryptCombatState() || this.bot.map === "crypt"
+    }
+
+    protected isHazardState(): boolean {
+        return this.current_state?.state_type === "hazard" || this.memoryStorage.isHazardActive
+    }
+
+    protected isHazardRunner(): boolean {
+        return this.memoryStorage.getHazardRunner === this.bot.id
+    }
+
+    /** Equip command/title weapon when the last kill(s) remain. */
+    protected shouldEquipHazardTitleWeapon(): boolean {
+        return this.isHazardRunner() && this.memoryStorage.isHazardTitleWeaponCritical
+    }
+
+    /** Mob burned by the hazard runner. */
+    protected isHazardBurnedByRunner(entity: Entity): boolean {
+        const runner = this.memoryStorage.getHazardRunner
+        if (!runner || !entity?.s?.burned) return false
+        return entity.s.burned.f === runner
+    }
+
+    /** Runner's burn will finish this mob — nobody may last-hit (resets firehazard counter). */
+    protected willHazardBurnKill(entity: Entity): boolean {
+        if (!entity?.s?.burned) return false
+        try {
+            if (!entity.willBurnToDeath()) return false
+        } catch {
+            return false
+        }
+        return this.isHazardBurnedByRunner(entity)
+    }
+
+    /** Attack would kill (or could kill) — used so runner never last-hits. */
+    protected wouldHazardOneShot(entity: Entity): boolean {
+        if (!entity) return false
+        try {
+            const [_minDmg, maxDmg] = this.bot.calculateDamageRange(entity, "attack")
+            return maxDmg >= entity.hp
+        } catch {
+            return this.bot.attack >= entity.hp
+        }
+    }
+
+    /** True if a visible non-party player is fighting this mob (their target or mob aggro). */
+    protected isHazardContestedByOutsiders(entity: Entity): boolean {
+        if (!entity) return false
+        const party = new Set<string>(this.bot.partyData?.list ?? [])
+        party.add(this.bot.id)
+
+        if (entity.target && !party.has(entity.target)) {
+            const aggroPlayer = this.bot.players?.[entity.target]
+                ?? this.bot.getPlayers().find(p => p.id === entity.target)
+            if (aggroPlayer) return true
+        }
+
+        for (const p of this.bot.getPlayers()) {
+            if (!p || party.has(p.id)) continue
+            if (p.target === entity.id) return true
+        }
+        return false
+    }
+
+    /** Runner's currently selected target id from visible party/player state. */
+    protected getHazardRunnerTargetId(): string | undefined {
+        const runner = this.memoryStorage.getHazardRunner
+        if (!runner) return undefined
+        if (runner === this.bot.id) return this.bot.target
+        const runnerPlayer = this.bot.getPlayers({ isPartyMember: true }).find(p => p.id === runner)
+            ?? this.bot.players?.[runner]
+        return runnerPlayer?.target
+    }
+
+    protected getWeaponConfigForBot() {
+        return WEAPON_CONFIGS[this.bot.id] ?? WEAPON_CONFIGS[this.bot.name]
+    }
+
+    private async equipHazardWeaponsLoop() {
+        if (this.deactivate) return
+        if (this.bot.ctype === "merchant") return
+        if (!this.isHazardState()) {
+            return setTimeout(this.equipHazardWeaponsLoop, 2000)
+        }
+        if (this.bot.rip || this.bot.c?.town) {
+            return setTimeout(this.equipHazardWeaponsLoop, 1000)
+        }
+
+        const nearLastKill = this.isHazardRunner() && this.memoryStorage.isHazardTitleWeaponCritical
+        const titleCritical = this.shouldEquipHazardTitleWeapon()
+        const fastPoll = nearLastKill
+
+        const cfg = this.getWeaponConfigForBot()
+        const batch: { num: number; slot: "mainhand" | "offhand" }[] = []
+
+        if (titleCritical) {
+            // Last kill(s): runner locks the command/title weapon for achievement credit
+            await this.equipHazardTitleWeapon()
+        } else {
+            // Whole party wears hazard_* from config (fallback to solo_*)
+            const mh = cfg?.hazard_mainhand ?? cfg?.solo_mainhand
+            if (mh && this.bot.slots.mainhand?.name !== mh.name) {
+                const idx = this.locateHazardGear(mh.name, mh.level)
+                if (idx >= 0) batch.push({ num: idx, slot: "mainhand" })
+                else this.addLog(`${this.bot.name} hazard: missing ${mh.name}`)
+            }
+        }
+
+        const mhName = titleCritical
+            ? (this.memoryStorage.getHazardWeapon ?? this.bot.slots.mainhand?.name)
+            : (cfg?.hazard_mainhand?.name ?? cfg?.solo_mainhand?.name ?? this.bot.slots.mainhand?.name)
+        const mhWtype = mhName ? Game.G.items[mhName]?.wtype : undefined
+        const needsQuiver = mhWtype === "bow" || mhWtype === "crossbow"
+
+        if (needsQuiver) {
+            if (!titleCritical) {
+                const oh = cfg?.hazard_offhand ?? cfg?.solo_offhand
+                const hasQuiver = this.bot.slots.offhand
+                    && Game.G.items[this.bot.slots.offhand.name]?.type === "quiver"
+                if (!hasQuiver || (oh && this.bot.slots.offhand?.name !== oh.name)) {
+                    let q = -1
+                    if (oh && Game.G.items[oh.name]?.type === "quiver") {
+                        q = this.locateHazardGear(oh.name, oh.level)
+                    }
+                    if (q < 0) {
+                        for (const [i, item] of this.bot.getItems()) {
+                            if (item && Game.G.items[item.name]?.type === "quiver") { q = i; break }
+                        }
+                    }
+                    if (q >= 0) batch.push({ num: q, slot: "offhand" })
+                }
+            }
+        } else {
+            const oh = cfg?.hazard_offhand ?? cfg?.solo_offhand
+            if (oh && this.bot.slots.offhand?.name !== oh.name) {
+                const idx = this.locateHazardGear(oh.name, oh.level)
+                if (idx >= 0) batch.push({ num: idx, slot: "offhand" })
+            }
+        }
+
+        if (batch.length > 0) {
+            await this.bot.equipBatch(batch).catch(console.warn)
+        }
+        return setTimeout(this.equipHazardWeaponsLoop, fastPoll ? 200 : 1000)
     }
 
     /**
@@ -1469,6 +1850,31 @@ export class StateStrategy extends ManageItems implements IState {
         return true
     }
 
+    /** Per-bot saved crypt state must match Mongo active_crypt and level-up gate. */
+    private normalizeLoadedCryptState(saved: State): State {
+        const instanceId = saved.instanceId
+        const activeId = this.memoryStorage.getActiveCryptInstance
+        if (!instanceId || !activeId || instanceId !== activeId) {
+            this.addLog(`${this.bot.name} stale crypt state — farming`)
+            return this.default_state
+        }
+        if (this.memoryStorage.isCryptPartyAssignPending) {
+            const mins = Math.round(this.memoryStorage.getCryptLevelUpRemainingMs / 60_000)
+            const detail = this.memoryStorage.isCryptLevelUpWaiting
+                ? `${mins}m level-up left`
+                : "party assign pending"
+            this.addLog(`${this.bot.name} crypt wait (${detail}) — farming`, false)
+            this.addStateToScheduler({ ...saved })
+            if (this.last_state?.state_type === "crypt") this.last_state = this.default_state
+            return this.default_state
+        }
+        if (!this.canResumeCrypt()) {
+            this.addStateToScheduler({ ...saved })
+            return this.default_state
+        }
+        return saved
+    }
+
     private async deferCryptForLater(reason: string) {
         const cryptState: State = {
             state_type: "crypt",
@@ -1478,9 +1884,14 @@ export class StateStrategy extends ManageItems implements IState {
         }
         // Only queue resume if crypt is still marked active — otherwise bots loop after event
         const activeId = this.memoryStorage.getActiveCryptInstance
+        const holdForAssign = reason === "level-up wait" || reason === "party assign pending"
         if (cryptState.instanceId && activeId && cryptState.instanceId === activeId) {
             this.addStateToScheduler(cryptState)
-            this.last_state = { ...cryptState }
+            if (!holdForAssign) {
+                this.last_state = { ...cryptState }
+            } else if (this.last_state?.state_type === "crypt") {
+                this.last_state = this.default_state
+            }
         } else if (this.last_state?.state_type === "crypt") {
             this.last_state = this.default_state
         }
@@ -1492,6 +1903,17 @@ export class StateStrategy extends ManageItems implements IState {
         // skipcrypt / generation bump — stop immediately, don't revive old instance
         if (this.isCryptRunStale()) {
             await this.abortCryptRun()
+            return true
+        }
+
+        if (this.memoryStorage.isCryptPartyAssignPending) {
+            const fallback = this.last_state?.state_type !== "crypt"
+                ? this.last_state
+                : this.default_state
+            await this.deferCryptForLater(
+                this.memoryStorage.isCryptLevelUpWaiting ? "level-up wait" : "party assign pending",
+            )
+            this.current_state = fallback ?? this.default_state
             return true
         }
 
@@ -1715,6 +2137,40 @@ export class StateStrategy extends ManageItems implements IState {
         return true
     }
 
+    /** True when scheduler has a task that should run now (not pending crypt level-up). */
+    private hasRunnableSchedulerTask(): boolean {
+        if (this.state_scheduler.length < 1) return false
+        return this.state_scheduler.some(s =>
+            s.state_type !== "crypt"
+            || (this.canResumeCrypt() && !this.memoryStorage.isCryptPartyAssignPending),
+        )
+    }
+
+    /**
+     * Farm: smartMove to wanted spawn when farm targets are not in range.
+     * Bots may still attack anything nearby — travel only happens here in checkState.
+     */
+    private async travelToFarmTargets(wanted_monster: MonsterName[]): Promise<boolean> {
+        if (this.current_state?.state_type !== "farm") return false
+        // Pending crypt in scheduler (level-up) must not block hazard travel
+        if (this.hasRunnableSchedulerTask()) return false
+        if (wanted_monster.length < 1) return false
+        if (this.bot.getEntities().some(e => wanted_monster.includes(e.type))) return false
+        if (this.bot.smartMoving) return true
+
+        const dest = this.current_state.location ?? wanted_monster[0]
+        const label = typeof dest === "string" ? dest : `${dest.map} ${Math.round(dest.x)},${Math.round(dest.y)}`
+        this.addLog(`${this.bot.name} farm → moving to ${label}`)
+        await this.bot.smartMove(
+            dest,
+            {
+                useBlink: this.bot.ctype == "mage",
+                avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length > 0),
+            },
+        ).catch(debugLog)
+        return true
+    }
+
     private async checkState() {
         if(this.deactivate) return
 
@@ -1723,11 +2179,18 @@ export class StateStrategy extends ManageItems implements IState {
         // DOUBLE CHECK IF WE MISSING CURRENT STATE => APPLY DEFAULT
         if(!this.current_state)  this.current_state = this.default_state
 
+        // Shared hazard from another bot's DB load / command — pull everyone in
+        this.ensureHazardState()
+
         // Active crypt still open — don't keep farming while priest waits inside
         this.ensureActiveCryptState()
 
         // Crypt: interrupt smartMove on mobs / party fight / stale destination
         if (this.current_state.state_type === "crypt") {
+            if (this.memoryStorage.isHazardActive) {
+                this.enterHazardState()
+                return setTimeout(this.checkState, 200)
+            }
             if (this.bot.smartMoving || this.cryptEnterBusy) {
                 const dest = this.bot.smartMoving
                 // Still entering via cave door — do NOT cancel that path as "wrong crypt WP"
@@ -1766,6 +2229,33 @@ export class StateStrategy extends ManageItems implements IState {
             return setTimeout(this.checkState, 1000)
         }
 
+        // Hazard: farm spiders, never yield to events/boss/crypt/quest
+        if (this.current_state.state_type === "hazard") {
+            if (!this.memoryStorage.isHazardActive) {
+                const runner = this.current_state.hazardRunner
+                const weapon = this.current_state.hazardWeapon
+                if (runner && weapon) {
+                    this.memoryStorage.startHazard(runner, weapon)
+                } else {
+                    this.leaveHazardState()
+                    return setTimeout(this.checkState, 500)
+                }
+            }
+            await this.prepareHazardTravel()
+            if (this.bot.smartMoving) return setTimeout(this.checkState, 1000)
+            const wanted = this.getWantedMobList()
+            if (this.bot.getEntities().filter(e => wanted.includes(e.type)).length < 1) {
+                await this.bot.smartMove(
+                    wanted[0] ?? "spider",
+                    {
+                        useBlink: this.bot.ctype == "mage",
+                        avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0),
+                    },
+                ).catch(debugLog)
+            }
+            return setTimeout(this.checkState, 1000)
+        }
+
         // WE ARE SMARTMOVING => EXIT
         if (this.bot.smartMoving) return setTimeout(this.checkState, 1000)
 
@@ -1781,8 +2271,14 @@ export class StateStrategy extends ManageItems implements IState {
         if( typeof this.current_state.wantedMob === "string" ) wanted_monster = [this.current_state.wantedMob]
         else wanted_monster = this.current_state.wantedMob as MonsterName[]
         
-        //WE ARE FARMING AND HAVE NO NEW EVENTS
-        if(!this.state_scheduler.length && this.current_state.state_type == "farm" && this.bot.getEntities().filter( e => wanted_monster.includes(e.type)).length>0) return setTimeout(this.checkState, 1000)
+        // Farm: wanted targets already in range — keep fighting (any mob) until they despawn
+        if (
+            !this.state_scheduler.length
+            && this.current_state.state_type == "farm"
+            && this.bot.getEntities().some(e => wanted_monster.includes(e.type))
+        ) {
+            return setTimeout(this.checkState, 1000)
+        }
         
         this.sortScheduler()
 
@@ -1793,9 +2289,14 @@ export class StateStrategy extends ManageItems implements IState {
             if(this.state_scheduler.length>0){
                 // Crypt only for home main composition — keep it pending, run other tasks first
                 const runnableIdx = this.state_scheduler.findIndex(
-                    s => s.state_type !== "crypt" || this.canResumeCrypt()
+                    s => s.state_type !== "crypt"
+                        || (this.canResumeCrypt() && !this.memoryStorage.isCryptPartyAssignPending),
                 )
                 if (runnableIdx < 0) {
+                    // Only pending crypt (level-up) — farm until merchant assigns
+                    if (await this.travelToFarmTargets(wanted_monster)) {
+                        return setTimeout(this.checkState, 1000)
+                    }
                     return setTimeout(this.checkState, 1000)
                 }
                 if (runnableIdx > 0) {
@@ -1812,11 +2313,8 @@ export class StateStrategy extends ManageItems implements IState {
                 return this.checkState()
                 
             }
-            //WE HAVE NO OTHER TASKS AND HAVE NO WANTED MOBS NEAR => SMART MOVING
-            else if(this.bot.getEntities().filter( e => wanted_monster.includes(e.type)).length < 1) {
-                console.log("there is no monsters, going search some")
-                if(this.current_state.location) await this.bot.smartMove(this.current_state.location, {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
-                else await this.bot.smartMove(wanted_monster[0], {useBlink: this.bot.ctype == "mage", avoidTownWarps: (this.bot.ctype == "mage" || this.bot.getEntities({targetingMe: true}).length>0)}).catch(debugLog)
+            // Empty / pending-only scheduler: go to farm targets when none nearby
+            else if (await this.travelToFarmTargets(wanted_monster)) {
                 return setTimeout(this.checkState, 1000)
             }
         }
@@ -1932,6 +2430,7 @@ export class StateStrategy extends ManageItems implements IState {
         if(this.state_scheduler.length<2) return
         this.state_scheduler.sort( (curr, next) => {
             const rank = (t: State["state_type"]) => {
+                if (t === "hazard") return -1
                 if (t === "event") return 0
                 if (t === "boss") return 1
                 if (t === "crypt") return 2
@@ -1947,6 +2446,9 @@ export class StateStrategy extends ManageItems implements IState {
     }
 
     protected getWantedMobList(): MonsterName[] {
+        if (this.current_state?.state_type === "hazard" || this.memoryStorage.isHazardActive) {
+            return ["spider"]
+        }
         if (typeof this.current_state?.wantedMob === "string") return [this.current_state.wantedMob]
         if (Array.isArray(this.current_state?.wantedMob)) return this.current_state.wantedMob
         return []
@@ -1963,37 +2465,46 @@ export class StateStrategy extends ManageItems implements IState {
         // console.log(`Target loop, ${this.bot.target}`)
         let target = this.bot.getTargetEntity()
         const wantedMob = this.getWantedMobList()
+        // Drop stale target that must not be hit (hazard burn / crypt / etc.)
+        if (target && !this.shouldAttack(target)) {
+            this.bot.target = undefined
+            target = undefined
+        }
         let entities = this.bot.getEntities().filter( e => this.shouldAttack(e))
         if(entities.length<1) {
-            return target
+            return null
         }
         try {
             if(!target || (target && target.willBurnToDeath()) || target.map != this.bot.map || Tools.distance(this.bot, target) > this.bot.range * 1.5) {
                 // console.log("Searching target")
                 entities = this.sortEntities(entities)
-                if (!entities[0]) return target
+                if (!entities[0]) return null
                 this.bot.target = entities[0].id
                 // console.log(`Target found?: ${this.bot.target}`)
                 return entities[0]
             }
             else if(target && target["1hp"] && target.spawns) {
                 entities = this.sortEntities(entities, {sortSpawns: true})
+                if (!entities[0]) return null
                 if(entities[0].id != target.id) this.bot.target = entities[0].id
                 return entities[0]
             }
             else if (target && !SPECIAL_MONSTERS.includes(target.type)) {
                 entities = this.sortEntities(entities)
+                const best = entities[0]
+                if (!best) return target
                 if(
-                    (!SPECIAL_MONSTERS.includes(target.type) && SPECIAL_MONSTERS.includes(entities[0].type))
-                    || (!wantedMob.includes(target.type) && wantedMob.includes(entities[0].type))
+                    (!SPECIAL_MONSTERS.includes(target.type) && SPECIAL_MONSTERS.includes(best.type))
+                    || (!wantedMob.includes(target.type) && wantedMob.includes(best.type))
                 ) {
-                    this.bot.target = entities[0].id
+                    this.bot.target = best.id
                     if(this.bot.ready && this.bot.smartMoving) this.bot.stopSmartMove().catch(debugLog)
                 }
-                return this.bot.getTargetEntity() ?? entities[0]
+                return this.bot.getTargetEntity() ?? best
             }
             else if (target && target.map != this.bot.map) {
                 entities = this.sortEntities(entities)
+                if (!entities[0]) return null
                 this.bot.target = entities[0].id
                 return entities[0]
             }
@@ -2001,13 +2512,24 @@ export class StateStrategy extends ManageItems implements IState {
         catch(ex) {
             console.warn(ex)
         }
-        return this.bot.getTargetEntity() ?? target
+        return this.bot.getTargetEntity() ?? target ?? null
     }
 
     private sortEntities(entities: Entity[], filter?: MobsSortFilter): Entity[] {
         let target = this.bot.getTargetEntity()
         
-        entities = entities.filter(e=> !e.s.fullguard && !e.willBurnToDeath() && !e.willDieToProjectiles(this.bot, this.bot.projectiles, this.bot.players, this.bot.entities))
+        entities = entities.filter(e => {
+            if (!e?.s) return false
+            try {
+                if (e.s.fullguard) return false
+                if (e.willBurnToDeath()) return false
+                if (e.willDieToProjectiles(this.bot, this.bot.projectiles, this.bot.players, this.bot.entities)) return false
+            } catch {
+                return false
+            }
+            return true
+        })
+        if (entities.length < 1) return entities
         let spawners: Entity[] = []
         if(filter?.sortSpawns && entities.filter( e => SPECIAL_MONSTERS.includes(e.type) && e["1hp"]).length>0) {
             spawners = entities.filter( e => SPECIAL_MONSTERS.includes(e.type) && e["1hp"] && e.spawns)
@@ -2083,6 +2605,31 @@ export class StateStrategy extends ManageItems implements IState {
 
     protected shouldAttack(entity: Entity): boolean {
         if (!entity) return false
+        if (this.current_state?.state_type === "hazard" || this.memoryStorage.isHazardActive) {
+            const wanted = this.getWantedMobList()
+            if (wanted.length > 0 && !wanted.includes(entity.type)) return false
+
+            // Burn from runner will finish the kill — nobody touches it (protects firehazard counter)
+            if (this.willHazardBurnKill(entity)) return false
+
+            // Runner: attack to apply/refresh burn, but never last-hit with an attack
+            if (this.isHazardRunner()) {
+                if (this.isHazardContestedByOutsiders(entity)) return false
+                if (this.wouldHazardOneShot(entity)) return false
+                return true
+            }
+
+            // Non-runners: assist runner's live target; if runner has none — finish remaining mobs
+            const runnerTargetId = this.getHazardRunnerTargetId()
+            const runnerTarget = runnerTargetId ? this.bot.entities[runnerTargetId] : undefined
+            if (runnerTarget && entity.id !== runnerTarget.id) return false
+
+            // Burned by runner but not yet lethal burn: help DPS, but don't steal the last hit
+            if (this.isHazardBurnedByRunner(entity) && this.wouldHazardOneShot(entity)) return false
+
+            // Not burning (or burn won't finish): non-runners may freely finish the kill
+            return true
+        }
         if (this.current_state?.state_type === "crypt") {
             // While traveling to the door, ignore farm targets (they cancel smartMove)
             if (this.bot.map !== "crypt") return false

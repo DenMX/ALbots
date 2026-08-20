@@ -2,10 +2,19 @@
   <section v-once class="comm-panel" :class="panelClass">
     <div class="comm-header">
       <h2 class="comm-title">Adventure Land Comm</h2>
-      <a class="comm-link" href="https://adventure.land/comm" target="_blank" rel="noopener noreferrer">Open in new tab</a>
+      <a class="comm-link" :href="commUrl" target="_blank" rel="noopener noreferrer">Open in new tab</a>
     </div>
     <div class="comm-frame-wrap" :class="frameWrapClass">
-      <component :is="frameType" :key="frameKey" :class="frameClass" :src="commUrl" :data="commUrl" :type="frameType === 'object' ? 'text/html' : undefined" loading="lazy">
+      <component
+        :is="frameType"
+        :key="frameKey"
+        :class="frameClass"
+        :src="commUrl"
+        :data="commUrl"
+        :type="frameType === 'object' ? 'text/html' : undefined"
+        loading="lazy"
+        allow="storage-access"
+      >
         <embed v-if="frameType === 'object'" class="comm-embed" type="text/html" :src="commUrl" />
       </component>
     </div>
@@ -33,7 +42,7 @@ defineProps({
   },
   commUrl: {
     type: String,
-    default: 'https://adventure.land/comm'
+    default: '/comm'
   }
 })
 

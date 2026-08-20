@@ -3,6 +3,7 @@ import * as MIC from "../configs/manage_items_configs"
 import * as CF from "../common_functions/common_functions"
 import { ManageItems } from "../common_functions/manage_items_strategy"
 import { MemoryStorage } from "../common_functions/memory_storage"
+import { recordCryptCompleted } from "../metrics/crypt"
 import { StateStrategy } from "../common_functions/state_strategy"
 import { IState } from "../controllers/state_interface"
 import { ActiveCryptModel } from "../database/active_crypt/active_crypt.model"
@@ -1021,6 +1022,10 @@ export class MerchantStrategy extends ManageItems implements IState {
     }
 
     private assignCryptToParty(instanceId: string) {
+        if (this.getMemoryStorage.isHazardActive) {
+            console.debug(`assignCryptToParty skipped — hazard active`)
+            return
+        }
         // Force-reactivate even if party released/finished this id (merchant reclear)
         this.getMemoryStorage.clearCryptLevelUpWait()
         this.getMemoryStorage.reopenActiveCrypt(instanceId)
@@ -1098,7 +1103,9 @@ export class MerchantStrategy extends ManageItems implements IState {
             }
 
             let verifyResult = await this.verifyCrypt(instanceId)
+            let hadReclear = false
             while (verifyResult === "needs_clear") {
+                hadReclear = true
                 if (abortToken !== this.cryptAbortToken) return
                 this.changeMerchState("Waiting crypt reclear")
                 await this.waitUntilPartyLeftCrypt()
@@ -1107,6 +1114,11 @@ export class MerchantStrategy extends ManageItems implements IState {
             }
 
             if (abortToken !== this.cryptAbortToken) return
+            recordCryptCompleted(
+                verifyResult === "clean"
+                    ? (hadReclear ? "recleared" : "clean")
+                    : "failed",
+            )
             this.getMemoryStorage.finishActiveCrypt(instanceId)
             this.scheduleCryptOpen(verifyResult === "clean" ? 60_000 : 10 * 60_000)
         } catch (ex) {
@@ -1119,6 +1131,7 @@ export class MerchantStrategy extends ManageItems implements IState {
 
     /** Pull any combat bots that drifted to farm back into the active crypt. */
     private recallCryptStragglers(instanceId: string): number {
+        if (this.getMemoryStorage.isHazardActive) return 0
         this.getMemoryStorage.reopenActiveCrypt(instanceId)
         let recalled = 0
         const cryptState = {
@@ -1172,6 +1185,10 @@ export class MerchantStrategy extends ManageItems implements IState {
      */
     public async skipCurrentCryptAndOpenNew() {
         if (this.deactivate) return
+        if (this.getMemoryStorage.isHazardActive) {
+            console.debug("skipcrypt: blocked while hazard is active")
+            return
+        }
         if (this.skipCryptInProgress) {
             console.debug("skipcrypt already in progress")
             return
@@ -1407,6 +1424,13 @@ export class MerchantStrategy extends ManageItems implements IState {
                 } else {
                     console.debug("Active crypt exists (in party/state/DB), skip open; retry in 60s")
                 }
+                this.scheduleCryptOpen(60_000)
+                return
+            }
+
+            // Don't open crypt while party is on firehazard
+            if (this.getMemoryStorage.isHazardActive) {
+                console.debug("Hazard active, skip crypt open; retry in 60s")
                 this.scheduleCryptOpen(60_000)
                 return
             }

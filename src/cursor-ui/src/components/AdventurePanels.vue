@@ -3,10 +3,16 @@
     <section v-once class="comm-panel">
       <div class="comm-header">
         <h2 class="comm-title">Adventure Land Comm</h2>
-        <a class="comm-link" href="https://adventure.land/comm" target="_blank" rel="noopener noreferrer">Open in new tab</a>
+        <a class="comm-link" href="/comm" target="_blank" rel="noopener noreferrer">Open in new tab</a>
       </div>
       <div class="comm-frame-wrap">
-        <iframe :key="'comm-panel'" class="comm-frame" src="https://adventure.land/comm" loading="lazy" />
+        <iframe
+          :key="'comm-panel'"
+          class="comm-frame"
+          src="/comm"
+          loading="lazy"
+          allow="storage-access"
+        />
       </div>
     </section>
   </div>

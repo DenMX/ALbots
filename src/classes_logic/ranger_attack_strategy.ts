@@ -1,4 +1,4 @@
-import {Tools, Ranger, SkillName, SlotType, Entity, Pathfinder, IPosition, MonsterName} from "alclient"
+import {Tools, Ranger, SkillName, SlotType, Entity, Pathfinder, IPosition, MonsterName, Game, ItemName} from "alclient"
 import * as CF from "../../src/common_functions/common_functions"
 import * as Items from "../configs/character_items_configs"
 import { MemoryStorage } from "../common_functions/memory_storage"
@@ -127,7 +127,7 @@ export class RangerAttackStrategy extends StateStrategy {
         }
 
         let healTarget = this.bot.getPlayers({isPartyMember: true, withinRange: "attack", isDead: false}).filter( e => e.hp < e.max_hp * 0.45).sort( (a,b) => a.hp - b.hp)[0]
-        if(healTarget && (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_weapon) {
+        if(!this.isHazardState() && healTarget && (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_weapon) {
             await this.switchWeapon("heal")
             await this.bot.basicAttack(healTarget.id).catch(debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1,this.ranger.getCooldown("attack")))
@@ -140,19 +140,19 @@ export class RangerAttackStrategy extends StateStrategy {
         let targetsForFiveShot = this.getTargets("5shot")
         let targetsForThreeShot = this.getTargets("3shot")
         let target = this.getTarget()
-        // Drop stale crypt target that is no longer a valid engage
-        if (this.isCryptCombatState() && target && !this.shouldAttack(target)) {
+        // Drop stale target that is no longer a valid engage (crypt / hazard burn)
+        if (target && !this.shouldAttack(target)) {
             this.ranger.target = undefined
             target = this.getTarget()
         }
         const massBlocked = CF.hasCryptBlacklistNear(this.ranger, target ?? targetsForFiveShot[0] ?? targetsForThreeShot[0])
 
-        if(!massBlocked && this.ranger.canUse("5shot") && targetsForFiveShot.length>3) {
+        if(!massBlocked && !this.isHazardState() && this.ranger.canUse("5shot") && targetsForFiveShot.length>3) {
             if(WEAPON_CONFIGS[this.bot.name]?.mass_mainhand) await this.switchWeapon("mass")
             await this.ranger.fiveShot(targetsForFiveShot[0]?.id,targetsForFiveShot[1]?.id,targetsForFiveShot[2]?.id,targetsForFiveShot[3]?.id,targetsForFiveShot[4]?.id).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("5shot")))
         }
-        if(!massBlocked && this.ranger.canUse("3shot") && targetsForThreeShot.length>1) {
+        if(!massBlocked && !this.isHazardState() && this.ranger.canUse("3shot") && targetsForThreeShot.length>1) {
             if(WEAPON_CONFIGS[this.bot.name]?.mass_mainhand) await this.switchWeapon("mass")
             await this.ranger.threeShot(targetsForThreeShot[0]?.id,targetsForThreeShot[1]?.id,targetsForThreeShot[2]?.id).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, Math.max(1, this.ranger.getCooldown("3shot")))
@@ -174,17 +174,31 @@ export class RangerAttackStrategy extends StateStrategy {
             if(CF.calculate_monster_dps(this,target)/CF.calculate_hps(this.ranger)>=2) {
                 return setTimeout(this.basicAttackLoop, 500)
             }
-            if(WEAPON_CONFIGS[this.bot.name]?.solo_mainhand) await this.switchWeapon("solo")
-            const tid = target.id ?? this.ranger.target
+            if(WEAPON_CONFIGS[this.bot.name]?.solo_mainhand) await this.switchWeapon(this.isHazardState() ? "hazard" : "solo")
+            // Re-check after weapon swap — burn may have become lethal mid-await
+            const live = this.ranger.entities[target.id] ?? target
+            if (!this.shouldAttack(live)) {
+                this.ranger.target = undefined
+                return setTimeout(this.basicAttackLoop, 200)
+            }
+            const tid = live.id ?? this.ranger.target
             if (!tid) return setTimeout(this.basicAttackLoop, 300)
-            if(target.armor - this.ranger.apiercing < 250) await this.ranger.basicAttack(tid).catch(CF.debugLog) 
+            if(live.armor - this.ranger.apiercing < 250) await this.ranger.basicAttack(tid).catch(CF.debugLog) 
             else await this.ranger.piercingShot(tid).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, this.ranger.getCooldown("attack"))
         }
         return setTimeout(this.basicAttackLoop, this.ranger.frequency)
     }
 
-    private async switchWeapon(weaponConfig: "heal" | "mass" | "solo") {
+    private async switchWeapon(weaponConfig: "heal" | "mass" | "solo" | "hazard") {
+        const locateConfigured = (name?: ItemName, level?: number): number => {
+            if (!name) return -1
+            // Prefer configured level, fallback to highest available level of the same item.
+            let idx = this.bot.locateItem(name, undefined, { level })
+            if (idx < 0) idx = this.bot.locateItem(name, undefined, { returnHighestLevel: true })
+            return idx
+        }
+
         if(weaponConfig == "heal") {
             if(this.bot.slots.mainhand?.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_weapon?.name
                && this.bot.slots.offhand?.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.heal_offhand?.name) return
@@ -207,15 +221,70 @@ export class RangerAttackStrategy extends StateStrategy {
             await this.ranger.equipBatch(equipBatch).catch(console.warn)
             return
         }
-        else if(weaponConfig == "solo") {
-            if(this.bot.slots.mainhand?.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_mainhand?.name
-               && this.bot.slots.offhand?.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_offhand?.name) return
-            let equipBatch : {num: number, slot: SlotType}[] = []
-            for( const [i, item] of this.bot.getItems() ) {
-                if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_mainhand?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_mainhand?.level) equipBatch.push({num: i, slot: "mainhand"})
-                if(item.name == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_offhand?.name && item.level == (WEAPON_CONFIGS as RangerWeaponConfig)[this.bot.name]?.solo_offhand?.level) equipBatch.push({num: i, slot: "offhand"})
+        else if(weaponConfig == "hazard") {
+            // Final kill(s): equip command/title weapon; otherwise farm with hazard_mainhand
+            const botWC = (WEAPON_CONFIGS[this.bot.name] ?? WEAPON_CONFIGS[this.bot.id]) as RangerWeaponConfig
+            if (this.shouldEquipHazardTitleWeapon() && this.memoryStorage.getHazardWeapon) {
+                const weapon = this.memoryStorage.getHazardWeapon
+                const batch: { num: number; slot: SlotType }[] = []
+                if (this.bot.slots.mainhand?.name !== weapon) {
+                    const idx = locateConfigured(weapon)
+                    if (idx >= 0) batch.push({ num: idx, slot: "mainhand" })
+                }
+                const wtype = Game.G.items[weapon]?.wtype
+                if (wtype === "bow" || wtype === "crossbow") {
+                    const oh = this.bot.slots.offhand
+                    if (!oh || Game.G.items[oh.name]?.type !== "quiver") {
+                        let q = -1
+                        if (botWC?.hazard_offhand && Game.G.items[botWC.hazard_offhand.name]?.type === "quiver") {
+                            q = locateConfigured(botWC.hazard_offhand.name, botWC.hazard_offhand.level)
+                        }
+                        if (q < 0 && botWC?.solo_offhand && Game.G.items[botWC.solo_offhand.name]?.type === "quiver") {
+                            q = locateConfigured(botWC.solo_offhand.name, botWC.solo_offhand.level)
+                        }
+                        if (q < 0) {
+                            for (const [i, item] of this.bot.getItems()) {
+                                if (item && Game.G.items[item.name]?.type === "quiver") { q = i; break }
+                            }
+                        }
+                        if (q >= 0) batch.push({ num: q, slot: "offhand" })
+                    }
+                } else if (botWC?.hazard_offhand) {
+                    const oh = botWC.hazard_offhand
+                    if (this.bot.slots.offhand?.name != oh.name) {
+                        const idx = locateConfigured(oh.name, oh.level)
+                        if (idx >= 0) batch.push({ num: idx, slot: "offhand" })
+                    }
+                }
+                if (batch.length) await this.ranger.equipBatch(batch).catch(debugLog)
+                return
             }
-            await this.ranger.equipBatch(equipBatch).catch(debugLog)
+            let equipBatch : {num: number; slot: SlotType}[] = []
+            if (botWC?.hazard_mainhand) {
+                if (this.bot.slots.mainhand?.name != botWC.hazard_mainhand.name) {
+                    const idx = locateConfigured(botWC.hazard_mainhand.name, botWC.hazard_mainhand.level)
+                    if (idx >= 0) equipBatch.push({ num: idx, slot: "mainhand" })
+                }
+            }
+            if (botWC?.hazard_offhand) {
+                if (this.bot.slots.offhand?.name != botWC.hazard_offhand.name) {
+                    const idx = locateConfigured(botWC.hazard_offhand.name, botWC.hazard_offhand.level)
+                    if (idx >= 0) equipBatch.push({ num: idx, slot: "offhand" })
+                }
+            }
+            if (equipBatch.length) await this.ranger.equipBatch(equipBatch).catch(debugLog)
+            return
+        }
+        else if(weaponConfig == "solo") {
+            const cfg = (WEAPON_CONFIGS[this.bot.name] ?? WEAPON_CONFIGS[this.bot.id]) as RangerWeaponConfig
+            if(this.bot.slots.mainhand?.name == cfg?.solo_mainhand?.name
+               && this.bot.slots.offhand?.name == cfg?.solo_offhand?.name) return
+            let equipBatch : {num: number, slot: SlotType}[] = []
+            const mainhandIdx = locateConfigured(cfg?.solo_mainhand?.name, cfg?.solo_mainhand?.level)
+            if (mainhandIdx >= 0) equipBatch.push({num: mainhandIdx, slot: "mainhand"})
+            const offhandIdx = locateConfigured(cfg?.solo_offhand?.name, cfg?.solo_offhand?.level)
+            if (offhandIdx >= 0) equipBatch.push({num: offhandIdx, slot: "offhand"})
+            if (equipBatch.length) await this.ranger.equipBatch(equipBatch).catch(debugLog)
             return
         }
     }
@@ -369,7 +438,7 @@ export class RangerAttackStrategy extends StateStrategy {
         if(!target || (target?.abilities?.stone && !target.target)) {
             return setTimeout(this.useSupershotLoop, 500)
         }
-        if (this.isCryptCombatState() && !this.shouldAttack(target)) {
+        if (!this.shouldAttack(target)) {
             return setTimeout(this.useSupershotLoop, 500)
         }
         if(!target?.target && CF.calculate_monster_dps(this,target)/CF.calculate_hps(this.ranger)>=0.95) {
@@ -393,7 +462,7 @@ export class RangerAttackStrategy extends StateStrategy {
         }
         
         let target = this.ranger.getTargetEntity()
-        if (this.isCryptCombatState() && target && !this.shouldAttack(target)) {
+        if (target && !this.shouldAttack(target)) {
             return setTimeout(this.useMarkLoop, 500)
         }
         if(!target?.target && CF.calculate_monster_dps(this, target)/CF.calculate_hps(this.ranger)>=0.95) {

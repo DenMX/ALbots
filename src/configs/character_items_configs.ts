@@ -17,7 +17,9 @@ export type DefaultWeaponsConfig = {
     mass_mainhand?: {name: ItemName, level: number},
     mass_offhand?: {name: ItemName, level: number},
     fast_mainhand?: {name: ItemName, level: number},
-    fast_offhand?: {name: ItemName, level: number}
+    fast_offhand?: {name: ItemName, level: number},
+    hazard_mainhand?: {name: ItemName, level: number},
+    hazard_offhand?: {name: ItemName, level: number}
 }
 
 export type WarriorWeaponsConfig = DefaultWeaponsConfig & {
@@ -38,14 +40,18 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         solo_offhand: { name: 'candycanesword', level: 9 },
         mass_mainhand: {name: 'vhammer', level: 6},
         mass_offhand: {name: 'ololipop', level: 9},
-        fast_mainhand: {name: "rapier", level: 7}
+        fast_mainhand: {name: "rapier", level: 7},
+        hazard_mainhand: { name: "fireblade", level: 9 },
+        hazard_offhand: { name: "candycanesword", level: 9 },
     },
     "arMAGEdon": {
-        solo_mainhand: { name: "firestaff", level: 9 },
+        solo_mainhand: { name: "ornamentstaff", level: 9 },
         solo_offhand: { name: "wbook1", level: 3},
         mass_mainhand: { name: "gstaff", level: 6 },
         fast_mainhand: { name: "pinkie", level: 8 },
-        fast_offhand: { name: "wbookhs", level: 3 }
+        fast_offhand: { name: "wbookhs", level: 3 },
+        hazard_mainhand: { name: "ornamentstaff", level: 9 },
+        hazard_offhand: { name: "wbook1", level: 3 },
     },
     "aRanDonDon": {
         solo_mainhand: { name: "crossbow", level: 9},
@@ -53,7 +59,15 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         mass_mainhand: { name: "pouchbow", level: 11},
         mass_offhand: { name: "alloyquiver", level: 8},
         heal_weapon: { name: "cupid", level: 8},
-        heal_offhand: {name: "t2quiver", level: 8}
+        heal_offhand: {name: "t2quiver", level: 8},
+        hazard_mainhand: { name: "firebow", level: 8 },
+        hazard_offhand: { name: "t2quiver", level: 8 },
+    },
+    "Archealer": {
+        solo_mainhand: { name: "lmace", level: 9 },
+        solo_offhand: { name: "wbookhs", level: 3 },
+        hazard_mainhand: { name: "firestaff", level: 9 },
+        hazard_offhand: { name: "wbookhs", level: 3 },
     },
     "frostyWar": {
         solo_mainhand: { name: "candycanesword", level: 9 },
@@ -61,7 +75,9 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         mass_mainhand: { name: "glolipop", level: 6 },
         mass_offhand: { name: "glolipop", level: 6 },
         stomp: { name: "basher", level: 0},
-        cleave: { name: "bataxe", level: 4}
+        cleave: { name: "bataxe", level: 4},
+        hazard_mainhand: { name: "fireblade", level: 8 },
+        hazard_offhand: { name: "candycanesword", level: 9 },
     },
     "MerchanDiser": {
         fast_mainhand: {name: "broom", level: 8},
@@ -78,7 +94,9 @@ export const WEAPON_CONFIGS:{ [T in string]: DefaultWeaponsConfig|WarriorWeapons
         mass_offhand: { name: "ololipop", level: 9},
         stomp: { name: "basher", level: 7},
         cleave: { name: "bataxe", level: 9},
-        fast_mainhand: { name: "rapier", level: 8}
+        fast_mainhand: { name: "rapier", level: 8},
+        hazard_mainhand: { name: "fireblade", level: 8 },
+        hazard_offhand: { name: "candycanesword", level: 9 },
     }
 }
 
