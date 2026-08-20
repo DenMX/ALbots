@@ -51,7 +51,9 @@ export class RogueAttackStrategy extends StateStrategy {
             return setTimeout(this.basicAttackLoop, 500)
         }
 
-        await this.rogue.basicAttack(target.id).catch(debugLog)
+        const live = this.guardHazardDamage(this.rogue.entities[target.id] ?? target, "attack")
+        if (!live) return setTimeout(this.basicAttackLoop, 300)
+        await this.rogue.basicAttack(live.id).catch(debugLog)
         return setTimeout(this.basicAttackLoop, Math.max(1, this.rogue.getCooldown("attack")))
     }
 
@@ -82,16 +84,16 @@ export class RogueAttackStrategy extends StateStrategy {
             return setTimeout(this.stubLoop, 500)
         }
         if(this.rogue.slots.mainhand){
-            let weaponSkill
             if(Game.G.items[this.rogue.slots.mainhand.name].wtype == "fist" && this.rogue.mp - Game.G.skills.quickpunch.mp! > this.rogue.mp_cost * 2) {
-                // weaponSkill = this.rogue.quickPunch
-                await this.rogue.quickPunch(target.id).catch(debugLog)
+                const live = this.guardHazardDamage(target, "quickpunch")
+                if (!live) return setTimeout(this.stubLoop, 300)
+                await this.rogue.quickPunch(live.id).catch(debugLog)
             }
             if(Game.G.items[this.rogue.slots.mainhand.name].wtype == "dagger" && this.rogue.mp - Game.G.skills.quickstab.mp! > this.rogue.mp_cost * 2) {
-                // weaponSkill = this.rogue.quickStab
-                await this.rogue.quickStab(target.id).catch(debugLog)
+                const live = this.guardHazardDamage(target, "quickstab")
+                if (!live) return setTimeout(this.stubLoop, 300)
+                await this.rogue.quickStab(live.id).catch(debugLog)
             }
-            // await weaponSkill(target.id).catch(console.warn)
             return setTimeout(this.stubLoop, Math.max(1,this.rogue.getCooldown("quickpunch")))
         }
         return setTimeout(this.stubLoop, 500)

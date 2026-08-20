@@ -175,15 +175,15 @@ export class RangerAttackStrategy extends StateStrategy {
                 return setTimeout(this.basicAttackLoop, 500)
             }
             if(WEAPON_CONFIGS[this.bot.name]?.solo_mainhand) await this.switchWeapon(this.isHazardState() ? "hazard" : "solo")
-            // Re-check after weapon swap — burn may have become lethal mid-await
-            const live = this.ranger.entities[target.id] ?? target
-            if (!this.shouldAttack(live)) {
+            const skill = (target.armor - this.ranger.apiercing < 250) ? "attack" : "piercingshot"
+            const live = this.guardHazardDamage(this.ranger.entities[target.id] ?? target, skill)
+            if (!live) {
                 this.ranger.target = undefined
                 return setTimeout(this.basicAttackLoop, 200)
             }
             const tid = live.id ?? this.ranger.target
             if (!tid) return setTimeout(this.basicAttackLoop, 300)
-            if(live.armor - this.ranger.apiercing < 250) await this.ranger.basicAttack(tid).catch(CF.debugLog) 
+            if(skill === "attack") await this.ranger.basicAttack(tid).catch(CF.debugLog) 
             else await this.ranger.piercingShot(tid).catch(CF.debugLog)
             return setTimeout(this.basicAttackLoop, this.ranger.getCooldown("attack"))
         }
@@ -445,7 +445,9 @@ export class RangerAttackStrategy extends StateStrategy {
             return setTimeout(this.useSupershotLoop, 500)
         }
         if(this.ranger.mp > this.ranger.max_mp * 0.6) {
-            await this.ranger.superShot(target.id).catch(debugLog)
+            const live = this.guardHazardDamage(target, "supershot")
+            if (!live) return setTimeout(this.useSupershotLoop, 500)
+            await this.ranger.superShot(live.id).catch(debugLog)
             return setTimeout(this.useSupershotLoop, Math.max(1,this.ranger.getCooldown("supershot")))
         }
 

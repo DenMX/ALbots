@@ -65,8 +65,10 @@ export class MageAttackStrategy extends StateStrategy {
             if(!this.mage.moving && !this.mage.smartMoving) CF.moveHalfWay(this.mage, location)
             return setTimeout(this.attackLoop, 500)
         }
-        
-        await this.mage.basicAttack(target.id).catch(debugLog)
+
+        const live = this.guardHazardDamage(this.mage.entities[target.id] ?? target, "attack")
+        if (!live) return setTimeout(this.attackLoop, 300)
+        await this.mage.basicAttack(live.id).catch(debugLog)
         return setTimeout(this.attackLoop, Math.max(1, this.mage.getCooldown("attack")))
         
     }

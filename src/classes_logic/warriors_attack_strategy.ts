@@ -257,12 +257,8 @@ export class WarriorsAttackStrategy extends StateStrategy {
                     if (!usedCleave) await this.tryStomp()
                 }
                 if (!this.isAttackWeaponsEquipped()) await this.equipAttackWeapons()
-                // Re-check after equip — hazard burn may have become lethal
-                const live = this.bot.entities[target.id] ?? target
-                if (!this.shouldAttack(live)) {
-                    this.bot.target = undefined
-                    return
-                }
+                const live = this.guardHazardDamage(this.bot.entities[target.id] ?? target, "attack")
+                if (!live) return
                 await this.warrior.basicAttack(live.id).catch(debugLog)
             } else if (!this.warrior.moving && !this.warrior.smartMoving) {
                 const location = CF.getHalfWay(this.warrior, target)
@@ -320,6 +316,7 @@ export class WarriorsAttackStrategy extends StateStrategy {
 
     public async useMassAggro() {
         if (this.deactivate) return
+        if (this.isHazardState()) return
         if (this.warrior.c.town) return
         if (this.warrior.isOnCooldown("scare")) {
             return setTimeout(this.useMassAggroLoop, this.warrior.getCooldown("scare"))

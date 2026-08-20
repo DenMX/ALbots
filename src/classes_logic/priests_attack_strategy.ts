@@ -93,7 +93,9 @@ export class PriestsAttackStrategy extends StateStrategy {
             return setTimeout(this.attackOrHealLoop, 500)
         }
         if(Tools.distance(target, this.priest)<= this.priest.range) {
-            await this.priest.basicAttack(target.id).catch(debugLog)
+            const live = this.guardHazardDamage(this.priest.entities[target.id] ?? target, "attack")
+            if (!live) return setTimeout(this.attackOrHealLoop, 300)
+            await this.priest.basicAttack(live.id).catch(debugLog)
             return setTimeout(this.attackOrHealLoop, this.priest.getCooldown("attack"))
         }
         return setTimeout(this.attackOrHealLoop, Math.min(this.priest.frequency, this.priest.getCooldown("attack")))
@@ -284,7 +286,9 @@ export class PriestsAttackStrategy extends StateStrategy {
         if(MobsWithoutTargetingParty.length>0 && dps<hps) {
             for( let mob of MobsWithoutTargetingParty) {
                 if(hps > dps + CF.calculate_monster_dps(this, mob) && (!mob.abilities.stone || mob.target)) {
-                    await this.priest.zapperZap(mob.id).catch(debugLog)
+                    const live = this.guardHazardDamage(mob, "zapperzap")
+                    if (!live) continue
+                    await this.priest.zapperZap(live.id).catch(debugLog)
                     return setTimeout(this.useZap, Math.max(1, this.priest.getCooldown("zapperzap")))
                 }
             }

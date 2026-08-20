@@ -1,4 +1,4 @@
-import { Database, Entity, MonsterName, PingCompensatedCharacter, Game, Tools, IPosition, Constants, MapName, Pathfinder, ServerRegion, ServerIdentifier, ItemName } from "alclient"
+import { Database, Entity, MonsterName, PingCompensatedCharacter, Game, Tools, IPosition, Constants, MapName, Pathfinder, ServerRegion, ServerIdentifier, ItemName, SkillName } from "alclient"
 import { StateModel } from "../database/state/state.model"
 import { IState } from "../controllers/state_interface"
 import { calculate_hps, calculate_monster_dps, calculate_monsters_dps, calculate_my_dps, debugLog, MY_CHARACTERS } from "./common_functions"
@@ -1110,11 +1110,26 @@ export class StateStrategy extends ManageItems implements IState {
         return this.isHazardRunner() && this.memoryStorage.isHazardTitleWeaponCritical
     }
 
-    /** Mob burned by the hazard runner. */
+    /** Mob burned by the hazard runner (matches name `f` and/or entity id `fid`). */
     protected isHazardBurnedByRunner(entity: Entity): boolean {
         const runner = this.memoryStorage.getHazardRunner
         if (!runner || !entity?.s?.burned) return false
-        return entity.s.burned.f === runner
+        const { f, fid } = entity.s.burned
+        if (f === runner || fid === runner) return true
+
+        // startHazard stores bot.id; burned.f is character NAME (alclient docs)
+        const aliases = new Set<string>([runner])
+        if (runner === this.bot.id || runner === this.bot.name) {
+            aliases.add(this.bot.id)
+            aliases.add(this.bot.name)
+        }
+        const runnerPlayer = this.bot.players?.get?.(runner)
+            ?? this.bot.getPlayers().find(p => p.id === runner || p.name === runner)
+        if (runnerPlayer) {
+            aliases.add(runnerPlayer.id)
+            aliases.add(runnerPlayer.name)
+        }
+        return (!!f && aliases.has(f)) || (!!fid && aliases.has(fid))
     }
 
     /** Runner's burn will finish this mob — nobody may last-hit (resets firehazard counter). */
@@ -1128,15 +1143,132 @@ export class StateStrategy extends ManageItems implements IState {
         return this.isHazardBurnedByRunner(entity)
     }
 
-    /** Attack would kill (or could kill) — used so runner never last-hits. */
-    protected wouldHazardOneShot(entity: Entity): boolean {
+    /** Worst-case damage already in-flight toward this entity (projectiles). */
+    protected estimateHazardIncomingMaxDamage(entity: Entity): number {
+        if (!entity) return 0
+        let incoming = 0
+        try {
+            const projectiles = this.bot.projectiles
+            if (!projectiles) return 0
+            for (const projectile of projectiles.values()) {
+                if (!projectile?.damage) continue
+                if (projectile.target !== entity.id) continue
+
+                let attacker: { damage_type?: string; calculateDamageRange?: (e: Entity, skill?: string) => [number, number] } | undefined
+                if (this.bot.id === projectile.attacker) attacker = this.bot
+                if (!attacker) attacker = this.bot.players?.get?.(projectile.attacker) ?? this.bot.players?.[projectile.attacker]
+                if (!attacker) attacker = this.bot.entities?.get?.(projectile.attacker) ?? this.bot.entities?.[projectile.attacker]
+
+                if (!attacker?.calculateDamageRange) {
+                    // Same fallback as alclient couldDieToProjectiles — assume max crit
+                    incoming += projectile.damage * 2.2
+                    continue
+                }
+                if (attacker.damage_type === "physical" && (entity.evasion ?? 0) >= 100) continue
+                if (attacker.damage_type === "magical" && (entity.reflection ?? 0) >= 100) continue
+                const skill = (projectile as { type?: string }).type ?? "attack"
+                const max = attacker.calculateDamageRange(entity, skill)[1]
+                incoming += max
+            }
+        } catch {
+            // ignore
+        }
+        return incoming
+    }
+
+    /** Remaining burn ticks from the runner — reserved so nobody steals the burn kill. */
+    protected estimateHazardBurnReserve(entity: Entity): number {
+        if (!this.isHazardBurnedByRunner(entity) || !entity.s?.burned) return 0
+        try {
+            const interval = Game.G.conditions.burned.interval
+            const numIntervals = Math.floor(entity.s.burned.ms / interval) - 1
+            if (numIntervals <= 0) return 0
+            if (entity["1hp"]) return numIntervals
+            return numIntervals * (entity.s.burned.intensity / 5)
+        } catch {
+            return 0
+        }
+    }
+
+    /** Conservative max hit for a skill (crit + cursed/marked ceiling fallback). */
+    protected estimateHazardMaxHit(entity: Entity, skill: string = "attack"): number {
+        let maxDmg = 0
+        try {
+            maxDmg = this.bot.calculateDamageRange(entity, skill as SkillName)[1]
+        } catch {
+            maxDmg = 0
+        }
+        // Ceiling fallback if calculateDamageRange underestimates (buffs / dual-wield edge cases)
+        const critMult = this.bot.crit
+            ? (2 + ((this.bot as { critdamage?: number }).critdamage ?? 0) / 100)
+            : 1
+        let crude = (this.bot.attack || 0) * 1.1 * critMult
+        try {
+            const gSkill = Game.G.skills[skill as keyof typeof Game.G.skills] as { damage_multiplier?: number; damage?: number } | undefined
+            if (gSkill?.damage) crude = gSkill.damage * 1.1 * critMult
+            if (gSkill?.damage_multiplier) crude *= gSkill.damage_multiplier
+        } catch {
+            // ignore
+        }
+        if (entity.s?.cursed) crude *= 1.2
+        if (entity.s?.marked) crude *= 1.1
+        return Math.max(maxDmg, crude)
+    }
+
+    /**
+     * True if this skill could finish the mob (resets firehazard).
+     * Runner uses a large safety margin so ping / race cannot last-hit.
+     */
+    protected wouldHazardOneShot(entity: Entity, skill: string = "attack"): boolean {
         if (!entity) return false
         try {
-            const [_minDmg, maxDmg] = this.bot.calculateDamageRange(entity, "attack")
-            return maxDmg >= entity.hp
+            if (entity.willDieToProjectiles(this.bot, this.bot.projectiles, this.bot.players, this.bot.entities)) {
+                return true
+            }
+            if (entity.couldDieToProjectiles(this.bot, this.bot.projectiles, this.bot.players, this.bot.entities)) {
+                return true
+            }
+
+            const maxDmg = this.estimateHazardMaxHit(entity, skill)
+            const incoming = this.estimateHazardIncomingMaxDamage(entity)
+            const burnReserve = this.estimateHazardBurnReserve(entity)
+            const vulnerableHp = Math.max(0, entity.hp - incoming - burnReserve)
+
+            if (maxDmg >= vulnerableHp) return true
+
+            // Runner: require ~2.5 max-hits of HP left. Non-runner burn-assist: last ~25% of a hit.
+            const margin = this.isHazardRunner() ? maxDmg * 2.5 : maxDmg * 1.25
+            if (vulnerableHp <= margin) return true
+
+            return false
         } catch {
-            return this.bot.attack >= entity.hp
+            return true
         }
+    }
+
+    /**
+     * Final gate before any damaging action. All classes must call this in hazard.
+     * Returns live entity if the hit is allowed, otherwise null.
+     */
+    protected guardHazardDamage(entity: Entity | null | undefined, skill: string = "attack"): Entity | null {
+        if (!entity) return null
+        const live = this.bot.entities[entity.id] ?? entity
+        if (!live) return null
+        if (!this.isHazardState()) return live
+
+        if (!this.shouldAttack(live)) {
+            if (this.bot.target === live.id) this.bot.target = undefined
+            return null
+        }
+        if (this.isHazardRunner() && this.wouldHazardOneShot(live, skill)) {
+            this.bot.target = undefined
+            return null
+        }
+        if (!this.isHazardRunner() && this.isHazardBurnedByRunner(live) && this.wouldHazardOneShot(live, skill)) {
+            if (this.bot.target === live.id) this.bot.target = undefined
+            return null
+        }
+        return live
     }
 
     /** True if a visible non-party player is fighting this mob (their target or mob aggro). */
@@ -2524,6 +2656,11 @@ export class StateStrategy extends ManageItems implements IState {
                 if (e.s.fullguard) return false
                 if (e.willBurnToDeath()) return false
                 if (e.willDieToProjectiles(this.bot, this.bot.projectiles, this.bot.players, this.bot.entities)) return false
+                // In hazard, also skip "might die" to flying shots (crit on projectile)
+                if (this.isHazardState()
+                    && e.couldDieToProjectiles(this.bot, this.bot.projectiles, this.bot.players, this.bot.entities)) {
+                    return false
+                }
             } catch {
                 return false
             }
@@ -2612,6 +2749,18 @@ export class StateStrategy extends ManageItems implements IState {
             // Burn from runner will finish the kill — nobody touches it (protects firehazard counter)
             if (this.willHazardBurnKill(entity)) return false
 
+            // Don't stack damage onto something that may already die to in-flight shots
+            try {
+                if (entity.couldDieToProjectiles(this.bot, this.bot.projectiles, this.bot.players, this.bot.entities)) {
+                    return false
+                }
+                if (entity.willDieToProjectiles(this.bot, this.bot.projectiles, this.bot.players, this.bot.entities)) {
+                    return false
+                }
+            } catch {
+                // ignore projectile probe errors
+            }
+
             // Runner: attack to apply/refresh burn, but never last-hit with an attack
             if (this.isHazardRunner()) {
                 if (this.isHazardContestedByOutsiders(entity)) return false
@@ -2624,7 +2773,7 @@ export class StateStrategy extends ManageItems implements IState {
             const runnerTarget = runnerTargetId ? this.bot.entities[runnerTargetId] : undefined
             if (runnerTarget && entity.id !== runnerTarget.id) return false
 
-            // Burned by runner but not yet lethal burn: help DPS, but don't steal the last hit
+            // Burned by runner: help DPS, but never last-hit (crit / projectiles / burn reserve)
             if (this.isHazardBurnedByRunner(entity) && this.wouldHazardOneShot(entity)) return false
 
             // Not burning (or burn won't finish): non-runners may freely finish the kill

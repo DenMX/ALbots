@@ -119,7 +119,7 @@ export const PRIEST_OFFHAND_CONFIGS: { [T in string]: PriestOffhandConfig} = {
 export const ORB_CONFIGS: { [T in string]: {name: ItemName, level: number}} = {
     "Warious": {name: "orbofstr", level: 4},
     "arMAGEdon": {name: "jacko", level: 4},
-    "aRanDonDon": {name: "rabbitsfoot", level: 2},
+    "aRanDonDon": {name: "orbofdex", level: 4},
     "Archealer": {name: "jacko", level: 4}
 }
 
